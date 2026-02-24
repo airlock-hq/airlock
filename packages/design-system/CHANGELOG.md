@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/airlock-hq/airlock/compare/design-system-v0.1.17...design-system-v0.1.18) (2026-02-24)
+
+
+### Features
+
+* initial commit ([cef9745](https://github.com/airlock-hq/airlock/commit/cef9745ecf0d7b47d9d2383a759e161878c43dad))
+
 ## [0.1.17](https://github.com/airlock-hq/airlock/compare/design-system-v0.1.16...design-system-v0.1.17) (2026-02-24)
 
 
