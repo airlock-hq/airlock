@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.36](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.35...airlock-v0.1.36) (2026-02-24)
+
+
+### Features
+
+* initial commit ([cef9745](https://github.com/airlock-hq/airlock/commit/cef9745ecf0d7b47d9d2383a759e161878c43dad))
+
 ## [0.1.35](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.34...airlock-v0.1.35) (2026-02-24)
 
 
