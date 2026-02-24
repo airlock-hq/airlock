@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.35](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.34...airlock-v0.1.35) (2026-02-24)
+
+
+### Bug Fixes
+
+* tweak README pipeline example ([94967e8](https://github.com/airlock-hq/airlock/commit/94967e8ca7e45cede2203b3967d1828c310e3ed8))
+
 ## [0.1.34](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.33...airlock-v0.1.34) (2026-02-24)
 
 
