@@ -76,20 +76,21 @@ Defined in `.airlock/config.yml` using a familiar YAML workflow syntax:
 
 ```yaml
 steps:
+  - name: rebase
+    uses: airlock-hq/airlock/defaults/rebase@main
   - name: lint
     uses: airlock-hq/airlock/defaults/lint@main
   - name: freeze
     run: airlock exec freeze
   - name: describe
     uses: airlock-hq/airlock/defaults/describe@main
+  - name: document
+    uses: airlock-hq/airlock/defaults/document@main
   - name: test
     uses: airlock-hq/airlock/defaults/test@main
-    continue-on-error: true
-  - name: review
-    run: 'true'
-    require-approval: true
   - name: push
     uses: airlock-hq/airlock/defaults/push@main
+    require-approval: true
   - name: create-pr
     uses: airlock-hq/airlock/defaults/create-pr@main
 ```
