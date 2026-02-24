@@ -1,0 +1,147 @@
+{
+  "run": {
+    "id": "fce62dbf-ad28-4f7e-b3c5-e60d956d73ad",
+    "repo_id": "85960af40743",
+    "status": "awaiting_approval",
+    "branch": "feature/add-database",
+    "base_sha": "ce197672bda3285df0927bf6cfba392974b220db",
+    "head_sha": "1bf54452591989e39f474a7c4d1aec36cef54ee2",
+    "current_step": "push",
+    "workflow_file": "main.yml",
+    "workflow_name": "Main Pipeline",
+    "ref_updates": [
+      {
+        "ref_name": "refs/heads/feature/add-database",
+        "old_sha": "ce197672bda3285df0927bf6cfba392974b220db",
+        "new_sha": "1bf54452591989e39f474a7c4d1aec36cef54ee2"
+      }
+    ],
+    "created_at": 1771950800,
+    "updated_at": 1771950879
+  },
+  "intents": [],
+  "jobs": [
+    {
+      "id": "job-fce62dbf-default",
+      "job_key": "default",
+      "name": "Lint, Test & Deploy",
+      "status": "awaiting_approval",
+      "job_order": 0,
+      "started_at": 1771950800,
+      "completed_at": null
+    }
+  ],
+  "step_results": [
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000001",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "rebase",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 3200,
+      "started_at": 1771950800,
+      "completed_at": 1771950804
+    },
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000002",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "lint",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 14800,
+      "started_at": 1771950804,
+      "completed_at": 1771950819
+    },
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000003",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "freeze",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 1800,
+      "started_at": 1771950819,
+      "completed_at": 1771950821
+    },
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000004",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "describe",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 11500,
+      "started_at": 1771950821,
+      "completed_at": 1771950833
+    },
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000005",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "document",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 12800,
+      "started_at": 1771950833,
+      "completed_at": 1771950846
+    },
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000006",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "test",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 32500,
+      "started_at": 1771950846,
+      "completed_at": 1771950879
+    },
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000007",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "push",
+      "status": "awaiting_approval",
+      "started_at": 1771950879
+    },
+    {
+      "id": "b1a2c3d4-1111-4aaa-bbbb-000000000008",
+      "job_id": "job-fce62dbf-default",
+      "job_key": "default",
+      "step": "create-pr",
+      "status": "pending"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "279589ca-a397-4066-9102-fce263cc0cbe.md",
+      "path": "/Users/kunchen/.airlock/artifacts/85960af40743/fce62dbf-ad28-4f7e-b3c5-e60d956d73ad/content/279589ca-a397-4066-9102-fce263cc0cbe.md",
+      "artifact_type": "file",
+      "size_bytes": 169,
+      "created_at": 1771950833
+    },
+    {
+      "name": "patch-fix-import.json",
+      "path": "/Users/kunchen/.airlock/artifacts/85960af40743/fce62dbf-ad28-4f7e-b3c5-e60d956d73ad/patches/patch-fix-import.json",
+      "artifact_type": "file",
+      "size_bytes": 512,
+      "created_at": 1771950819
+    },
+    {
+      "name": "patch-add-error-handling.json",
+      "path": "/Users/kunchen/.airlock/artifacts/85960af40743/fce62dbf-ad28-4f7e-b3c5-e60d956d73ad/patches/patch-add-error-handling.json",
+      "artifact_type": "file",
+      "size_bytes": 480,
+      "created_at": 1771950819
+    },
+    {
+      "name": "patch-update-types.json",
+      "path": "/Users/kunchen/.airlock/artifacts/85960af40743/fce62dbf-ad28-4f7e-b3c5-e60d956d73ad/patches/patch-update-types.json",
+      "artifact_type": "file",
+      "size_bytes": 445,
+      "created_at": 1771950821
+    }
+  ]
+}

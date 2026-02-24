@@ -1,0 +1,122 @@
+description: Use AI agent to autonomously run and verify tests for the changes
+shell: bash
+continue-on-error: false
+run: |
+  set -euo pipefail
+
+  # Build prompt for agent-driven testing
+  PROMPT="You are a testing agent. Your task is to validate this code change and provide a final verdict.
+
+  ## Changes
+  Base SHA: $AIRLOCK_BASE_SHA
+  Head SHA: $AIRLOCK_HEAD_SHA
+
+  ## Your Task
+
+  1. **Understand the change** - Read the code change and other relevant files to understand the intent.
+
+  2. **Test the change** - Think about how you would validate the change. This may involve:
+     - Running existing tests (unit, integration, end-to-end)
+     - Writing and running new tests if coverage is insufficient
+     - Testing E2E manually as a real end user if feasible (e.g., running the app or web page and trying out the new feature)
+
+  3. **Analyze results** - If tests fail, determine whether it's:
+     - A real test failure (code bug)
+     - A setup/environment issue you can fix
+     - A flaky test or infrastructure problem
+     If it's not a real test failure, try to fix the underlying issue and re-run tests to get a valid result.
+
+  4. **Return your verdict** - After completing your testing, respond with a JSON verdict.
+
+  ## Important Notes
+  - The working directory is the repository root
+  - Do NOT run linters, formatters, or static analysis tools (cargo clippy, cargo fmt, eslint, prettier, etc.) - a separate lint step should handle that. Your job is ONLY to run tests.
+
+  ## Final Output
+  When you are done, respond with JSON in this exact format:
+  {
+    \"verdict\": \"pass\" | \"fail\" | \"skip\",
+    \"summary\": \"Brief summary of what was tested and the outcome\",
+    \"details\": \"Additional details about the test run, any issues encountered, or why tests were skipped\"
+  }
+
+  - Use \"pass\" if all tests passed
+  - Use \"fail\" if tests failed due to actual code issues
+  - Use \"skip\" if no tests exist or tests couldn't be run for legitimate reasons (not setup issues you could fix)"
+
+  # Define output schema for structured response
+  SCHEMA='{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail","skip"]},"summary":{"type":"string"},"details":{"type":["string","null"]}},"required":["verdict","summary","details"]}'
+
+  echo "Starting agent-driven test run..."
+
+  # Run the agent - it will autonomously explore, setup, and run tests
+  RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+
+  # Parse the verdict
+  VERDICT=$(echo "$RESPONSE" | airlock exec json verdict)
+  SUMMARY=$(echo "$RESPONSE" | airlock exec json summary)
+  DETAILS=$(echo "$RESPONSE" | airlock exec json details 2>/dev/null || echo "")
+
+  echo "Test verdict: $VERDICT"
+  echo "Summary: $SUMMARY"
+
+  # Prepare artifacts directory
+  mkdir -p "$AIRLOCK_ARTIFACTS"
+
+  # Determine status text for the artifact
+  case "$VERDICT" in
+      pass)
+          STATUS="✅ Tests Passed"
+          EXIT_CODE=0
+          PASSED="true"
+          ;;
+      fail)
+          STATUS="❌ Tests Failed"
+          EXIT_CODE=1
+          PASSED="false"
+          ;;
+      skip)
+          STATUS="⏭️ Tests Skipped"
+          EXIT_CODE=0
+          PASSED="true"
+          ;;
+      *)
+          STATUS="⚠️ Unknown verdict: $VERDICT"
+          EXIT_CODE=1
+          PASSED="false"
+          ;;
+  esac
+
+  # Write test result as content artifact
+  if [[ -n "$DETAILS" ]]; then
+      cat << EOF | airlock artifact content --title "Test Results"
+  **$STATUS**
+
+  ## Summary
+  $SUMMARY
+
+  ## Details
+  $DETAILS
+  EOF
+  else
+      cat << EOF | airlock artifact content --title "Test Results"
+  **$STATUS**
+
+  ## Summary
+  $SUMMARY
+  EOF
+  fi
+
+  # Write test_result.json for compatibility
+  cat > "$AIRLOCK_ARTIFACTS/test_result.json" << EOF
+  {
+    "verdict": $(echo "$VERDICT" | jq -Rs .),
+    "summary": $(echo "$SUMMARY" | jq -Rs .),
+    "details": $(echo "$DETAILS" | jq -Rs .),
+    "passed": $PASSED,
+    "exit_code": $EXIT_CODE,
+    "tested_at": $(date +%s)
+  }
+  EOF
+
+  exit $EXIT_CODE

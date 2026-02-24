@@ -1,0 +1,10 @@
+{
+  "run_id": "fce62dbf-ad28-4f7e-b3c5-e60d956d73ad",
+  "branch": "feature/add-database",
+  "base_sha": "ce197672bda3285df0927bf6cfba392974b220db",
+  "head_sha": "1bf54452591989e39f474a7c4d1aec36cef54ee2",
+  "patch": "diff --git a/.airlock/config.yml b/.airlock/config.yml\nindex 793b549..4d3dbf7 100644\n--- a/.airlock/config.yml\n+++ b/.airlock/config.yml\n@@ -10,19 +10,20 @@ pipeline:\n         echo \"Base: $AIRLOCK_BASE_SHA\"\n         echo \"Head: $AIRLOCK_HEAD_SHA\"\n         # Create a simple description artifact\n-        airlock artifact content description.md << CONTENT\n+        cat << CONTENT | airlock artifact content --title \"PR Description\"\n         ## Changes in $AIRLOCK_BRANCH\n         \n         This push contains changes ready for review.\n         \n-        **Base commit:** \\`$AIRLOCK_BASE_SHA\\`\n-        **Head commit:** \\`$AIRLOCK_HEAD_SHA\\`\n+        **Base commit:** \\`$(echo $AIRLOCK_BASE_SHA | cut -c1-7)\\`\n+        **Head commit:** \\`$(echo $AIRLOCK_HEAD_SHA | cut -c1-7)\\`\n         CONTENT\n \n     # Simple test stage\n     - name: test\n       run: |\n         echo \"Running tests...\"\n+        sleep 1\n         echo \"All tests passed!\"\n \n     # Pause for user review before pushing\ndiff --git a/src/database.ts b/src/database.ts\nindex 0f4d0ba..aacbff5 100644\n--- a/src/database.ts\n+++ b/src/database.ts\n@@ -13,16 +13,3 @@ export async function query<T>(sql: string, params?: any[]): Promise<T[]> {\n     client.release();\n   }\n }\n-\n-export async function getUser(id: string) {\n-  const users = await query('SELECT * FROM users WHERE id = $1', [id]);\n-  return users[0] || null;\n-}\n-\n-export async function createUser(email: string, name: string) {\n-  const result = await query(\n-    'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING *',\n-    [email, name]\n-  );\n-  return result[0];\n-}\n",
+  "files_changed": [".airlock/config.yml", "src/database.ts"],
+  "additions": 4,
+  "deletions": 16
+}

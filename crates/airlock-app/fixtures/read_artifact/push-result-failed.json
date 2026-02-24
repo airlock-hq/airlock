@@ -1,0 +1,7 @@
+{
+  "content": "---\ntitle: \"Push Result\"\n---\n\n# Push Failed\n\n**Branch:** `main`\n**Upstream:** `git@github.com-airlock:airlock-hq/airlock.git`\n\n## Output\n```\nPush failed: upstream has commits not in your working copy.\n\nTo resolve in your working repo:\n  cd /Users/kunchen/github/airlock-hq/airlock\n  git fetch origin\n  git rebase origin/main\n  git push origin main\n```\n",
+  "is_binary": false,
+  "total_size": 380,
+  "bytes_read": 380,
+  "offset": 0
+}

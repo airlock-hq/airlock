@@ -1,0 +1,40 @@
+[package]
+name = "airlock-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Daemon for Airlock - manages repos, pipelines, and sync"
+
+[lib]
+name = "airlock_daemon"
+path = "src/lib.rs"
+
+[[bin]]
+name = "airlockd"
+path = "src/main.rs"
+
+[dependencies]
+airlock-core = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+interprocess = { workspace = true }
+uuid = { workspace = true }
+git2 = { workspace = true }
+reqwest = { workspace = true }
+tempfile = { workspace = true }
+filetime = "0.2"
+tokio-util = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+anyhow = { workspace = true }
+git2 = { workspace = true }
+tracing-test = "0.2"
+walkdir = "2.5"

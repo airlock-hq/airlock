@@ -1,0 +1,132 @@
+@import 'tw-animate-css';
+@import './tokens.css';
+
+@source './';
+
+@theme {
+  --font-sans: var(--font-family-sans);
+  --font-mono: var(--font-family-mono);
+
+  --text-display: var(--font-size-display);
+  --text-display--line-height: var(--line-height-display);
+  --text-display--letter-spacing: var(--letter-spacing-display);
+  --text-h1: var(--font-size-h1);
+  --text-h1--line-height: var(--line-height-h1);
+  --text-h2: var(--font-size-h2);
+  --text-h2--line-height: var(--line-height-h2);
+  --text-body: var(--font-size-body);
+  --text-body--line-height: var(--line-height-body);
+  --text-small: var(--font-size-small);
+  --text-small--line-height: var(--line-height-small);
+  --text-micro: var(--font-size-micro);
+  --text-micro--line-height: var(--line-height-micro);
+  --text-micro--letter-spacing: var(--letter-spacing-micro);
+
+  --color-background: hsl(var(--background));
+  --color-surface: hsl(var(--surface));
+  --color-surface-elevated: hsl(var(--surface-elevated));
+  --color-foreground: hsl(var(--foreground));
+  --color-foreground-muted: hsl(var(--foreground-muted));
+  --color-border: hsl(var(--border));
+  --color-border-subtle: hsl(var(--border-subtle));
+  --color-signal: hsl(var(--signal));
+  --color-signal-subtle: hsl(var(--signal-subtle));
+  --color-signal-glow: hsl(var(--signal-glow));
+  --color-signal-active: hsl(var(--signal-active));
+  --color-signal-focus: hsl(var(--signal-focus));
+  --color-signal-attention: hsl(var(--signal-attention));
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
+  --color-danger: hsl(var(--danger));
+  --color-destructive: hsl(var(--danger));
+  --color-ring: hsl(var(--ring));
+  --color-atmosphere-orbit-line: hsl(var(--atmosphere-orbit-line));
+  --color-terminal: hsl(var(--terminal));
+  --color-terminal-foreground: hsl(var(--terminal-foreground));
+  --color-terminal-muted: hsl(var(--terminal-muted));
+  --color-terminal-border: hsl(var(--terminal-border));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+/* ── Orbital-line dash animation ── */
+
+.al-orbit > ellipse {
+  stroke-linecap: round;
+  stroke-dasharray: 1.5 18; /* longer, calmer */
+  animation: al-orbitDash 90s linear infinite;
+}
+
+.al-orbit-2 > ellipse {
+  animation-duration: 180s;
+}
+.al-orbit-3 > ellipse {
+  animation-duration: 240s;
+}
+.al-orbit-4 > ellipse {
+  animation-duration: 30s;
+  opacity: 0.35;
+}
+
+@keyframes al-orbitDash {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -260;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .al-orbit > ellipse {
+    animation: none;
+  }
+}
+
+/* ── Particles ── */
+
+.al-particle {
+  animation-name: al-twinkle;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  will-change: transform, opacity;
+}
+
+@keyframes al-twinkle {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.12;
+  }
+  50% {
+    transform: translateY(-2px);
+    opacity: 0.28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .al-particle {
+    animation: none;
+  }
+}

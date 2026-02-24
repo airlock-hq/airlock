@@ -1,0 +1,10 @@
+node_modules
+dist
+target
+*.rs
+Cargo.toml
+Cargo.lock
+CHANGELOG.md
+assets/manifest.json
+crates/airlock-app/src-tauri/tauri.conf.json
+crates/airlock-app/src-tauri/gen

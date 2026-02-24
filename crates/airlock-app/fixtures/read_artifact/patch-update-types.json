@@ -1,0 +1,7 @@
+{
+  "content": "{\"title\":\"Update type definitions\",\"explanation\":\"Add missing optional fields to the UserProfile interface for API compatibility.\",\"diff\":\"diff --git a/src/types.ts b/src/types.ts\\nindex 3456789..cdefghi 100644\\n--- a/src/types.ts\\n+++ b/src/types.ts\\n@@ -5,4 +5,6 @@\\n interface UserProfile {\\n   id: string;\\n   name: string;\\n   email: string;\\n+  avatar_url?: string;\\n+  bio?: string;\\n }\"}",
+  "is_binary": false,
+  "total_size": 445,
+  "bytes_read": 445,
+  "offset": 0
+}

@@ -1,0 +1,85 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/airlock-core",
+  "crates/airlock-cli",
+  "crates/airlock-daemon",
+  "crates/airlock-app/src-tauri",
+  "crates/airlock-fixtures",
+]
+
+[workspace.package]
+version = "0.1.33" # x-release-please-version
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/airlock-hq/airlock"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+dialoguer = "0.11"
+console = "0.15"
+
+# Git operations (vendored for easier cross-platform builds)
+git2 = { version = "0.19", features = ["vendored-libgit2", "vendored-openssl"] }
+
+# Database
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# IPC
+interprocess = { version = "2", features = ["tokio"] }
+
+# HTTP client (for LLM APIs)
+reqwest = { version = "0.12", features = ["json"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Configuration
+config = "0.14"
+
+# Path handling
+dirs = "5"
+
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
+# Async traits
+async-trait = "0.1"
+
+# Async utilities (CancellationToken, etc.)
+tokio-util = "0.7"
+
+# Streaming
+futures = "0.3"
+
+# Claude Code SDK (agent provider)
+claude-agent-sdk-rs = "0.6"
+
+# Testing
+tempfile = "3"
+
+# Random number generation
+rand = "0.8"
+
+# Regex for pattern matching
+regex = "1"
+
+# Platform-specific
+libc = "0.2"
+
+# Internal crates
+airlock-core = { path = "crates/airlock-core" }

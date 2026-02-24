@@ -1,0 +1,2 @@
+description: Push changes to the upstream remote
+run: airlock exec push

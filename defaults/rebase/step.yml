@@ -1,0 +1,103 @@
+description: Rebase onto upstream to handle drift since push
+shell: bash
+continue-on-error: false
+run: |
+  set -euo pipefail
+
+  echo "Fetching latest upstream state..."
+  git fetch origin
+
+  # Determine the current branch
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  UPSTREAM_REF="origin/${BRANCH}"
+
+  # Check if upstream ref exists
+  if ! git rev-parse --verify "$UPSTREAM_REF" >/dev/null 2>&1; then
+    echo "No upstream ref $UPSTREAM_REF found — this is a new branch, skipping rebase."
+    exit 0
+  fi
+
+  # Check if rebase is needed
+  LOCAL_SHA=$(git rev-parse HEAD)
+  UPSTREAM_SHA=$(git rev-parse "$UPSTREAM_REF")
+
+  if [ "$LOCAL_SHA" = "$UPSTREAM_SHA" ]; then
+    echo "Already up-to-date with upstream."
+    exit 0
+  fi
+
+  # Check if we're already ahead (upstream is ancestor of local)
+  if git merge-base --is-ancestor "$UPSTREAM_REF" HEAD; then
+    echo "Already ahead of upstream — no rebase needed."
+    exit 0
+  fi
+
+  # Check if we can fast-forward (local is ancestor of upstream)
+  if git merge-base --is-ancestor HEAD "$UPSTREAM_REF"; then
+    echo "Fast-forwarding to upstream..."
+    git reset --hard "$UPSTREAM_REF"
+    exit 0
+  fi
+
+  # Diverged — need to rebase
+  echo "Branch has diverged from upstream. Rebasing onto $UPSTREAM_REF..."
+
+  if git rebase "$UPSTREAM_REF"; then
+    echo "Rebase completed cleanly."
+    exit 0
+  fi
+
+  # Rebase had conflicts — use agent to resolve
+  echo "Rebase has conflicts. Invoking agent for resolution..."
+
+  CONFLICTED_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+
+  if [ -z "$CONFLICTED_FILES" ]; then
+    echo "No conflicted files found but rebase failed. Aborting."
+    git rebase --abort
+    exit 1
+  fi
+
+  PROMPT="You are a software developer assistant called Airlock. Your job here is to resolve merge conflicts during a git rebase operation.
+
+  The local branch is being rebased onto upstream changes.
+  Local changes are the user's un-forwarded commits; incoming changes are from upstream.
+
+  ## Conflicted Files
+  $CONFLICTED_FILES
+
+  ## Your Task
+
+  1. Run git status to understand the current state of the repo.
+  2. Read each conflicted file and understand the conflict markers
+  3. Resolve each conflict by choosing the correct resolution that preserves both the local intent and upstream changes
+  4. After resolving each file, run \`git add <file>\` to mark it resolved
+  5. After all conflicts are resolved, run \`git rebase --continue\`
+  6. If further conflicts arise during continue, resolve those too
+
+  ## Important Notes
+  - Prefer preserving both sets of changes when possible
+  - If changes are incompatible, prefer the upstream version but preserve local intent
+  - Do NOT run \`git rebase --abort\` — we want to complete the rebase
+
+  ## Final Output
+  When done, respond with JSON:
+  {
+    \"verdict\": \"pass\" | \"fail\",
+    \"summary\": \"Brief description of how conflicts were resolved\",
+    \"files_resolved\": [\"list\", \"of\", \"resolved\", \"files\"]
+  }"
+
+  SCHEMA='{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail"]},"summary":{"type":"string"},"files_resolved":{"type":"array","items":{"type":"string"}}},"required":["verdict","summary"]}'
+
+  RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+  VERDICT=$(echo "$RESPONSE" | airlock exec json verdict)
+
+  if [ "$VERDICT" = "pass" ]; then
+    echo "Agent successfully resolved rebase conflicts."
+    exit 0
+  else
+    echo "Agent failed to resolve rebase conflicts. Aborting rebase."
+    git rebase --abort 2>/dev/null || true
+    exit 1
+  fi

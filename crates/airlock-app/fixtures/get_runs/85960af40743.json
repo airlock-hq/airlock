@@ -1,0 +1,28 @@
+{
+  "runs": [
+    {
+      "id": "b7e31f4a-multi-job-demo",
+      "status": "running",
+      "branch": "feature/multi-service",
+      "current_stage": "run-tests",
+      "created_at": 1771947500,
+      "updated_at": 1771947560
+    },
+    {
+      "id": "fce62dbf-ad28-4f7e-b3c5-e60d956d73ad",
+      "status": "awaiting_approval",
+      "branch": "feature/add-database",
+      "current_stage": "push",
+      "created_at": 1771950800,
+      "updated_at": 1771950879
+    },
+    {
+      "id": "a43179d6-85bb-45a5-b637-57a75335638c",
+      "status": "awaiting_approval",
+      "branch": "feature/add-auth",
+      "current_stage": "push",
+      "created_at": 1771864700,
+      "updated_at": 1771864780
+    }
+  ]
+}

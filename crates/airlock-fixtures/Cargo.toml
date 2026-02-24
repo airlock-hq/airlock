@@ -1,0 +1,23 @@
+[package]
+name = "airlock-fixtures"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Fixture generator for Airlock - generates realistic test data from the backend"
+
+[[bin]]
+name = "generate-fixtures"
+path = "src/main.rs"
+
+[dependencies]
+airlock-core = { path = "../airlock-core" }
+airlock-daemon = { path = "../airlock-daemon" }
+clap = { version = "4", features = ["derive"] }
+dirs = "5"
+tempfile = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+anyhow = { workspace = true }
+chrono = "0.4"
+uuid = { workspace = true }

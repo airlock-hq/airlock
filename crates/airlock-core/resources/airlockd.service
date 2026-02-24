@@ -1,0 +1,29 @@
+[Unit]
+Description=Airlock Daemon - Local Git proxy for AI-assisted development
+Documentation=https://github.com/airlock-hq/airlock
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{DAEMON_PATH}}
+WorkingDirectory=%h/.airlock
+Restart=on-failure
+RestartSec=5
+
+# Environment
+Environment="HOME=%h"
+
+# Logging (systemd journal)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=airlockd
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.airlock
+
+[Install]
+WantedBy=default.target

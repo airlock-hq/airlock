@@ -1,0 +1,38 @@
+[package]
+name = "airlock-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI for Airlock - local Git proxy for AI-assisted development"
+
+[[bin]]
+name = "airlock"
+path = "src/main.rs"
+
+[dependencies]
+airlock-core = { workspace = true }
+clap = { workspace = true }
+dialoguer = { workspace = true }
+console = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+interprocess = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+futures = { workspace = true }
+dirs = { workspace = true }
+uuid = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+git2 = { workspace = true }
+uuid = { workspace = true }
+serial_test = "3"
+indexmap = "2"

@@ -1,0 +1,106 @@
+{
+  "run": {
+    "id": "a43179d6-85bb-45a5-b637-57a75335638c",
+    "repo_id": "85960af40743",
+    "status": "awaiting_approval",
+    "branch": "feature/add-auth",
+    "base_sha": "ed8819f4e3039004fe5700edafdd9e1680c0b71b",
+    "head_sha": "4f4e88ab47b274d1d5ea289282328638a145060d",
+    "current_step": "review",
+    "workflow_file": "main.yml",
+    "workflow_name": "Main Pipeline",
+    "ref_updates": [
+      {
+        "ref_name": "refs/heads/feature/add-auth",
+        "old_sha": "ed8819f4e3039004fe5700edafdd9e1680c0b71b",
+        "new_sha": "4f4e88ab47b274d1d5ea289282328638a145060d"
+      }
+    ],
+    "created_at": 1770108318,
+    "updated_at": 1770108319
+  },
+  "intents": [],
+  "jobs": [
+    {
+      "id": "job-a43179d6-default",
+      "job_key": "default",
+      "name": "Lint, Test & Deploy",
+      "status": "awaiting_approval",
+      "job_order": 0,
+      "started_at": 1770108318,
+      "completed_at": null
+    }
+  ],
+  "step_results": [
+    {
+      "id": "df4ed948-8515-4c7c-8ecf-9bc27ad7d1ac",
+      "job_id": "job-a43179d6-default",
+      "job_key": "default",
+      "step": "describe",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 10,
+      "started_at": 1770108318,
+      "completed_at": 1770108318
+    },
+    {
+      "id": "f9b47f90-7403-4541-afd6-9f323244ce86",
+      "job_id": "job-a43179d6-default",
+      "job_key": "default",
+      "step": "test",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 1009,
+      "started_at": 1770108318,
+      "completed_at": 1770108319
+    },
+    {
+      "id": "0c0d1113-71fa-440a-a97c-ab9eb4a7f5a6",
+      "job_id": "job-a43179d6-default",
+      "job_key": "default",
+      "step": "review",
+      "status": "awaiting_approval",
+      "exit_code": 0,
+      "duration_ms": 3,
+      "started_at": 1770108319,
+      "completed_at": 1770108319
+    },
+    {
+      "id": "0fd9f620-edba-4924-90f2-2d0e4f5c9605",
+      "job_id": "job-a43179d6-default",
+      "job_key": "default",
+      "step": "push",
+      "status": "pending"
+    },
+    {
+      "id": "7b5f2f1e-4b42-4633-8737-329b2496dc47",
+      "job_id": "job-a43179d6-default",
+      "job_key": "default",
+      "step": "create-pr",
+      "status": "pending"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "935498f5-5eac-4313-8773-66b3d552b61e.md",
+      "path": "/Users/kunchen/.airlock/artifacts/85960af40743/a43179d6-85bb-45a5-b637-57a75335638c/content/935498f5-5eac-4313-8773-66b3d552b61e.md",
+      "artifact_type": "file",
+      "size_bytes": 165,
+      "created_at": 1770108318
+    },
+    {
+      "name": "patch-fix-typos.json",
+      "path": "/Users/kunchen/.airlock/artifacts/85960af40743/a43179d6-85bb-45a5-b637-57a75335638c/patches/patch-fix-typos.json",
+      "artifact_type": "file",
+      "size_bytes": 350,
+      "created_at": 1770108319
+    },
+    {
+      "name": "push-result-failed.md",
+      "path": "/Users/kunchen/.airlock/artifacts/85960af40743/a43179d6-85bb-45a5-b637-57a75335638c/content/push-result-failed.md",
+      "artifact_type": "file",
+      "size_bytes": 380,
+      "created_at": 1770108320
+    }
+  ]
+}

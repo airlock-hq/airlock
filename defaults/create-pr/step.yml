@@ -1,0 +1,150 @@
+description: Create a pull/merge request using an AI agent that determines the appropriate method
+shell: bash
+run: |
+  set -euo pipefail
+
+  # Extract branch name (strip refs/heads/ prefix if present)
+  BRANCH="${AIRLOCK_BRANCH#refs/heads/}"
+
+  # Skip PR creation when pushing to the default branch (e.g. main→main is nonsensical)
+  DEFAULT_BRANCH="${AIRLOCK_DEFAULT_BRANCH:-main}"
+  if [[ "$BRANCH" == "$DEFAULT_BRANCH" ]]; then
+    echo "Skipping PR creation: pushing to default branch '$DEFAULT_BRANCH'"
+    exit 0
+  fi
+
+  # Detect platform and check CLI availability
+  if [[ "$AIRLOCK_UPSTREAM_URL" == *"github.com"* ]]; then
+    if ! command -v gh &>/dev/null; then
+      echo "Skipping: 'gh' CLI is not installed. Install it from https://cli.github.com"
+      exit 0
+    fi
+    if ! gh auth status &>/dev/null 2>&1; then
+      echo "Skipping: 'gh' CLI is not authenticated. Run 'gh auth login' to authenticate."
+      exit 0
+    fi
+  elif [[ "$AIRLOCK_UPSTREAM_URL" == *"gitlab"* ]]; then
+    if ! command -v glab &>/dev/null; then
+      echo "Skipping: 'glab' CLI is not installed. Install it from https://gitlab.com/gitlab-org/cli"
+      exit 0
+    fi
+    if ! glab auth status &>/dev/null 2>&1; then
+      echo "Skipping: 'glab' CLI is not authenticated. Run 'glab auth login' to authenticate."
+      exit 0
+    fi
+  else
+    echo "Skipping: this provider is not supported for automatic pull request creation yet."
+    exit 0
+  fi
+
+  # Build prompt for agent
+  PROMPT="You are a software developer assistant called Airlock. You are creating a pull request (or merge request) for a code change.
+
+  ## Context
+
+  **Upstream URL:** $AIRLOCK_UPSTREAM_URL
+  **Branch:** $BRANCH
+  **Artifacts:** $AIRLOCK_ARTIFACTS
+
+  ## Your Task
+
+  1. **Identify the platform** - Based on the upstream URL, determine the Git hosting platform:
+     - GitHub (github.com)
+     - GitLab (gitlab.com or self-hosted)
+     - Other platforms
+
+  2. **Detect the default branch** - Figure out the target branch (usually main or master)
+
+  3. **Inspect artifacts** - Look for existing artifacts to see useful information that can be put in PR title/description
+
+  4. **Create the PR/MR** - Use the appropriate CLI or API to create the pull/merge request
+
+  5. **Return the result** - Provide the PR/MR URL if successful, or explain the error
+
+  ## PR/MR Content
+  - Reference artifact content when generating below
+  - Do NOT add a signature for who created the PR/MR
+  - The title should be concise and reflect the key change made
+  - The description should have a few concise sections:
+    - Summary (of the rationale behind the change)
+    - Key changes made
+    - How was this tested
+
+  ## Important Notes
+  - The branch has already been pushed to the remote
+  - If the PR/MR already exists, find and return its URL instead of failing
+  - If the required CLI is not installed and there's no alternative way to create the PR, report an error
+
+  ## Final Output
+  When you are done, respond with JSON in this exact format:
+  {
+    \"success\": true | false,
+    \"pr_url\": \"URL of the created or existing PR/MR (null if failed)\",
+    \"pr_number\": number or null,
+    \"platform\": \"github\" | \"gitlab\" | \"bitbucket\" | \"azure\" | \"other\",
+    \"summary\": \"Brief summary of what happened\",
+    \"error\": \"Error message if failed (null if successful)\"
+  }"
+
+  # Define output schema
+  SCHEMA='{"type":"object","properties":{"success":{"type":"boolean"},"pr_url":{"type":["string","null"]},"pr_number":{"type":["integer","null"]},"platform":{"type":"string"},"summary":{"type":"string"},"error":{"type":["string","null"]}},"required":["success","platform","summary"]}'
+
+  echo "Starting agent to create pull request..."
+  echo "Upstream: $AIRLOCK_UPSTREAM_URL"
+  echo "Branch: $BRANCH"
+
+  # Run the agent
+  RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+
+  # Parse the response
+  SUCCESS=$(echo "$RESPONSE" | airlock exec json success)
+  PR_URL=$(echo "$RESPONSE" | airlock exec json pr_url 2>/dev/null || echo "")
+  PR_NUMBER=$(echo "$RESPONSE" | airlock exec json pr_number 2>/dev/null || echo "null")
+  PLATFORM=$(echo "$RESPONSE" | airlock exec json platform)
+  SUMMARY=$(echo "$RESPONSE" | airlock exec json summary)
+  ERROR=$(echo "$RESPONSE" | airlock exec json error 2>/dev/null || echo "")
+
+  echo "Platform: $PLATFORM"
+  echo "Success: $SUCCESS"
+  echo "Summary: $SUMMARY"
+
+  # Prepare artifacts directory
+  mkdir -p "$AIRLOCK_ARTIFACTS"
+
+  # Determine exit code
+  if [[ "$SUCCESS" == "true" ]]; then
+      EXIT_CODE=0
+      echo "PR URL: $PR_URL"
+  else
+      EXIT_CODE=1
+      echo "Error: $ERROR"
+  fi
+
+  # Write content artifact for UI display
+  if [[ "$SUCCESS" == "true" ]]; then
+      cat << EOF | airlock artifact content --title "Pull Request"
+  # Pull Request Created
+
+  **Platform:** $PLATFORM
+  **URL:** $PR_URL
+  **Branch:** \`$BRANCH\`
+
+  ## Summary
+  $SUMMARY
+  EOF
+  else
+      cat << EOF | airlock artifact content --title "Pull Request"
+  # Pull Request Failed
+
+  **Platform:** $PLATFORM
+  **Branch:** \`$BRANCH\`
+
+  ## Error
+  $ERROR
+
+  ## Summary
+  $SUMMARY
+  EOF
+  fi
+
+  exit $EXIT_CODE

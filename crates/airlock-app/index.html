@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Airlock</title>
+    <script
+      defer
+      src="https://cloud.umami.is/script.js"
+      data-website-id="c78d4e11-cbf6-4916-8e8c-a4547f5b696d"
+    ></script>
+    <style>
+      /* Fallback styles shown when React fails to load */
+      .fallback-message {
+        display: none;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        max-width: 600px;
+        margin: 80px auto;
+        padding: 40px;
+        text-align: center;
+        color: hsl(220 15% 45%); /* --foreground-muted */
+      }
+      .fallback-message h1 {
+        font-size: 24px;
+        margin-bottom: 16px;
+        color: hsl(220 30% 10%); /* --foreground */
+      }
+      .fallback-message p {
+        margin: 12px 0;
+        line-height: 1.6;
+      }
+      .fallback-message code {
+        background: hsl(220 20% 96%); /* --surface-elevated */
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .fallback-message pre {
+        background: hsl(220 20% 9%); /* --terminal */
+        color: hsl(220 15% 92%); /* --terminal-foreground */
+        padding: 16px;
+        border-radius: 8px;
+        text-align: left;
+        overflow-x: auto;
+        font-size: 14px;
+      }
+      /* Show fallback after timeout if root is empty */
+      #root:empty + .fallback-message {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div class="fallback-message">
+      <h1>Frontend Not Loaded</h1>
+      <p>The Airlock UI couldn't be loaded. This usually means the frontend hasn't been built yet.</p>
+      <p><strong>To fix this, run one of:</strong></p>
+      <pre>
+# Development mode (with hot reload):
+make dev
+
+# Or build the frontend first:
+make build
+
+# Or just build frontend:
+cd crates/airlock-app && npm run build</pre
+      >
+      <p style="margin-top: 24px; color: hsl(220 15% 45%); font-size: 14px">
+        If you're seeing this after running <code>make build</code>, try refreshing the window.
+      </p>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

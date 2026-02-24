@@ -1,0 +1,162 @@
+{
+  "run": {
+    "id": "b7e31f4a-multi-job-demo",
+    "repo_id": "85960af40743",
+    "status": "running",
+    "branch": "feature/multi-service",
+    "base_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    "head_sha": "f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5",
+    "current_step": "run-tests",
+    "workflow_file": "ci.yml",
+    "workflow_name": "CI Pipeline",
+    "ref_updates": [
+      {
+        "ref_name": "refs/heads/feature/multi-service",
+        "old_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        "new_sha": "f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5"
+      }
+    ],
+    "created_at": 1770108400,
+    "updated_at": 1770108450
+  },
+  "intents": [],
+  "jobs": [
+    {
+      "id": "job-b7e31f4a-build",
+      "job_key": "build",
+      "name": "Build",
+      "status": "passed",
+      "job_order": 0,
+      "started_at": 1770108400,
+      "completed_at": 1770108420
+    },
+    {
+      "id": "job-b7e31f4a-lint",
+      "job_key": "lint",
+      "name": "Lint",
+      "status": "passed",
+      "job_order": 1,
+      "started_at": 1770108420,
+      "completed_at": 1770108435
+    },
+    {
+      "id": "job-b7e31f4a-test",
+      "job_key": "test",
+      "name": "Test",
+      "status": "running",
+      "job_order": 2,
+      "started_at": 1770108420,
+      "completed_at": null
+    },
+    {
+      "id": "job-b7e31f4a-deploy",
+      "job_key": "deploy",
+      "name": "Deploy",
+      "status": "pending",
+      "job_order": 3,
+      "started_at": null,
+      "completed_at": null
+    }
+  ],
+  "step_results": [
+    {
+      "id": "step-b7e31f4a-build-checkout",
+      "job_id": "job-b7e31f4a-build",
+      "job_key": "build",
+      "step": "checkout",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 1230,
+      "started_at": 1770108400,
+      "completed_at": 1770108401
+    },
+    {
+      "id": "step-b7e31f4a-build-compile",
+      "job_id": "job-b7e31f4a-build",
+      "job_key": "build",
+      "step": "compile",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 18500,
+      "started_at": 1770108401,
+      "completed_at": 1770108420
+    },
+    {
+      "id": "step-b7e31f4a-lint-setup",
+      "job_id": "job-b7e31f4a-lint",
+      "job_key": "lint",
+      "step": "setup",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 2100,
+      "started_at": 1770108420,
+      "completed_at": 1770108422
+    },
+    {
+      "id": "step-b7e31f4a-lint-eslint",
+      "job_id": "job-b7e31f4a-lint",
+      "job_key": "lint",
+      "step": "eslint",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 8400,
+      "started_at": 1770108422,
+      "completed_at": 1770108430
+    },
+    {
+      "id": "step-b7e31f4a-lint-clippy",
+      "job_id": "job-b7e31f4a-lint",
+      "job_key": "lint",
+      "step": "clippy",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 4800,
+      "started_at": 1770108430,
+      "completed_at": 1770108435
+    },
+    {
+      "id": "step-b7e31f4a-test-setup",
+      "job_id": "job-b7e31f4a-test",
+      "job_key": "test",
+      "step": "setup",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": 3200,
+      "started_at": 1770108420,
+      "completed_at": 1770108423
+    },
+    {
+      "id": "step-b7e31f4a-test-run-tests",
+      "job_id": "job-b7e31f4a-test",
+      "job_key": "test",
+      "step": "run-tests",
+      "status": "running",
+      "exit_code": null,
+      "duration_ms": null,
+      "started_at": 1770108423,
+      "completed_at": null
+    },
+    {
+      "id": "step-b7e31f4a-deploy-prepare",
+      "job_id": "job-b7e31f4a-deploy",
+      "job_key": "deploy",
+      "step": "prepare",
+      "status": "pending"
+    },
+    {
+      "id": "step-b7e31f4a-deploy-push",
+      "job_id": "job-b7e31f4a-deploy",
+      "job_key": "deploy",
+      "step": "push",
+      "status": "pending"
+    },
+    {
+      "id": "step-b7e31f4a-deploy-create-pr",
+      "job_id": "job-b7e31f4a-deploy",
+      "job_key": "deploy",
+      "step": "create-pr",
+      "status": "pending"
+    }
+  ],
+  "artifacts": []
+}

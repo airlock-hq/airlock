@@ -1,0 +1,131 @@
+description: Update project documentation to reflect code changes
+shell: bash
+continue-on-error: true
+run: |
+  set -euo pipefail
+
+  # Build prompt for agent-driven documentation updates
+  PROMPT="You are a software developer assistant called Airlock. Your task is to review a code change and update any project documentation that needs to reflect the changes.
+
+  ## Changes
+  Base SHA: $AIRLOCK_BASE_SHA
+  Head SHA: $AIRLOCK_HEAD_SHA
+
+  ## Your Task
+
+  1. **Understand the change**
+     - Read the diff and changed files to understand what was added, modified, or removed.
+     - Identify the intent and scope of the change (new feature, API change, config change, behavioral change, etc.).
+
+  2. **Identify documentation that needs updating**
+     - Look for existing documentation files in the project: README.md, docs/, JSDoc/rustdoc/docstrings, config examples, etc.
+     - Determine which docs are affected by the change. Common cases:
+       - New or changed public APIs → update API docs, doc comments, or usage examples
+       - New features or behaviors → update README or relevant guide
+       - Changed configuration → update config docs or examples
+       - Removed functionality → remove or update stale references
+
+  3. **Make documentation updates**
+     - Update only the documentation that is directly affected by this change.
+     - Keep updates minimal and accurate — don't rewrite docs that are already correct.
+     - Match the existing documentation style and conventions of the project.
+     - If no documentation updates are needed (e.g., internal refactoring, test-only changes), that's fine — just skip.
+
+  4. **Return your verdict** - After completing your work, respond with a JSON verdict.
+
+  ## Important Notes
+  - The working directory is the repository root
+  - Do NOT change any source code — only update documentation files and doc comments
+  - Do NOT create new documentation files unless the change clearly warrants it (e.g., a major new feature with no existing docs)
+
+  ## Final Output
+  When you are done, respond with JSON in this exact format:
+  {
+    \"verdict\": \"updated\" | \"skipped\",
+    \"summary\": \"Brief summary of what documentation was updated and why\",
+    \"details\": \"Additional details about specific files updated or why no updates were needed\"
+  }
+
+  - Use \"updated\" if documentation was reviewed and updates were made
+  - Use \"skipped\" if no documentation updates are needed (internal refactoring, test-only, already up to date, etc.)"
+
+  # Define output schema for structured response
+  SCHEMA='{"type":"object","properties":{"verdict":{"type":"string","enum":["updated","skipped"]},"summary":{"type":"string"},"details":{"type":["string","null"]}},"required":["verdict","summary","details"]}'
+
+  echo "Starting agent-driven documentation update..."
+
+  # Run the agent - it will autonomously review and update documentation
+  RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+
+  # Capture any file changes as a patch artifact (deterministic, not agent-dependent)
+  if ! git diff --quiet 2>/dev/null; then
+      echo "Documentation updates detected, submitting patch..."
+      airlock artifact patch --title "Documentation Updates" --explanation "Documentation updates to reflect code changes"
+      UPDATES_APPLIED="true"
+  else
+      UPDATES_APPLIED="false"
+  fi
+
+  # Parse the verdict
+  VERDICT=$(echo "$RESPONSE" | airlock exec json verdict)
+  SUMMARY=$(echo "$RESPONSE" | airlock exec json summary)
+  DETAILS=$(echo "$RESPONSE" | airlock exec json details 2>/dev/null || echo "")
+
+  echo "Document verdict: $VERDICT"
+  echo "Summary: $SUMMARY"
+  if [[ "$UPDATES_APPLIED" == "true" ]]; then
+      echo "Documentation updates were applied and submitted as a patch."
+  fi
+
+  # Prepare artifacts directory
+  mkdir -p "$AIRLOCK_ARTIFACTS"
+
+  # Determine status text for the artifact
+  case "$VERDICT" in
+      updated)
+          STATUS="✅ Docs Updated"
+          EXIT_CODE=0
+          ;;
+      skipped)
+          STATUS="⏭️ Docs Skipped (no updates needed)"
+          EXIT_CODE=0
+          ;;
+      *)
+          STATUS="⚠️ Unknown verdict: $VERDICT"
+          EXIT_CODE=1
+          ;;
+  esac
+
+  # Write document result as content artifact
+  if [[ -n "$DETAILS" ]]; then
+      cat << EOF | airlock artifact content --title "Documentation Review"
+  **$STATUS**
+
+  ## Summary
+  $SUMMARY
+
+  ## Details
+  $DETAILS
+  EOF
+  else
+      cat << EOF | airlock artifact content --title "Documentation Review"
+  **$STATUS**
+
+  ## Summary
+  $SUMMARY
+  EOF
+  fi
+
+  # Write document_result.json for compatibility
+  cat > "$AIRLOCK_ARTIFACTS/document_result.json" << EOF
+  {
+    "verdict": $(echo "$VERDICT" | jq -Rs .),
+    "summary": $(echo "$SUMMARY" | jq -Rs .),
+    "details": $(echo "$DETAILS" | jq -Rs .),
+    "updates_applied": $UPDATES_APPLIED,
+    "exit_code": $EXIT_CODE,
+    "documented_at": $(date +%s)
+  }
+  EOF
+
+  exit $EXIT_CODE

@@ -1,0 +1,7 @@
+{
+  "content": "{\"title\":\"Fix typos\",\"explanation\":\"Fix typos in error messages and comments throughout the auth module.\",\"diff\":\"diff --git a/src/auth.ts b/src/auth.ts\\nindex 4567890..defghij 100644\\n--- a/src/auth.ts\\n+++ b/src/auth.ts\\n@@ -12,7 +12,7 @@\\n export function validateToken(token: string) {\\n   if (!token) {\\n-    throw new Error('Authetication token is required');\\n+    throw new Error('Authentication token is required');\\n   }\\n-  // Verifiy the token signature\\n+  // Verify the token signature\\n   return jwt.verify(token, SECRET);\\n }\"}",
+  "is_binary": false,
+  "total_size": 350,
+  "bytes_read": 350,
+  "offset": 0
+}

@@ -1,0 +1,13 @@
+{
+  "repos": [
+    {
+      "id": "85960af40743",
+      "working_path": "/private/tmp/airlock-test-repo",
+      "upstream_url": "git@github.com:acme-corp/backend-api.git",
+      "gate_path": "/Users/kunchen/.airlock/repos/85960af40743.git",
+      "created_at": 1770108169,
+      "pending_runs": 2,
+      "gate_healthy": true
+    }
+  ]
+}

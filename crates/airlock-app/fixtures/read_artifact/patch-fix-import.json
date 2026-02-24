@@ -1,0 +1,7 @@
+{
+  "content": "{\"title\":\"Fix import ordering\",\"explanation\":\"Reorder imports to follow the project convention: stdlib first, then third-party, then local modules.\",\"diff\":\"diff --git a/src/main.ts b/src/main.ts\\nindex 1234567..abcdefg 100644\\n--- a/src/main.ts\\n+++ b/src/main.ts\\n@@ -1,5 +1,5 @@\\n-import { render } from './components';\\n-import path from 'path';\\n import fs from 'fs';\\n+import path from 'path';\\n+import { render } from './components';\\n import { Config } from './config';\\n import express from 'express';\"}",
+  "is_binary": false,
+  "total_size": 512,
+  "bytes_read": 512,
+  "offset": 0
+}

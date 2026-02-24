@@ -1,0 +1,10 @@
+{
+  "run_id": "a43179d6-85bb-45a5-b637-57a75335638c",
+  "branch": "feature/add-auth",
+  "base_sha": "ed8819f4e3039004fe5700edafdd9e1680c0b71b",
+  "head_sha": "4f4e88ab47b274d1d5ea289282328638a145060d",
+  "patch": "diff --git a/.airlock/config.yml b/.airlock/config.yml\nindex 793b549..4d3dbf7 100644\n--- a/.airlock/config.yml\n+++ b/.airlock/config.yml\n@@ -10,19 +10,20 @@ pipeline:\n         echo \"Base: $AIRLOCK_BASE_SHA\"\n         echo \"Head: $AIRLOCK_HEAD_SHA\"\n         # Create a simple description artifact\n-        airlock artifact content description.md << CONTENT\n+        cat << CONTENT | airlock artifact content --title \"PR Description\"\n         ## Changes in $AIRLOCK_BRANCH\n         \n         This push contains changes ready for review.\n         \n-        **Base commit:** \\`$AIRLOCK_BASE_SHA\\`\n-        **Head commit:** \\`$AIRLOCK_HEAD_SHA\\`\n+        **Base commit:** \\`$(echo $AIRLOCK_BASE_SHA | cut -c1-7)\\`\n+        **Head commit:** \\`$(echo $AIRLOCK_HEAD_SHA | cut -c1-7)\\`\n         CONTENT\n \n     # Simple test stage\n     - name: test\n       run: |\n         echo \"Running tests...\"\n+        sleep 1\n         echo \"All tests passed!\"\n \n     # Pause for user review before pushing\ndiff --git a/src/auth.ts b/src/auth.ts\nindex e59eed1..f719506 100644\n--- a/src/auth.ts\n+++ b/src/auth.ts\n@@ -13,16 +13,3 @@ export function verifyToken(token: string): { userId: string } | null {\n     return null;\n   }\n }\n-\n-export function authMiddleware(req: any, res: any, next: any) {\n-  const token = req.headers.authorization?.split(' ')[1];\n-  if (!token) {\n-    return res.status(401).json({ error: 'No token provided' });\n-  }\n-  const payload = verifyToken(token);\n-  if (!payload) {\n-    return res.status(401).json({ error: 'Invalid token' });\n-  }\n-  req.userId = payload.userId;\n-  next();\n-}\n",
+  "files_changed": [".airlock/config.yml", "src/auth.ts"],
+  "additions": 4,
+  "deletions": 16
+}

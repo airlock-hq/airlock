@@ -1,0 +1,224 @@
+description: Run formatters and linters on changed files and auto-fix issues
+shell: bash
+continue-on-error: false
+run: |
+  set -euo pipefail
+
+  # Get the list of changed files for context
+  FILES=$(git diff --name-only "$AIRLOCK_BASE_SHA" "$AIRLOCK_HEAD_SHA" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+
+  if [[ -z "$FILES" ]]; then
+      echo "No changed files detected, skipping lint."
+      mkdir -p "$AIRLOCK_ARTIFACTS"
+      echo '{"verdict":"skip","summary":"No changed files","details":null,"fixes_applied":false,"passed":true,"exit_code":0}' > "$AIRLOCK_ARTIFACTS/lint_result.json"
+      cat << 'EOF' | airlock artifact content --title "Lint & Format Results"
+  **⏭️ Lint Skipped**
+
+  ## Summary
+  No changed files detected.
+  EOF
+      exit 0
+  fi
+
+  # Define output schema for structured agent responses
+  SCHEMA='{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail","skip"]},"summary":{"type":"string"},"details":{"type":["string","null"]}},"required":["verdict","summary","details"]}'
+
+  LINT_SCRIPT=".airlock/lint.sh"
+  AGENT_CALLED="false"
+
+  if [[ -x "$LINT_SCRIPT" ]]; then
+      #---------------------------------------------------------------
+      # CACHE HIT: Run the cached lint script
+      #---------------------------------------------------------------
+      echo "Running cached lint script: $LINT_SCRIPT"
+      LINT_OUTPUT=""
+      LINT_EXIT=0
+      LINT_OUTPUT=$(bash "$LINT_SCRIPT" 2>&1) || LINT_EXIT=$?
+
+      if [[ $LINT_EXIT -eq 0 ]]; then
+          # Fast path — lint passed, no agent needed
+          echo "Cached lint script passed."
+          VERDICT="pass"
+          SUMMARY="Lint passed using cached script (no agent needed)"
+          DETAILS="$LINT_OUTPUT"
+      else
+          # Cache hit but lint failed — call agent to fix issues
+          echo "Cached lint script exited with code $LINT_EXIT, calling agent to fix..."
+          AGENT_CALLED="true"
+
+          PROMPT="You are a software developer assistant called Airlock. The project's cached lint script (.airlock/lint.sh) ran and found issues.
+
+  ## Changed Files
+  $FILES
+
+  ## Lint Script Output (exit code $LINT_EXIT)
+  $LINT_OUTPUT
+
+  ## Your Task
+
+  1. **Fix the lint/format issues** shown above by editing the source files.
+  2. If the lint script itself is broken (e.g. references a missing tool, has a syntax error, or doesn't match the current project config), fix the script at \`.airlock/lint.sh\` too.
+  3. After applying fixes, re-run the lint script to verify.
+
+  ## Final Output
+  When you are done, respond with JSON in this exact format:
+  {
+    \"verdict\": \"pass\" | \"fail\",
+    \"summary\": \"Brief summary of what was fixed\",
+    \"details\": \"Additional details about issues found and fixes applied\"
+  }
+
+  - Use \"pass\" if all issues are resolved
+  - Use \"fail\" if unfixable issues remain"
+
+          RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+          VERDICT=$(echo "$RESPONSE" | airlock exec json verdict)
+          SUMMARY=$(echo "$RESPONSE" | airlock exec json summary)
+          DETAILS=$(echo "$RESPONSE" | airlock exec json details 2>/dev/null || echo "")
+      fi
+  else
+      #---------------------------------------------------------------
+      # NO CACHE: Agent discovers setup and creates lint.sh
+      #---------------------------------------------------------------
+      echo "No cached lint script found, running agent discovery..."
+      AGENT_CALLED="true"
+
+      PROMPT="You are a software developer assistant called Airlock. Your task is to discover the project's lint/format setup, create a reusable lint script, and fix any issues in the changed files.
+
+  ## Changed Files
+  $FILES
+
+  ## Your Task
+
+  1. **Explore the project** — Look at config files (package.json, Makefile, Cargo.toml, pyproject.toml, .eslintrc, .prettierrc, rustfmt.toml, setup.cfg, etc.) to understand which linters and formatters are configured.
+
+  2. **Set up prerequisites** — If linters/formatters are configured, check if they're installed. If not, install them. If none are configured, identify the primary language(s) and set up sensible defaults.
+
+  3. **Create \`.airlock/lint.sh\`** — This is CRITICAL. You MUST create an executable script at \`.airlock/lint.sh\` that can be reused on future runs without needing an agent. The script should:
+     - Start with \`#!/usr/bin/env bash\` and \`set -euo pipefail\`
+     - Use \`\$AIRLOCK_BASE_SHA\` and \`\$AIRLOCK_HEAD_SHA\` to compute changed files
+     - Filter to relevant file types for each tool
+     - Run formatters with auto-fix first
+     - Then run linters with auto-fix
+     - Then run linters in check mode to verify
+     - Exit 0 if everything is clean, non-zero if issues remain
+     - Be idempotent and safe to re-run
+     - Make sure \`mkdir -p .airlock\` before writing the script
+     - Make the script executable: \`chmod +x .airlock/lint.sh\`
+
+  4. **Run the created lint script** and auto-fix any issues.
+
+  5. **Verify** — Run \`.airlock/lint.sh\` to confirm it works correctly.
+
+  ## Important Notes
+  - The working directory is the repository root
+  - Try to only lint/format the files that were changed, not the entire codebase
+  - The \`.airlock/lint.sh\` script will be committed to the repo so it persists across runs
+
+  ## Final Output
+  When you are done, respond with JSON in this exact format:
+  {
+    \"verdict\": \"pass\" | \"fail\" | \"skip\",
+    \"summary\": \"Brief summary of what was linted/formatted and the outcome\",
+    \"details\": \"Additional details about issues found, fixes applied, or remaining problems\"
+  }
+
+  - Use \"pass\" if all lint/format checks passed (with or without auto-fixes applied)
+  - Use \"fail\" if there are remaining lint issues that could not be auto-fixed
+  - Use \"skip\" if no linters/formatters are configured for this project"
+
+      RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+      VERDICT=$(echo "$RESPONSE" | airlock exec json verdict)
+      SUMMARY=$(echo "$RESPONSE" | airlock exec json summary)
+      DETAILS=$(echo "$RESPONSE" | airlock exec json details 2>/dev/null || echo "")
+  fi
+
+  # Capture any file changes as a patch artifact (fixes + new lint.sh)
+  HAS_CHANGES="false"
+  if ! git diff --quiet 2>/dev/null; then
+      HAS_CHANGES="true"
+  fi
+  if [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+      HAS_CHANGES="true"
+  fi
+
+  FIXES_APPLIED="false"
+  if [[ "$HAS_CHANGES" == "true" ]]; then
+      echo "Changes detected, submitting patch..."
+      airlock artifact patch --title "Lint & Format Fixes" --explanation "Auto-fixes applied by linters and formatters"
+      FIXES_APPLIED="true"
+  fi
+
+  echo "Lint verdict: $VERDICT"
+  echo "Summary: $SUMMARY"
+  if [[ "$FIXES_APPLIED" == "true" ]]; then
+      echo "Auto-fixes were applied and submitted as a patch."
+  fi
+
+  # Prepare artifacts directory
+  mkdir -p "$AIRLOCK_ARTIFACTS"
+
+  # Determine status text for the artifact
+  case "$VERDICT" in
+      pass)
+          if [[ "$FIXES_APPLIED" == "true" ]]; then
+              STATUS="✅ Lint Passed (fixes applied)"
+          elif [[ "$AGENT_CALLED" == "false" ]]; then
+              STATUS="✅ Lint Passed (cached, no agent)"
+          else
+              STATUS="✅ Lint Passed (clean)"
+          fi
+          EXIT_CODE=0
+          PASSED="true"
+          ;;
+      fail)
+          STATUS="❌ Lint Failed (unfixable issues remain)"
+          EXIT_CODE=1
+          PASSED="false"
+          ;;
+      skip)
+          STATUS="⏭️ Lint Skipped"
+          EXIT_CODE=0
+          PASSED="true"
+          ;;
+      *)
+          STATUS="⚠️ Unknown verdict: $VERDICT"
+          EXIT_CODE=1
+          PASSED="false"
+          ;;
+  esac
+
+  # Write lint result as content artifact
+  if [[ -n "$DETAILS" ]]; then
+      cat << EOF | airlock artifact content --title "Lint & Format Results"
+  **$STATUS**
+
+  ## Summary
+  $SUMMARY
+
+  ## Details
+  $DETAILS
+  EOF
+  else
+      cat << EOF | airlock artifact content --title "Lint & Format Results"
+  **$STATUS**
+
+  ## Summary
+  $SUMMARY
+  EOF
+  fi
+
+  # Write lint_result.json for compatibility
+  cat > "$AIRLOCK_ARTIFACTS/lint_result.json" << EOF
+  {
+    "verdict": $(echo "$VERDICT" | jq -Rs .),
+    "summary": $(echo "$SUMMARY" | jq -Rs .),
+    "details": $(echo "$DETAILS" | jq -Rs .),
+    "fixes_applied": $FIXES_APPLIED,
+    "passed": $PASSED,
+    "exit_code": $EXIT_CODE,
+    "linted_at": $(date +%s)
+  }
+  EOF
+
+  exit $EXIT_CODE

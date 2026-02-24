@@ -1,0 +1,32 @@
+{
+  "run_id": "b7e31f4a-multi-job-demo",
+  "branch": "feature/multi-service",
+  "base_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "head_sha": "f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5",
+  "patch": "diff --git a/services/api/src/main.rs b/services/api/src/main.rs\nindex 1234567..abcdef0 100644\n--- a/services/api/src/main.rs\n+++ b/services/api/src/main.rs\n@@ -1,5 +1,12 @@\n+use axum::{Router, routing::get};\n+\n fn main() {\n-    println!(\"Hello, world!\");\n+    let app = Router::new()\n+        .route(\"/health\", get(health_check));\n+    println!(\"Starting API server...\");\n+}\n+\n+async fn health_check() -> &'static str {\n+    \"ok\"\n }\ndiff --git a/services/worker/src/lib.rs b/services/worker/src/lib.rs\nnew file mode 100644\nindex 0000000..fedcba9\n--- /dev/null\n+++ b/services/worker/src/lib.rs\n@@ -0,0 +1,8 @@\n+pub struct Worker {\n+    pub name: String,\n+}\n+\n+impl Worker {\n+    pub fn new(name: &str) -> Self {\n+        Self { name: name.to_string() }\n+    }\n+}\n",
+  "files_changed": ["services/api/src/main.rs", "services/worker/src/lib.rs"],
+  "additions": 18,
+  "deletions": 2,
+  "commits": [
+    {
+      "sha": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+      "message": "feat: add API server with health check endpoint",
+      "author": "Alice Dev",
+      "timestamp": 1704070800,
+      "patch": "diff --git a/services/api/src/main.rs b/services/api/src/main.rs\nindex 1234567..abcdef0 100644\n--- a/services/api/src/main.rs\n+++ b/services/api/src/main.rs\n@@ -1,5 +1,12 @@\n+use axum::{Router, routing::get};\n+\n fn main() {\n-    println!(\"Hello, world!\");\n+    let app = Router::new()\n+        .route(\"/health\", get(health_check));\n+    println!(\"Starting API server...\");\n+}\n+\n+async fn health_check() -> &'static str {\n+    \"ok\"\n }\n",
+      "files_changed": ["services/api/src/main.rs"],
+      "additions": 10,
+      "deletions": 2
+    },
+    {
+      "sha": "f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5",
+      "message": "feat: add worker service skeleton",
+      "author": "Alice Dev",
+      "timestamp": 1704074400,
+      "patch": "diff --git a/services/worker/src/lib.rs b/services/worker/src/lib.rs\nnew file mode 100644\nindex 0000000..fedcba9\n--- /dev/null\n+++ b/services/worker/src/lib.rs\n@@ -0,0 +1,8 @@\n+pub struct Worker {\n+    pub name: String,\n+}\n+\n+impl Worker {\n+    pub fn new(name: &str) -> Self {\n+        Self { name: name.to_string() }\n+    }\n+}\n",
+      "files_changed": ["services/worker/src/lib.rs"],
+      "additions": 8,
+      "deletions": 0
+    }
+  ]
+}

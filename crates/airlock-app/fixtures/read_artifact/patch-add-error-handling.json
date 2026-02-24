@@ -1,0 +1,7 @@
+{
+  "content": "{\"title\":\"Add error handling\",\"explanation\":\"Wrap database calls in try/catch blocks to prevent unhandled promise rejections.\",\"diff\":\"diff --git a/src/db.ts b/src/db.ts\\nindex 2345678..bcdefgh 100644\\n--- a/src/db.ts\\n+++ b/src/db.ts\\n@@ -10,7 +10,12 @@\\n export async function getUser(id: string) {\\n-  const user = await db.query('SELECT * FROM users WHERE id = $1', [id]);\\n-  return user.rows[0];\\n+  try {\\n+    const user = await db.query('SELECT * FROM users WHERE id = $1', [id]);\\n+    return user.rows[0];\\n+  } catch (error) {\\n+    console.error('Failed to fetch user:', error);\\n+    throw new DatabaseError('User lookup failed', { cause: error });\\n+  }\\n }\"}",
+  "is_binary": false,
+  "total_size": 480,
+  "bytes_read": 480,
+  "offset": 0
+}

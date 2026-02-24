@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Label must match the filename (without .plist) -->
+    <key>Label</key>
+    <string>dev.airlock.daemon</string>
+
+    <!-- Path to the daemon executable -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{DAEMON_PATH}}</string>
+    </array>
+
+    <!-- Run at login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep the daemon alive (restart if it crashes) -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>{{HOME}}/.airlock</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+    </dict>
+
+    <!-- Log files -->
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/.airlock/logs/daemon.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/.airlock/logs/daemon.stderr.log</string>
+
+    <!-- Process type (background) -->
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Throttle restart attempts -->
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+</dict>
+</plist>

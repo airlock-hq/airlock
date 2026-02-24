@@ -1,0 +1,56 @@
+description: Generate PR title and description for the code change
+shell: bash
+run: |
+  set -euo pipefail
+
+  DIFF=$(git diff --no-color "$AIRLOCK_BASE_SHA" "$AIRLOCK_HEAD_SHA")
+  if [[ -z "$DIFF" ]]; then
+      echo "No changes detected"
+      printf "# No Changes\n\nNo changes detected between base and head commits." | \
+          airlock artifact content --title "Description"
+
+      # Write minimal description.json for create-pr stage
+      mkdir -p "$AIRLOCK_ARTIFACTS"
+      cat > "$AIRLOCK_ARTIFACTS/description.json" << 'EOF'
+  {
+    "title": "No changes",
+    "body": "No changes detected between base and head commits.",
+    "generated_at": 0
+  }
+  EOF
+      exit 0
+  fi
+
+  # Extract branch name
+  BRANCH="${AIRLOCK_BRANCH#refs/heads/}"
+
+  # Build prompt
+  PROMPT="You are a software developer assistant called Airlock. Your task here is to analyze and summarize a code change.
+
+  ## Context
+  Base SHA: $AIRLOCK_BASE_SHA
+  Head SHA: $AIRLOCK_HEAD_SHA
+  Branch: $BRANCH
+
+  ## Instructions
+
+  1. Understand the code change especially the intent of it
+  2. Generate a clear, concise title (50 chars or less, conventional commit style)
+  3. Generate a markdown body with 2 sections: Summary, Key changes
+
+  Respond with JSON: {\"title\": \"...\", \"markdown_body\": \"...\"}"
+
+  # Define output schema for structured response
+  SCHEMA='{"type":"object","properties":{"title":{"type":"string"},"markdown_body":{"type":"string"}},"required":["title","markdown_body"]}'
+
+  # Call agent and get JSON response (with output schema, response is clean JSON)
+  RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+
+  # Extract title and body using airlock exec json helper
+  TITLE=$(echo "$RESPONSE" | airlock exec json title)
+  BODY=$(echo "$RESPONSE" | airlock exec json markdown_body)
+
+  # Write as content artifact for display in UI
+  printf "# %s\n\n%s" "$TITLE" "$BODY" | airlock artifact content --title "Description"
+
+  echo "Generated description: $TITLE"
