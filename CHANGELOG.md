@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.38](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.37...airlock-v0.1.38) (2026-02-25)
+
+
+### Bug Fixes
+
+* **workflow:** rename require_approval flag ([e64c9da](https://github.com/airlock-hq/airlock/commit/e64c9dabcf4f3e08d7a18c8176bf24d0c5d0e25a))
+
 ## [0.1.37](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.36...airlock-v0.1.37) (2026-02-25)
 
 
