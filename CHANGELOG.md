@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.37](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.36...airlock-v0.1.37) (2026-02-25)
+
+
+### Bug Fixes
+
+* more robust patch apply behavior ([d1657f2](https://github.com/airlock-hq/airlock/commit/d1657f20eb01a405970a081deb88ff7043e77b85))
+
 ## [0.1.36](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.35...airlock-v0.1.36) (2026-02-24)
 
 
