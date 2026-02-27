@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.39](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.38...airlock-v0.1.39) (2026-02-27)
+
+
+### Bug Fixes
+
+* **cli:** ux improvements ([6fe36c6](https://github.com/airlock-hq/airlock/commit/6fe36c6d70b97bfcfe3369d8b89360a2a0de993f))
+* improve shell PATH resolution ([fc82cb2](https://github.com/airlock-hq/airlock/commit/fc82cb2816f8974eb269513fc3de6ec2d2a547a1))
+
 ## [0.1.38](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.37...airlock-v0.1.38) (2026-02-25)
 
 
