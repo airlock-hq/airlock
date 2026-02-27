@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.42](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.41...airlock-v0.1.42) (2026-02-27)
+
+
+### Bug Fixes
+
+* adjust diagram zoom control ([54fb65e](https://github.com/airlock-hq/airlock/commit/54fb65ef62c290246d7cd9c8a21ff2df4604a1ed))
+* mermaid diagram crash ([12655fc](https://github.com/airlock-hq/airlock/commit/12655fc046cd777f78997d2286b4afcd8a597533))
+* mermaid diagram scroll direction ([daad974](https://github.com/airlock-hq/airlock/commit/daad974c3a2d25ba4374faf9cd42a6de1cf2b5b2))
+
 ## [0.1.41](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.40...airlock-v0.1.41) (2026-02-27)
 
 
