@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "airlock-cli"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "airlock-core",
  "anyhow",
@@ -89,7 +89,7 @@ dependencies = [
 
 [[package]]
 name = "airlock-core"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "airlock-daemon"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "airlock-core",
  "anyhow",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "airlock-fixtures"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "airlock-core",
  "airlock-daemon",
