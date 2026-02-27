@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.40](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.39...airlock-v0.1.40) (2026-02-27)
+
+
+### Features
+
+* **tabs:** add content count badge and reorder tabs ([3317b48](https://github.com/airlock-hq/airlock/commit/3317b489eae80db34a915583b8a9d150cc6edce0))
+
+
+### Bug Fixes
+
+* **handlers:** improve patch apply error handling ([74b9103](https://github.com/airlock-hq/airlock/commit/74b910355baa8bf2a7ef144dd76f10b9249ea412))
+
 ## [0.1.39](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.38...airlock-v0.1.39) (2026-02-27)
 
 
