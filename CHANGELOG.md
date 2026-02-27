@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.41](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.40...airlock-v0.1.41) (2026-02-27)
+
+
+### Features
+
+* **component:** add mermaid diagram support ([f5cb553](https://github.com/airlock-hq/airlock/commit/f5cb553eb84f49bf836cb9b0f6fd2925467b32f9))
+* mermaid diagram in describe ([6e067f4](https://github.com/airlock-hq/airlock/commit/6e067f42fdfc33a4368dc09ecf2b952ca5ec9f52))
+
+
+### Bug Fixes
+
+* cleanup push marker refs ([4ac097f](https://github.com/airlock-hq/airlock/commit/4ac097f711124f5a4a9e9abb1bd072129b0c9730))
+* make diagram zoom to fit ([5580e83](https://github.com/airlock-hq/airlock/commit/5580e83a35e3830a6dab57451838f0bb4012d93b))
+* no need for content artifact for some steps ([fe726d8](https://github.com/airlock-hq/airlock/commit/fe726d8db93734ab48ca95a7a30aa5319e578551))
+* remove lint content artifact ([3eebe28](https://github.com/airlock-hq/airlock/commit/3eebe289484c61c7b567823268a44bb2dc6e0087))
+
 ## [0.1.40](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.39...airlock-v0.1.40) (2026-02-27)
 
 
