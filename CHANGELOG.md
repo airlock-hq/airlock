@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.44](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.43...airlock-v0.1.44) (2026-02-28)
+
+
+### Features
+
+* allow re-init of Airlock ([492bd07](https://github.com/airlock-hq/airlock/commit/492bd07c91b8f7e22f310a743af8d05ade776121))
+* **init:** add approval mode handling and allow re-init ([5d69c39](https://github.com/airlock-hq/airlock/commit/5d69c39d7a783b6f806b0f90c5c7fd29ca126b25))
+* **notification:** add OS push notifications and tray icon ([92f14a9](https://github.com/airlock-hq/airlock/commit/92f14a91473a262d05614ad986d476fd1be516bc))
+* rename Changes tab to Critique and show count ([37394a7](https://github.com/airlock-hq/airlock/commit/37394a7809f4d8b2264fc01a5b83651828f1704c))
+
 ## [0.1.43](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.42...airlock-v0.1.43) (2026-02-28)
 
 

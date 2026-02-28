@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Airlock",
-  "version": "0.1.43",
+  "version": "0.1.44",
   "identifier": "dev.airlock.desktop",
   "build": {
     "frontendDist": "../dist",
