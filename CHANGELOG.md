@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.43](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.42...airlock-v0.1.43) (2026-02-28)
+
+
+### Features
+
+* **critique:** add critique step to workflow ([7daa6ad](https://github.com/airlock-hq/airlock/commit/7daa6ada4b2dd2a049d448bc765281224713ee7a))
+* **rebase:** add dual-phase upstream sync and conflict resolution ([e6d436e](https://github.com/airlock-hq/airlock/commit/e6d436e1426a6670baf68868e514b2d72f46f294))
+
+
+### Bug Fixes
+
+* approval flow ([3e729b2](https://github.com/airlock-hq/airlock/commit/3e729b26e4100eb13d8292224ab700fed23beac0))
+* **approval:** add pre-execution pause for IfPatches ([83e8aec](https://github.com/airlock-hq/airlock/commit/83e8aec50b0b5694854cd00eb17c565c3214a691))
+
 ## [0.1.42](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.41...airlock-v0.1.42) (2026-02-27)
 
 
