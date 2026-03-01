@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.45](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.44...airlock-v0.1.45) (2026-03-01)
+
+
+### Features
+
+* **activity-feed:** add activity feed UI ([554fe37](https://github.com/airlock-hq/airlock/commit/554fe3751a2a33534fd6f30b07da337b3e60a332))
+* add critique comment UI and patch selection handling ([a7098b3](https://github.com/airlock-hq/airlock/commit/a7098b358dc6db7925176046039d309cc9bb261b))
+* **events:** more notifications ([368de9b](https://github.com/airlock-hq/airlock/commit/368de9bd9a5d39f76ee40025be491c81e141a1bc))
+
+
+### Bug Fixes
+
+* better window state ([88daf73](https://github.com/airlock-hq/airlock/commit/88daf733cc22664e7738891aa684efa93204a02b))
+* buf fixes for edge cases ([8621c15](https://github.com/airlock-hq/airlock/commit/8621c155adec485a649851752fe4b84245222bb2))
+* centralize comment and patch key generation ([57fbd2c](https://github.com/airlock-hq/airlock/commit/57fbd2c24d612f1d3357f48bc6eda38a0e0da542))
+* ensure unique keys for steps and artifacts ([580df10](https://github.com/airlock-hq/airlock/commit/580df102a8347f45ce79984df7f4b2ef494d30b3))
+* handle duplicate step names in approval flow ([85a205d](https://github.com/airlock-hq/airlock/commit/85a205d04c4024a22ece163730162ebda446a209))
+* remove critique content artifact ([26fcd4b](https://github.com/airlock-hq/airlock/commit/26fcd4b565f6f7ff7e7bab556a9a11fcd2f20548))
+* remove error label from run list ([008dcc5](https://github.com/airlock-hq/airlock/commit/008dcc56fbaca2e53721c573eb5a432c05d8ed64))
+* resolve issue with duplicate step names ([65cae7d](https://github.com/airlock-hq/airlock/commit/65cae7d0e4808b31b6d3941a30e29ba1f03d3376))
+* **steps:** handle duplicate step names in approval flow ([873a29e](https://github.com/airlock-hq/airlock/commit/873a29ede266ffc8e0e1dd09407e6c016ca9fd63))
+
 ## [0.1.44](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.43...airlock-v0.1.44) (2026-02-28)
 
 

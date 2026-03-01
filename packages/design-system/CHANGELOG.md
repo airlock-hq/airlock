@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.19](https://github.com/airlock-hq/airlock/compare/design-system-v0.1.18...design-system-v0.1.19) (2026-03-01)
+
+
+### Features
+
+* **activity-feed:** add activity feed UI ([554fe37](https://github.com/airlock-hq/airlock/commit/554fe3751a2a33534fd6f30b07da337b3e60a332))
+* add critique comment UI and patch selection handling ([a7098b3](https://github.com/airlock-hq/airlock/commit/a7098b358dc6db7925176046039d309cc9bb261b))
+
 ## [0.1.18](https://github.com/airlock-hq/airlock/compare/design-system-v0.1.17...design-system-v0.1.18) (2026-02-24)
 
 
