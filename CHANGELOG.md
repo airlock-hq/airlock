@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.46](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.45...airlock-v0.1.46) (2026-03-02)
+
+
+### Bug Fixes
+
+* **run-detail:** show copied state for copy comments button ([fc1a290](https://github.com/airlock-hq/airlock/commit/fc1a290f471e5d11ad09f3b5b7b1c29fd87d4bda))
+
 ## [0.1.45](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.44...airlock-v0.1.45) (2026-03-01)
 
 
