@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.47](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.46...airlock-v0.1.47) (2026-03-02)
+
+
+### Bug Fixes
+
+* reset worktree handling and improve pipeline logic ([c7805f2](https://github.com/airlock-hq/airlock/commit/c7805f22b3d2d8aaa46f8111ebda1ca1daeb61ea))
+
 ## [0.1.46](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.45...airlock-v0.1.46) (2026-03-02)
 
 
