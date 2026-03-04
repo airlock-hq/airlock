@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.48](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.47...airlock-v0.1.48) (2026-03-04)
+
+
+### Bug Fixes
+
+* clean CLAUDE env vars on daemon startup ([#19](https://github.com/airlock-hq/airlock/issues/19)) ([b677883](https://github.com/airlock-hq/airlock/commit/b677883cbed61ec45ebeabfa049f0a03f3c59f4a))
+
 ## [0.1.47](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.46...airlock-v0.1.47) (2026-03-02)
 
 
