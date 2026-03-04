@@ -169,7 +169,8 @@ pub async fn process_coalesced_push(
                                     superseded_run.id,
                                     update.ref_name,
                                     &update.old_sha[..8.min(update.old_sha.len())],
-                                    &superseded_run.base_sha[..8.min(superseded_run.base_sha.len())],
+                                    &superseded_run.base_sha
+                                        [..8.min(superseded_run.base_sha.len())],
                                 );
                                 update.old_sha = superseded_run.base_sha.clone();
                             }
@@ -183,19 +184,35 @@ pub async fn process_coalesced_push(
         }
     }
 
-    // Use upstream ref as base_sha to ensure we capture all un-forwarded commits.
-    // Git's old_sha reflects the gate's previous state, but if a prior run failed,
-    // upstream may be further behind. refs/remotes/origin/<branch> tracks the last
-    // known upstream state.
+    // Compute base_sha for the diff.
+    // For feature branches: use merge-base with the default branch so the
+    // diff covers the entire branch, not just the last push.
+    // For the default branch: use the upstream tracking ref.
     for update in pipeline_updates.iter_mut() {
-        // Skip branch creations (null SHA) — no upstream to compare against
         if git::is_null_sha(&update.old_sha) {
             continue;
         }
         if let Some(branch) = update.ref_name.strip_prefix("refs/heads/") {
+            // Try merge-base with common default branches
+            if let Some(merge_base) =
+                git::find_merge_base(&repo.gate_path, &update.new_sha, git::DEFAULT_BRANCHES)
+            {
+                // Only use merge-base if this is a feature branch (merge-base != head)
+                if merge_base != update.new_sha {
+                    info!(
+                        "Using merge-base for ref {}: {} (was {})",
+                        update.ref_name,
+                        &merge_base[..8.min(merge_base.len())],
+                        &update.old_sha[..8.min(update.old_sha.len())],
+                    );
+                    update.old_sha = merge_base;
+                    continue;
+                }
+            }
+            // Fallback for default branch or no merge-base: use upstream ref
             let upstream_ref = format!("refs/remotes/origin/{}", branch);
-            match git::resolve_ref(&repo.gate_path, &upstream_ref) {
-                Ok(Some(upstream_sha)) if upstream_sha != update.old_sha => {
+            if let Ok(Some(upstream_sha)) = git::resolve_ref(&repo.gate_path, &upstream_ref) {
+                if upstream_sha != update.old_sha {
                     info!(
                         "Using upstream base for ref {}: {} (was {})",
                         update.ref_name,
@@ -204,7 +221,6 @@ pub async fn process_coalesced_push(
                     );
                     update.old_sha = upstream_sha;
                 }
-                _ => {} // No upstream ref or same SHA — keep git's old_sha
             }
         }
     }
