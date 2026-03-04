@@ -156,16 +156,11 @@ fn detect_shell_from_system() -> Option<String> {
 
 /// Check whether a shell supports the `-i` (interactive) flag with `-c`.
 ///
-/// Shells like `bash` and `zsh` keep some PATH/env setup in their
-/// interactive-only config files (`~/.bashrc`, `~/.zshrc`). Without `-i`,
-/// `shell -l -c …` won't source those files, so tools installed via nvm,
-/// fnm, rustup, etc. may be missing from PATH.
-///
-/// We allowlist known shells rather than passing `-i` unconditionally,
-/// because other shells (fish, nu, etc.) may not accept the same flags.
-fn shell_supports_interactive(shell: &str) -> bool {
-    let basename = shell.rsplit('/').next().unwrap_or(shell);
-    matches!(basename, "bash" | "zsh")
+/// Returns false: the daemon has no TTY, so `-i` causes warnings like
+/// "cannot set terminal process group: Inappropriate ioctl for device".
+/// The `-l` (login) flag is sufficient to source shell profiles.
+fn shell_supports_interactive(_shell: &str) -> bool {
+    false
 }
 
 /// Resolve the user's full PATH by spawning their login shell.
