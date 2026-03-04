@@ -26,6 +26,18 @@ async fn main() -> Result<()> {
         .with_target(true)
         .init();
 
+    // Clean environment variables that would interfere with child processes
+    // (e.g. when the daemon is started from within a Claude Code session).
+    for key in [
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CLAUDE_CODE_ENTRY_POINT",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ACCESS_TOKEN",
+    ] {
+        std::env::remove_var(key);
+    }
+
     info!("Starting Airlock daemon...");
 
     // Ensure Airlock directories exist
