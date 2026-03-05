@@ -33,7 +33,8 @@ impl SubprocessReader {
         cmd.args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
-            .stdin(Stdio::null());
+            .stdin(Stdio::null())
+            .kill_on_drop(true);
 
         if let Some(dir) = cwd {
             cmd.current_dir(dir);

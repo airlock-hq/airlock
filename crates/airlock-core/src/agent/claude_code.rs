@@ -81,7 +81,8 @@ impl AgentAdapter for ClaudeCodeAdapter {
         cmd.args(&args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::inherit());
+            .stderr(std::process::Stdio::inherit())
+            .kill_on_drop(true);
 
         if let Some(ref cwd) = request.cwd {
             cmd.current_dir(cwd);
