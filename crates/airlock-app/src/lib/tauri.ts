@@ -162,6 +162,9 @@ async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
       return mockData.readArtifact(artifactPath) as T;
     }
 
+    case 'show_window':
+      return undefined as T;
+
     default:
       throw new Error(`Unknown command: ${cmd}`);
   }

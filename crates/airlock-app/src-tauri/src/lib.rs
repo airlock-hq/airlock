@@ -382,6 +382,16 @@ async fn read_artifact(
     }
 }
 
+/// Show the main window. Called by the frontend once it has mounted,
+/// ensuring the window-state plugin has already restored geometry.
+#[tauri::command]
+async fn show_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 // =============================================================================
 // Application Entry Point
 // =============================================================================
@@ -401,7 +411,14 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        & !tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(
@@ -476,10 +493,10 @@ pub fn run() {
                 event_bridge::run_event_bridge(app_handle).await;
             });
 
-            // Focus the window on initial launch
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_focus();
-            }
+            // Window stays hidden until the frontend calls show_window.
+            // By that point the window-state plugin has already restored
+            // size/position/maximized, so the window appears in its final
+            // state with no resize flicker.
 
             Ok(())
         })
@@ -515,6 +532,7 @@ pub fn run() {
             update_config,
             read_artifact,
             apply_patches,
+            show_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
