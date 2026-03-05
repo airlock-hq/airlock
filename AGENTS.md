@@ -33,6 +33,9 @@ cargo run --bin airlockd # Run daemon
 Never run multiple make or cargo commands in parallel. It will cause lock contention. Run one command at a time, and
 wait for it to finish before starting another.
 
+Never run cargo tests in parallel (e.g. `--test-threads=N` where N > 1). Tests share database and filesystem
+resources that cause deadlocks under parallel execution. Always use the default single-threaded test runner.
+
 ## Desktop App Development
 
 The desktop app uses Tauri (Rust) + React (TypeScript). We use shadcn for UI components (look up context7 for docs when needed).
@@ -87,6 +90,11 @@ After implementing new features, always write:
 
 1. **Unit tests** - Test individual functions and logic in isolation
 2. **Integration/E2E tests** - Test the full flow with real git repos and database
+
+### Test Performance
+
+Use the smallest possible timeouts and delays in tests. If a test needs a timeout to trigger, use 1ms — not
+100ms, not 1s. Every unnecessary millisecond adds up across the test suite.
 
 ### E2E Test Principles
 

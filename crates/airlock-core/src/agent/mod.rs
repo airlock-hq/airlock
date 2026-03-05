@@ -10,6 +10,7 @@
 
 mod claude_code;
 mod codex;
+mod idle_timeout;
 pub mod stream;
 pub mod subprocess;
 pub mod types;
@@ -19,6 +20,7 @@ use async_trait::async_trait;
 use crate::error::{AirlockError, Result};
 pub use claude_code::{try_extract_json, ClaudeCodeAdapter};
 pub use codex::CodexAdapter;
+pub use idle_timeout::IdleTimeoutAdapter;
 pub use stream::StreamCollector;
 pub use types::{
     AgentEvent, AgentEventStream, AgentMessage, AgentRequest, AgentResult, AgentUsage, ContentBlock,
@@ -59,15 +61,21 @@ pub trait AgentAdapter: Send + Sync {
 /// - `"claude-code"` or `"claude"` — Claude Code adapter
 /// - `"codex"` — OpenAI Codex adapter
 /// - `"auto"` — auto-detect the first available adapter on PATH
+///
+/// All adapters are wrapped with [`IdleTimeoutAdapter`] to kill hung
+/// subprocesses that produce no output for an extended period.
 pub fn create_adapter(name: &str) -> Result<Box<dyn AgentAdapter>> {
-    match name {
-        "claude-code" | "claude" => Ok(Box::new(ClaudeCodeAdapter::new())),
-        "codex" => Ok(Box::new(CodexAdapter::new())),
-        "auto" => detect_available_adapter(),
-        _ => Err(AirlockError::Config(format!(
-            "Unknown agent adapter: {name}"
-        ))),
-    }
+    let inner: Box<dyn AgentAdapter> = match name {
+        "claude-code" | "claude" => Box::new(ClaudeCodeAdapter::new()),
+        "codex" => Box::new(CodexAdapter::new()),
+        "auto" => return detect_available_adapter(),
+        _ => {
+            return Err(AirlockError::Config(format!(
+                "Unknown agent adapter: {name}"
+            )))
+        }
+    };
+    Ok(Box::new(IdleTimeoutAdapter::new(inner)))
 }
 
 /// Auto-detect the first available agent CLI on PATH.
@@ -80,7 +88,7 @@ fn detect_available_adapter() -> Result<Box<dyn AgentAdapter>> {
     ];
     for adapter in adapters {
         if adapter.is_available() {
-            return Ok(adapter);
+            return Ok(Box::new(IdleTimeoutAdapter::new(adapter)));
         }
     }
     Err(AirlockError::Agent(
