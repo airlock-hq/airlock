@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.50](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.49...airlock-v0.1.50) (2026-03-05)
+
+
+### Features
+
+* **agent:** timeout and kill stalled streams ([#24](https://github.com/airlock-hq/airlock/issues/24)) ([90bdfe3](https://github.com/airlock-hq/airlock/commit/90bdfe3a27fc32c63bb30f689ccdf9cb6fbf25a2))
+
 ## [0.1.49](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.48...airlock-v0.1.49) (2026-03-05)
 
 
