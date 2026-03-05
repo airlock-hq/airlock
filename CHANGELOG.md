@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.49](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.48...airlock-v0.1.49) (2026-03-05)
+
+
+### Bug Fixes
+
+* better catching of rebase state errors in push stage ([05c6bea](https://github.com/airlock-hq/airlock/commit/05c6bea3ee861a6752c061667dd3479643721062))
+* **core:** resolve push lease handling ([4d4c645](https://github.com/airlock-hq/airlock/commit/4d4c645676f6fd932e13333e82f4be7559bb19e3))
+* handle process_coalesced_push return changes ([f32fdd7](https://github.com/airlock-hq/airlock/commit/f32fdd7ed6ce71b918f2517ee5d8ed45ca963aef))
+* **push:** cancel active run when superseded ([faf1c09](https://github.com/airlock-hq/airlock/commit/faf1c098c19502e783176a91b9befbac92c7d8ad))
+* **push:** filter workflows by branch and forward unmatched branches ([938508c](https://github.com/airlock-hq/airlock/commit/938508cd5f5b84516b7ca57e6f25abdc947a0c61))
+* **push:** forward unmatched branch refs to upstream ([3545b24](https://github.com/airlock-hq/airlock/commit/3545b243a013b160e2ca671481459736a61e5eae))
+* **push:** handle unmatched branches correctly ([39a9925](https://github.com/airlock-hq/airlock/commit/39a9925d484834bedf2d15abcc47420bd6437b7a))
+* **push:** improve branch workflow handling ([959743f](https://github.com/airlock-hq/airlock/commit/959743f9bee2550a34a9406b235bd4f6ee8f6550))
+
 ## [0.1.48](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.47...airlock-v0.1.48) (2026-03-04)
 
 
