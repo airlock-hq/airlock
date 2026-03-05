@@ -333,8 +333,9 @@ pub async fn handle_reprocess_run(
 
     // Spawn the pipeline through the run queue so we can return immediately.
     // The frontend tracks progress via RunUpdated / RunCompleted events.
+    let ref_names: Vec<String> = run.ref_updates.iter().map(|u| u.ref_name.clone()).collect();
     tokio::spawn(async move {
-        let permit = ctx.run_queue.acquire(&run.repo_id).await;
+        let permit = ctx.run_queue.acquire(&run.repo_id, &ref_names).await;
         execute_pipeline(ctx.clone(), run, repo, permit.token).await;
     });
 

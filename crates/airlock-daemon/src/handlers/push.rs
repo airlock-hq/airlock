@@ -220,6 +220,12 @@ pub async fn process_coalesced_push(
     let mut branch_matches: Vec<BranchMatch> = Vec::new();
     let mut unmatched_updates = Vec::new();
 
+    // Collect ref names before drain — needed for ref-aware run queue.
+    let pipeline_ref_names: Vec<String> = pipeline_updates
+        .iter()
+        .map(|u| u.ref_name.clone())
+        .collect();
+
     for update in pipeline_updates.drain(..) {
         // pipeline_updates was filtered by is_pipeline_ref, which only accepts
         // refs/heads/* (BranchUpdate), so strip_prefix always succeeds.
@@ -315,7 +321,9 @@ pub async fn process_coalesced_push(
         // All pipeline refs were unmatched — no runs needed.
         // If we superseded runs in the DB, cancel their runtime tokens too.
         if had_superseded {
-            ctx.run_queue.cancel_active(&repo.id).await;
+            ctx.run_queue
+                .cancel_active(&repo.id, Some(&pipeline_ref_names))
+                .await;
         }
         return;
     }
@@ -456,8 +464,12 @@ pub async fn process_coalesced_push(
     if !all_runs.is_empty() {
         let ctx = ctx.clone();
         let repo = repo.clone();
+        let ref_names: Vec<String> = all_runs
+            .iter()
+            .flat_map(|r| r.ref_updates.iter().map(|u| u.ref_name.clone()))
+            .collect();
         tokio::spawn(async move {
-            let permit = ctx.run_queue.acquire(&repo.id).await;
+            let permit = ctx.run_queue.acquire(&repo.id, &ref_names).await;
             let mut run_idx = 0;
             while run_idx < all_runs.len() {
                 let run = &all_runs[run_idx];
