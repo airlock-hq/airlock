@@ -61,39 +61,36 @@ impl AgentAdapter for IdleTimeoutAdapter {
 /// produces no event within that window a fatal error is emitted and the
 /// stream ends.
 fn with_idle_timeout(inner: AgentEventStream, timeout: Duration) -> AgentEventStream {
-    let stream = futures::stream::unfold(
-        (inner, false),
-        move |(mut inner, done)| async move {
-            if done {
-                return None;
-            }
+    let stream = futures::stream::unfold((inner, false), move |(mut inner, done)| async move {
+        if done {
+            return None;
+        }
 
-            match tokio::time::timeout(timeout, inner.next()).await {
-                // Inner stream yielded an event — pass it through.
-                Ok(Some(event)) => Some((event, (inner, false))),
-                // Inner stream ended normally.
-                Ok(None) => None,
-                // Idle timeout — emit a fatal error and stop.
-                // Drop the inner stream immediately so that the underlying
-                // subprocess (if any) is killed via `kill_on_drop` right now,
-                // rather than waiting for the caller to poll or drop us.
-                Err(_) => {
-                    warn!(
-                        "Agent produced no output for {:?} — terminating stream",
-                        timeout
-                    );
-                    drop(inner);
-                    Some((
-                        Err(AirlockError::Agent(format!(
-                            "Agent produced no output for {} minutes (idle timeout)",
-                            timeout.as_secs() / 60
-                        ))),
-                        (Box::pin(futures::stream::empty()) as AgentEventStream, true),
-                    ))
-                }
+        match tokio::time::timeout(timeout, inner.next()).await {
+            // Inner stream yielded an event — pass it through.
+            Ok(Some(event)) => Some((event, (inner, false))),
+            // Inner stream ended normally.
+            Ok(None) => None,
+            // Idle timeout — emit a fatal error and stop.
+            // Drop the inner stream immediately so that the underlying
+            // subprocess (if any) is killed via `kill_on_drop` right now,
+            // rather than waiting for the caller to poll or drop us.
+            Err(_) => {
+                warn!(
+                    "Agent produced no output for {:?} — terminating stream",
+                    timeout
+                );
+                drop(inner);
+                Some((
+                    Err(AirlockError::Agent(format!(
+                        "Agent produced no output for {} minutes (idle timeout)",
+                        timeout.as_secs() / 60
+                    ))),
+                    (Box::pin(futures::stream::empty()) as AgentEventStream, true),
+                ))
             }
-        },
-    );
+        }
+    });
 
     Box::pin(stream)
 }
@@ -107,9 +104,7 @@ mod tests {
     #[tokio::test]
     async fn test_passthrough_when_active() {
         let events: Vec<Result<AgentEvent>> = vec![
-            Ok(AgentEvent::TextDelta {
-                text: "hi".into(),
-            }),
+            Ok(AgentEvent::TextDelta { text: "hi".into() }),
             Ok(AgentEvent::Complete {
                 session_id: None,
                 usage: Default::default(),

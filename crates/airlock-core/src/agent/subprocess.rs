@@ -218,5 +218,4 @@ mod tests {
             line
         );
     }
-
 }
