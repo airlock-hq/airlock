@@ -74,17 +74,21 @@ fn with_idle_timeout(inner: AgentEventStream, timeout: Duration) -> AgentEventSt
                 // Inner stream ended normally.
                 Ok(None) => None,
                 // Idle timeout — emit a fatal error and stop.
+                // Drop the inner stream immediately so that the underlying
+                // subprocess (if any) is killed via `kill_on_drop` right now,
+                // rather than waiting for the caller to poll or drop us.
                 Err(_) => {
                     warn!(
                         "Agent produced no output for {:?} — terminating stream",
                         timeout
                     );
+                    drop(inner);
                     Some((
                         Err(AirlockError::Agent(format!(
                             "Agent produced no output for {} minutes (idle timeout)",
                             timeout.as_secs() / 60
                         ))),
-                        (inner, true),
+                        (Box::pin(futures::stream::empty()) as AgentEventStream, true),
                     ))
                 }
             }
