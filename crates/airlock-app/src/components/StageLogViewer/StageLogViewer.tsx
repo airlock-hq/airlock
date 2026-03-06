@@ -41,8 +41,9 @@ function TabIcon({ item }: { item: TabItem }) {
 }
 
 /**
- * StageLogViewer displays logs (stdout/stderr) for a pipeline step.
- * Uses a tabbed interface to switch between different outputs.
+ * StageLogViewer displays step output in tabs (stdout/stderr plus step artifacts).
+ * Shows the step failure message when `step.error` is present, including failed
+ * steps that produced no log files.
  * Supports real-time updates for running steps.
  */
 export function StageLogViewer({ step, jobKey, repoId, runId, artifacts = [] }: StageLogViewerProps) {
