@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.53](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.52...airlock-v0.1.53) (2026-03-06)
+
+
+### Bug Fixes
+
+* **defaults:** replace jq with airlock exec json ([#33](https://github.com/airlock-hq/airlock/issues/33)) ([53383e8](https://github.com/airlock-hq/airlock/commit/53383e8aa153ca1e28a2a710547df0a8ea3ebce6))
+
 ## [0.1.52](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.51...airlock-v0.1.52) (2026-03-06)
 
 
