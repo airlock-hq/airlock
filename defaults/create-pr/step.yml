@@ -62,11 +62,15 @@ run: |
   5. **Return the result** - Provide the PR/MR URL if successful, or explain the error
 
   ## PR/MR Content
-  - Reference artifact content when generating below
+  - Check if \`\$AIRLOCK_ARTIFACTS/description.json\` exists. If it does, use it:
+    - Use the \`title\` field as the PR title
+    - Use the \`body\` field as the basis for the PR description
+    - If a \`mermaid_diagram\` field is present, include it in the PR description as a fenced mermaid code block (\\\`\\\`\\\`mermaid ... \\\`\\\`\\\`)
+  - If description.json does not exist, generate a title and description from the branch name and commit history
   - Do NOT add a signature for who created the PR/MR
-  - The title should be concise and reflect the key change made
-  - The description should have a few concise sections:
+  - The description should have these sections:
     - Summary (of the rationale behind the change)
+    - Diagram (only if a mermaid diagram is available from description.json)
     - Key changes made
     - How was this tested
 
