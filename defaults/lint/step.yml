@@ -155,16 +155,14 @@ run: |
 
   # Write lint_result.json for compatibility
   mkdir -p "$AIRLOCK_ARTIFACTS"
-  cat > "$AIRLOCK_ARTIFACTS/lint_result.json" << EOF
-  {
-    "verdict": $(echo "$VERDICT" | jq -Rs .),
-    "summary": $(echo "$SUMMARY" | jq -Rs .),
-    "details": $(echo "$DETAILS" | jq -Rs .),
-    "fixes_applied": $FIXES_APPLIED,
-    "passed": $PASSED,
-    "exit_code": $EXIT_CODE,
-    "linted_at": $(date +%s)
-  }
-  EOF
+  echo '{}' | airlock exec json \
+    --set "verdict=$VERDICT" \
+    --set "summary=$SUMMARY" \
+    --set "details=$DETAILS" \
+    --set "fixes_applied=$FIXES_APPLIED" \
+    --set "passed=$PASSED" \
+    --set "exit_code=$EXIT_CODE" \
+    --set "linted_at=$(date +%s)" \
+    > "$AIRLOCK_ARTIFACTS/lint_result.json"
 
   exit $EXIT_CODE

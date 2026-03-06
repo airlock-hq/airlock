@@ -87,11 +87,11 @@ run: |
 
   # Write description.json for downstream stages (e.g. create-pr)
   mkdir -p "$AIRLOCK_ARTIFACTS"
-  jq -n \
-    --arg title "$TITLE" \
-    --arg body "$BODY" \
-    --arg diagram "$DIAGRAM" \
-    '{"title": $title, "body": $body, "mermaid_diagram": $diagram, "generated_at": now}' \
+  echo '{}' | airlock exec json \
+    --set "title=$TITLE" \
+    --set "body=$BODY" \
+    --set "mermaid_diagram=$DIAGRAM" \
+    --set "generated_at=$(date +%s)" \
     > "$AIRLOCK_ARTIFACTS/description.json"
 
   # Write as content artifact for display in UI (text summary + mermaid diagram)

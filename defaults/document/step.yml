@@ -97,15 +97,13 @@ run: |
   esac
 
   # Write document_result.json for compatibility
-  cat > "$AIRLOCK_ARTIFACTS/document_result.json" << EOF
-  {
-    "verdict": $(echo "$VERDICT" | jq -Rs .),
-    "summary": $(echo "$SUMMARY" | jq -Rs .),
-    "details": $(echo "$DETAILS" | jq -Rs .),
-    "updates_applied": $UPDATES_APPLIED,
-    "exit_code": $EXIT_CODE,
-    "documented_at": $(date +%s)
-  }
-  EOF
+  echo '{}' | airlock exec json \
+    --set "verdict=$VERDICT" \
+    --set "summary=$SUMMARY" \
+    --set "details=$DETAILS" \
+    --set "updates_applied=$UPDATES_APPLIED" \
+    --set "exit_code=$EXIT_CODE" \
+    --set "documented_at=$(date +%s)" \
+    > "$AIRLOCK_ARTIFACTS/document_result.json"
 
   exit $EXIT_CODE

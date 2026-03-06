@@ -105,6 +105,25 @@ E2E tests must reflect **end-user-visible behavior**. Do things the way a real u
 - **Test full round trips.** If init changes something, test that eject reverses it correctly by running init then eject, not by manually constructing post-init state.
 - **Before writing any test, verify which code path the CLI actually uses.** The daemon handler and CLI command may have separate implementations. A test that only covers one is incomplete.
 
+## Pipeline Step Scripts (defaults/)
+
+Step scripts in `defaults/*/step.yml` run on user machines. **Never use `jq`** — it's not universally installed. Use `airlock exec json` instead:
+
+```bash
+# Extract a field
+TITLE=$(echo "$RESPONSE" | airlock exec json title)
+
+# Extract nested field
+VALUE=$(echo "$RESPONSE" | airlock exec json a.b.c)
+
+# Build JSON from scratch (--set values auto-detect types: numbers, booleans, strings)
+echo '{}' | airlock exec json \
+    --set "title=$TITLE" \
+    --set "count=42" \
+    --set "passed=true" \
+    > output.json
+```
+
 ## Code Organization
 
 ### File Size Guidelines

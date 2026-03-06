@@ -108,15 +108,13 @@ run: |
   fi
 
   # Write test_result.json for compatibility
-  cat > "$AIRLOCK_ARTIFACTS/test_result.json" << EOF
-  {
-    "verdict": $(echo "$VERDICT" | jq -Rs .),
-    "summary": $(echo "$SUMMARY" | jq -Rs .),
-    "details": $(echo "$DETAILS" | jq -Rs .),
-    "passed": $PASSED,
-    "exit_code": $EXIT_CODE,
-    "tested_at": $(date +%s)
-  }
-  EOF
+  echo '{}' | airlock exec json \
+    --set "verdict=$VERDICT" \
+    --set "summary=$SUMMARY" \
+    --set "details=$DETAILS" \
+    --set "passed=$PASSED" \
+    --set "exit_code=$EXIT_CODE" \
+    --set "tested_at=$(date +%s)" \
+    > "$AIRLOCK_ARTIFACTS/test_result.json"
 
   exit $EXIT_CODE

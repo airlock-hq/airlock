@@ -52,14 +52,13 @@ run: |
 
   # Parse response
   SUMMARY=$(echo "$RESPONSE" | airlock exec json summary)
-  COMMENTS=$(echo "$RESPONSE" | jq -c '.comments')
-  COMMENT_COUNT=$(echo "$COMMENTS" | jq 'length')
+  COMMENTS=$(echo "$RESPONSE" | airlock exec json comments)
 
-  echo "Critique complete: $COMMENT_COUNT comment(s)"
+  echo "Critique complete"
   echo "Summary: $SUMMARY"
 
   # Write comments as artifact (if any)
-  if [[ "$COMMENT_COUNT" -gt 0 ]]; then
+  if [[ "$COMMENTS" != "[]" ]]; then
       # Write batch file and submit as comment artifact
       BATCH_FILE=$(mktemp)
       echo "$COMMENTS" > "$BATCH_FILE"
