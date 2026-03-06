@@ -30,8 +30,8 @@ pub use fetch::{
     BranchSyncStatus, ConflictResolver, SyncReport,
 };
 pub use hooks::{
-    configure_upload_pack, install_hooks, install_upload_pack_wrapper, pre_receive_hook,
-    remove_hooks, POST_RECEIVE, UPLOAD_PACK_WRAPPER,
+    configure_upload_pack, install_hooks, install_upload_pack_wrapper, post_receive_hook,
+    pre_receive_hook, remove_hooks, UPLOAD_PACK_WRAPPER,
 };
 pub use push::{
     build_refspec, push, push_all_branches, push_branch, push_force_with_lease, push_ref_updates,

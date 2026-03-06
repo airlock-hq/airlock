@@ -93,10 +93,8 @@ pub async fn dispatch(ctx: Arc<HandlerContext>, request: Request) -> Response {
         methods::GET_RUN_DETAIL => runs::handle_get_run_detail(ctx, request.params, id).await,
         methods::MARK_FORWARDED => forward::handle_mark_forwarded(ctx, request.params, id).await,
         methods::PUSH_RECEIVED => {
-            // Push received is a notification (fire and forget), no response needed
-            // But we still process it
-            push::handle_push_received(ctx, request.params).await;
-            Response::success(id, serde_json::json!({"acknowledged": true}))
+            let result = push::handle_push_received(ctx, request.params).await;
+            Response::success(id, serde_json::to_value(result).unwrap())
         }
         methods::FETCH_NOTIFICATION => {
             sync::handle_fetch_notification(ctx, request.params, id).await

@@ -551,7 +551,7 @@ fn test_init_installs_post_receive_hook_in_bare_repo() {
     assert!(post_receive_path.exists());
 
     let hook_content = fs::read_to_string(&post_receive_path).unwrap();
-    assert_eq!(hook_content, git::hooks::POST_RECEIVE);
+    assert_eq!(hook_content, git::hooks::post_receive_hook());
     assert!(hook_content.starts_with("#!/bin/sh"));
     assert!(hook_content.contains("SOCKET="));
     assert!(hook_content.contains("push_received"));

@@ -8,95 +8,101 @@ use std::path::Path;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-/// Build the pre-receive hook script, embedding `crate::BANNER`.
+/// Build the pre-receive hook script.
 ///
-/// The banner is displayed in the brand signal color (ANSI 256-color 98, orbital violet)
-/// when stderr is a terminal and `NO_COLOR` is not set.
+/// The pre-receive hook silently accepts all pushes. All user-visible output
+/// is deferred to the post-receive hook, which conditionally displays the
+/// banner based on whether the daemon will create a pipeline run.
 pub fn pre_receive_hook() -> String {
-    format!(
-        r#"#!/bin/sh
-# Airlock pre-receive hook
-# Accepts pushes locally and displays push info.
-
-# Use brand color (signal violet) when stderr is a terminal and NO_COLOR is unset
-if [ -t 2 ] && [ -z "${{NO_COLOR:-}}" ]; then
-    BRAND='\033[1;38;5;{color}m'
-    RESET='\033[0m'
-else
-    BRAND=''
-    RESET=''
-fi
-
-printf "${{BRAND}}" >&2
-cat >&2 <<'BANNER'
-{}BANNER
-printf "${{RESET}}" >&2
-
-echo "" >&2
-
-while read oldrev newrev refname; do
-    branch="${{refname#refs/heads/}}"
-    if [ "$oldrev" = "0000000000000000000000000000000000000000" ]; then
-        echo "${{branch}} (new branch)" >&2
-    elif [ "$newrev" = "0000000000000000000000000000000000000000" ]; then
-        echo "${{branch}} (delete)" >&2
-    else
-        short_old=$(echo "$oldrev" | cut -c1-7)
-        short_new=$(echo "$newrev" | cut -c1-7)
-        echo "${{branch}} (${{short_old}}..${{short_new}})" >&2
-    fi
-done
-
-echo "" >&2
-
-# Always accept the push (soft gate)
-exit 0
-"#,
-        crate::BANNER,
-        color = crate::BRAND_COLOR_256,
-    )
+    "#!/bin/sh\n# Airlock pre-receive hook\nexit 0\n".to_string()
 }
 
-/// Post-receive hook script.
-/// This hook triggers the transformation pipeline after push is accepted.
-pub const POST_RECEIVE: &str = r#"#!/bin/sh
+/// Build the post-receive hook script, embedding `crate::BANNER`.
+///
+/// The post-receive hook sends a synchronous JSON-RPC request to the daemon
+/// and conditionally displays the banner + branch info based on whether
+/// the daemon will create a pipeline run.
+pub fn post_receive_hook() -> String {
+    format!(
+        r#"#!/bin/sh
 # Airlock post-receive hook
 # Triggers the transformation pipeline after a push is accepted.
 
-SOCKET="${HOME}/.airlock/socket"
+SOCKET="${{HOME}}/.airlock/socket"
 REPO_PATH="$(pwd)"
 
-# Collect all ref updates and create push marker refs
+# Collect all ref updates, create push marker refs, and build display info
 REF_UPDATES=""
+DISPLAY_INFO=""
 while read oldrev newrev refname; do
     if [ -n "$REF_UPDATES" ]; then
-        REF_UPDATES="${REF_UPDATES},"
+        REF_UPDATES="${{REF_UPDATES}},"
     fi
-    REF_UPDATES="${REF_UPDATES}{\"ref_name\":\"${refname}\",\"old_sha\":\"${oldrev}\",\"new_sha\":\"${newrev}\"}"
+    REF_UPDATES="${{REF_UPDATES}}{{\"ref_name\":\"${{refname}}\",\"old_sha\":\"${{oldrev}}\",\"new_sha\":\"${{newrev}}\"}}"
 
     # Create marker ref for pipeline branches (non-deletion pushes to refs/heads/*)
     case "$refname" in
         refs/heads/*)
             if [ "$newrev" != "0000000000000000000000000000000000000000" ]; then
-                branch="${refname#refs/heads/}"
-                git update-ref "refs/airlock/pushed/${branch}" "$newrev" 2>/dev/null || true
+                branch="${{refname#refs/heads/}}"
+                git update-ref "refs/airlock/pushed/${{branch}}" "$newrev" 2>/dev/null || true
             fi
             ;;
     esac
+
+    # Build display info for branch updates
+    branch="${{refname#refs/heads/}}"
+    if [ "$oldrev" = "0000000000000000000000000000000000000000" ]; then
+        DISPLAY_INFO="${{DISPLAY_INFO}}${{branch}} (new branch)
+"
+    elif [ "$newrev" = "0000000000000000000000000000000000000000" ]; then
+        DISPLAY_INFO="${{DISPLAY_INFO}}${{branch}} (delete)
+"
+    else
+        short_old=$(echo "$oldrev" | cut -c1-7)
+        short_new=$(echo "$newrev" | cut -c1-7)
+        DISPLAY_INFO="${{DISPLAY_INFO}}${{branch}} (${{short_old}}..${{short_new}})
+"
+    fi
 done
 
-# Notify daemon of push received
+# Notify daemon and check if runs will be created
 if [ -S "$SOCKET" ]; then
-    echo "{\"jsonrpc\":\"2.0\",\"method\":\"push_received\",\"params\":{\"gate_path\":\"${REPO_PATH}\",\"ref_updates\":[${REF_UPDATES}]},\"id\":null}" | nc -U "$SOCKET" > /dev/null 2>&1 &
-    echo "A new change has entered Airlock. Track it in the Airlock app." >&2
+    RESPONSE=$(echo "{{\"jsonrpc\":\"2.0\",\"method\":\"push_received\",\"params\":{{\"gate_path\":\"${{REPO_PATH}}\",\"ref_updates\":[${{REF_UPDATES}}]}},\"id\":1}}" | nc -U "$SOCKET" 2>/dev/null)
+
+    if echo "$RESPONSE" | grep -q '"will_create_run":true'; then
+        # Use brand color (signal violet) when stderr is a terminal and NO_COLOR is unset
+        if [ -t 2 ] && [ -z "${{NO_COLOR:-}}" ]; then
+            BRAND='\033[1;38;5;{color}m'
+            RESET='\033[0m'
+        else
+            BRAND=''
+            RESET=''
+        fi
+
+        printf "${{BRAND}}" >&2
+        cat >&2 <<'BANNER'
+{banner}BANNER
+        printf "${{RESET}}" >&2
+
+        echo "" >&2
+        printf "%s" "$DISPLAY_INFO" >&2
+        echo "" >&2
+        echo "A new change has entered Airlock. Track it in the Airlock app." >&2
+        echo "" >&2
+    fi
 else
     echo "! Daemon is not running" >&2
     echo "Run 'airlock daemon start' to process this push." >&2
+    echo "" >&2
 fi
 
-echo "" >&2
 exit 0
-"#;
+"#,
+        banner = crate::BANNER,
+        color = crate::BRAND_COLOR_256,
+    )
+}
 
 /// Upload-pack wrapper script content.
 ///
@@ -160,7 +166,7 @@ pub fn install_hooks(repo_path: &Path) -> Result<()> {
 
     // Install post-receive hook
     let post_receive_path = hooks_dir.join("post-receive");
-    fs::write(&post_receive_path, POST_RECEIVE)?;
+    fs::write(&post_receive_path, post_receive_hook())?;
     make_executable(&post_receive_path)?;
     tracing::debug!(
         "Installed post-receive hook at {}",

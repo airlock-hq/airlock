@@ -576,23 +576,16 @@ fn test_pre_receive_hook_logs_ref_updates_to_stderr() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    // 5. Verify stderr contains the banner from pre-receive hook
+    // 5. Verify stderr does NOT contain the banner (pre-receive is now silent)
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("▗▄▖"),
-        "Pre-receive hook should display Airlock banner. Got: {}",
-        stderr
-    );
-
-    // 6. Verify the branch info is shown
-    assert!(
-        stderr.contains("master"),
-        "Pre-receive hook should display branch name. Got: {}",
+        !stderr.contains("▗▄▖"),
+        "Pre-receive hook should NOT display Airlock banner (output moved to post-receive). Got: {}",
         stderr
     );
 }
 
-/// Test that the pre-receive hook script content has the expected format.
+/// Test that the pre-receive hook script is a minimal accept-all script.
 #[test]
 fn test_pre_receive_hook_content_format() {
     let hook = pre_receive_hook();
@@ -600,25 +593,17 @@ fn test_pre_receive_hook_content_format() {
     // Verify hook is a shell script
     assert!(hook.starts_with("#!/bin/sh"));
 
-    // Verify hook reads from stdin (the standard git hook protocol)
-    assert!(hook.contains("while read oldrev newrev refname"));
-
-    // Verify hook displays branch info to stderr
-    assert!(
-        hook.contains(r#"branch="${refname#refs/heads/}""#),
-        "Pre-receive hook should extract branch name from refname"
-    );
-
-    // Verify hook always exits 0 (soft gate - accepts all pushes)
+    // Verify hook always exits 0 (accepts all pushes)
     assert!(hook.contains("exit 0"));
 
-    // Verify the comment explains it's a soft gate
-    assert!(hook.contains("Always accept the push"));
-
-    // Verify the banner is embedded from the shared constant
+    // Pre-receive hook should be silent — no banner, no branch info
     assert!(
-        hook.contains("▗▄▖"),
-        "Pre-receive hook should contain the BANNER text"
+        !hook.contains("▗▄▖"),
+        "Pre-receive hook should not contain the BANNER text (moved to post-receive)"
+    );
+    assert!(
+        !hook.contains("while read"),
+        "Pre-receive hook should not read stdin (output moved to post-receive)"
     );
 }
 
@@ -653,114 +638,127 @@ fn test_pre_receive_hook_does_not_notify_daemon() {
 fn test_post_receive_hook_notifies_daemon() {
     // Post-receive hook SHOULD contain socket communication
     assert!(
-        POST_RECEIVE.contains("nc -U"),
+        post_receive_hook().contains("nc -U"),
         "Post-receive hook should notify daemon via socket"
     );
     assert!(
-        POST_RECEIVE.contains("SOCKET="),
+        post_receive_hook().contains("SOCKET="),
         "Post-receive hook should have SOCKET variable"
     );
     assert!(
-        POST_RECEIVE.contains("push_received"),
+        post_receive_hook().contains("push_received"),
         "Post-receive hook should send push_received notification"
     );
     assert!(
-        POST_RECEIVE.contains("jsonrpc"),
+        post_receive_hook().contains("jsonrpc"),
         "Post-receive hook should send JSON-RPC messages"
     );
 }
 
-/// Test that post-receive hook content has correct JSON-RPC notification format.
+/// Test that post-receive hook content has correct JSON-RPC request format.
 ///
 /// This test verifies the post-receive hook script structure:
 /// 1. Collects all ref updates from stdin
-/// 2. Constructs a JSON-RPC push_received notification
-/// 3. Sends it to the daemon socket (fire and forget)
+/// 2. Constructs a JSON-RPC push_received request (synchronous, with id)
+/// 3. Sends it to the daemon socket and waits for the response
+/// 4. Conditionally displays banner based on will_create_run in response
 #[test]
 fn test_post_receive_hook_content_format() {
+    let hook = post_receive_hook();
+
     // Verify hook is a shell script
-    assert!(POST_RECEIVE.starts_with("#!/bin/sh"));
+    assert!(hook.starts_with("#!/bin/sh"));
 
     // Verify hook reads from stdin (the standard git hook protocol)
-    assert!(POST_RECEIVE.contains("while read oldrev newrev refname"));
+    assert!(hook.contains("while read oldrev newrev refname"));
 
     // Verify SOCKET is set to the expected path
     assert!(
-        POST_RECEIVE.contains(r#"SOCKET="${HOME}/.airlock/socket""#),
+        hook.contains(r#"SOCKET="${HOME}/.airlock/socket""#),
         "Post-receive hook should use standard socket path"
     );
 
     // Verify REPO_PATH is captured
     assert!(
-        POST_RECEIVE.contains(r#"REPO_PATH="$(pwd)""#),
+        hook.contains(r#"REPO_PATH="$(pwd)""#),
         "Post-receive hook should capture repo path"
     );
 
     // Verify ref updates are collected into JSON array format
-    // The hook uses escaped quotes like \"${refname}\"
     assert!(
-        POST_RECEIVE.contains(r#"\"ref_name\":\"${refname}\""#),
+        hook.contains(r#"\"ref_name\":\"${refname}\""#),
         "Post-receive hook should include ref_name in JSON"
     );
     assert!(
-        POST_RECEIVE.contains(r#"\"old_sha\":\"${oldrev}\""#),
+        hook.contains(r#"\"old_sha\":\"${oldrev}\""#),
         "Post-receive hook should include old_sha in JSON"
     );
     assert!(
-        POST_RECEIVE.contains(r#"\"new_sha\":\"${newrev}\""#),
+        hook.contains(r#"\"new_sha\":\"${newrev}\""#),
         "Post-receive hook should include new_sha in JSON"
     );
 
-    // Verify JSON-RPC notification format with push_received method
-    // The hook uses escaped quotes in the JSON structure
+    // Verify JSON-RPC request format with push_received method
     assert!(
-        POST_RECEIVE.contains(r#"\"method\":\"push_received\""#),
+        hook.contains(r#"\"method\":\"push_received\""#),
         "Post-receive hook should send push_received method"
     );
     assert!(
-        POST_RECEIVE.contains(r#"\"gate_path\":\"${REPO_PATH}\""#),
+        hook.contains(r#"\"gate_path\":\"${REPO_PATH}\""#),
         "Post-receive hook should include gate_path in params"
     );
     assert!(
-        POST_RECEIVE.contains(r#"\"ref_updates\":[${REF_UPDATES}]"#),
+        hook.contains(r#"\"ref_updates\":[${REF_UPDATES}]"#),
         "Post-receive hook should include ref_updates array"
+    );
+
+    // Verify synchronous request pattern (id: 1, captures RESPONSE)
+    assert!(
+        hook.contains(r#"\"id\":1"#),
+        "Post-receive hook should send a request with id (not a notification)"
+    );
+    assert!(
+        hook.contains("RESPONSE=$("),
+        "Post-receive hook should capture daemon response"
+    );
+
+    // Verify conditional output based on will_create_run
+    assert!(
+        hook.contains("will_create_run"),
+        "Post-receive hook should check will_create_run in response"
+    );
+
+    // Verify banner is embedded for conditional display
+    assert!(
+        hook.contains("▗▄▖"),
+        "Post-receive hook should contain the BANNER text"
     );
 
     // Verify socket check before sending
     assert!(
-        POST_RECEIVE.contains(r#"if [ -S "$SOCKET" ]"#),
+        hook.contains(r#"if [ -S "$SOCKET" ]"#),
         "Post-receive hook should check if socket exists"
-    );
-
-    // Verify fire-and-forget pattern (background with &)
-    assert!(
-        POST_RECEIVE.contains("nc -U \"$SOCKET\"") && POST_RECEIVE.contains("&"),
-        "Post-receive hook should send notification in background"
     );
 
     // Verify hook always exits 0
     assert!(
-        POST_RECEIVE.contains("exit 0"),
+        hook.contains("exit 0"),
         "Post-receive hook should always succeed"
     );
 
     // Verify hook has else clause for when daemon is not running
     assert!(
-        POST_RECEIVE.contains("else"),
+        hook.contains("else"),
         "Post-receive hook should have else clause for daemon not running case"
     );
 
     // Verify warning message when daemon is not running
     assert!(
-        POST_RECEIVE.contains("Daemon is not running"),
+        hook.contains("Daemon is not running"),
         "Post-receive hook should warn when daemon is not running"
     );
     assert!(
-        POST_RECEIVE.contains("not running"),
-        "Post-receive hook should explain daemon is not running"
-    );
-    assert!(
-        POST_RECEIVE.contains("airlock daemon start"),
+        hook.contains("airlock daemon start"),
         "Post-receive hook should suggest how to start daemon"
     );
 }

@@ -579,6 +579,13 @@ pub struct RunDetailInfo {
     pub completed_at: Option<i64>,
 }
 
+/// Result for the `push_received` method.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PushReceivedResult {
+    /// Whether the push will create any pipeline runs.
+    pub will_create_run: bool,
+}
+
 /// Result for the `mark_forwarded` method.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MarkForwardedResult {

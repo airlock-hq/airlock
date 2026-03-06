@@ -13,21 +13,70 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-/// Handle the `push_received` notification (from post-receive hook).
+/// Quick pre-check: will the pushed refs create any pipeline runs?
 ///
-/// This function implements push coalescing and deduplication:
-/// 1. Records the push in the coalescer for debouncing
-/// 2. Checks for ready pushes (debounce period passed)
-/// 3. For each ready push, supersedes overlapping runs and creates a new run
-pub async fn handle_push_received(ctx: Arc<HandlerContext>, params: serde_json::Value) {
-    use crate::ipc::PushReceivedParams;
+/// Partitions refs with `is_pipeline_ref()`, then for each pipeline ref loads
+/// workflows from its tree and filters for the branch. Returns `true` if any
+/// pipeline ref has matching workflows (or would create an error run due to
+/// missing/broken workflows).
+fn check_will_create_runs(gate_path: &Path, ref_updates: &[RefUpdate]) -> bool {
+    let (pipeline_refs, _): (Vec<_>, Vec<_>) =
+        ref_updates.iter().partition(|r| git::is_pipeline_ref(r));
+
+    if pipeline_refs.is_empty() {
+        return false;
+    }
+
+    for update in &pipeline_refs {
+        let branch = match update.ref_name.strip_prefix("refs/heads/") {
+            Some(b) => b,
+            None => continue,
+        };
+
+        match load_workflows_from_tree(gate_path, &update.new_sha) {
+            Ok(all_workflows) if !all_workflows.is_empty() => {
+                let branch_workflows = filter_workflows_for_branch(all_workflows, branch);
+                if !branch_workflows.is_empty() {
+                    return true; // Has matching workflows → will create run
+                }
+                // Has workflows but none match this branch → unmatched, forwarded directly
+            }
+            Ok(_empty) => {
+                // No workflows at all → error run will be created
+                return true;
+            }
+            Err(_) => {
+                // Error loading workflows → error run will be created
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Handle the `push_received` request (from post-receive hook).
+///
+/// This function:
+/// 1. Checks if the push will create any pipeline runs (quick pre-check)
+/// 2. Records the push in the coalescer for debouncing
+/// 3. Checks for ready pushes (debounce period passed)
+/// 4. For each ready push, supersedes overlapping runs and creates a new run
+/// 5. Returns whether the push will create runs (for conditional hook output)
+pub async fn handle_push_received(
+    ctx: Arc<HandlerContext>,
+    params: serde_json::Value,
+) -> crate::ipc::PushReceivedResult {
+    use crate::ipc::{PushReceivedParams, PushReceivedResult};
 
     // Parse parameters
     let params: PushReceivedParams = match serde_json::from_value(params) {
         Ok(p) => p,
         Err(e) => {
             error!("Invalid push_received params: {}", e);
-            return;
+            return PushReceivedResult {
+                will_create_run: false,
+            };
         }
     };
 
@@ -41,7 +90,9 @@ pub async fn handle_push_received(ctx: Arc<HandlerContext>, params: serde_json::
             Ok(r) => r,
             Err(e) => {
                 error!("Failed to list repos: {}", e);
-                return;
+                return PushReceivedResult {
+                    will_create_run: false,
+                };
             }
         };
 
@@ -52,7 +103,9 @@ pub async fn handle_push_received(ctx: Arc<HandlerContext>, params: serde_json::
         Some(r) => r,
         None => {
             error!("No repo found for gate path: {}", params.gate_path);
-            return;
+            return PushReceivedResult {
+                will_create_run: false,
+            };
         }
     };
 
@@ -66,6 +119,9 @@ pub async fn handle_push_received(ctx: Arc<HandlerContext>, params: serde_json::
             new_sha: r.new_sha,
         })
         .collect();
+
+    // Quick pre-check: will this push create any runs?
+    let will_create_run = check_will_create_runs(&repo.gate_path, &ref_updates);
 
     // Record push in coalescer (may return immediately if debounce period passed)
     let ready_refs = ctx
@@ -84,6 +140,8 @@ pub async fn handle_push_received(ctx: Arc<HandlerContext>, params: serde_json::
     for (ready_repo_id, ready_refs) in all_ready {
         process_coalesced_push(ctx.clone(), &ready_repo_id, ready_refs).await;
     }
+
+    PushReceivedResult { will_create_run }
 }
 
 /// Process a coalesced push after the debounce period.
