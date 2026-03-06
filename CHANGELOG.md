@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.52](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.51...airlock-v0.1.52) (2026-03-06)
+
+
+### Features
+
+* show mermaid diagram in PR ([#32](https://github.com/airlock-hq/airlock/issues/32)) ([956f7fb](https://github.com/airlock-hq/airlock/commit/956f7fb6de32a6f98f5c0ad5467114d27ee357fc))
+
+
+### Bug Fixes
+
+* show airlock banner only if push matched a pipeline ([#30](https://github.com/airlock-hq/airlock/issues/30)) ([3e66ca3](https://github.com/airlock-hq/airlock/commit/3e66ca3efce65b855f88a80b38f299398f37c9ae))
+
 ## [0.1.51](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.50...airlock-v0.1.51) (2026-03-06)
 
 
