@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.51](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.50...airlock-v0.1.51) (2026-03-06)
+
+
+### Features
+
+* show error when step has no stdout/stderr ([dc5de0c](https://github.com/airlock-hq/airlock/commit/dc5de0c01800dd772508d684f2b067b2863fa73f))
+
+
+### Bug Fixes
+
+* **daemon:** make run queue cancellation ref-aware ([#28](https://github.com/airlock-hq/airlock/issues/28)) ([60ef542](https://github.com/airlock-hq/airlock/commit/60ef542710b37c4888bb33a4c2014cf8f4c46157))
+* record correct branch sha in rebase ([72a7a51](https://github.com/airlock-hq/airlock/commit/72a7a51e57a381485ce1c129e71b5ad83e33c1dd))
+* **window-resize:** smooth out window launch ([#29](https://github.com/airlock-hq/airlock/issues/29)) ([93c2ec9](https://github.com/airlock-hq/airlock/commit/93c2ec97c8b8214c25b137a7f754f9aae664d67f))
+* **window:** unminimize window on show ([b3a79dc](https://github.com/airlock-hq/airlock/commit/b3a79dc8d92b34ce98aec3d74ae4d0104c944160))
+
 ## [0.1.50](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.49...airlock-v0.1.50) (2026-03-05)
 
 
