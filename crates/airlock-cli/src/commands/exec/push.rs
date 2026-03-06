@@ -879,7 +879,11 @@ mod tests {
         );
 
         // --- Simulate rebase: amend the commit (diverged history) ---
-        std::fs::write(worktree_path.join("feature.txt"), "feature work (rebased)\n").unwrap();
+        std::fs::write(
+            worktree_path.join("feature.txt"),
+            "feature work (rebased)\n",
+        )
+        .unwrap();
         Command::new("git")
             .args(["add", "."])
             .current_dir(&worktree_path)

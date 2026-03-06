@@ -2096,7 +2096,10 @@ mod tests {
 
             // Upstream bare repo
             let upstream_path = temp_dir.path().join("upstream.git");
-            git(temp_dir.path(), &["init", "--bare", upstream_path.to_str().unwrap()]);
+            git(
+                temp_dir.path(),
+                &["init", "--bare", upstream_path.to_str().unwrap()],
+            );
 
             // Working repo: main branch with initial commit
             let work_path = temp_dir.path().join("work");
@@ -2108,7 +2111,10 @@ mod tests {
             git(&work_path, &["add", "."]);
             git(&work_path, &["commit", "-m", "initial"]);
             git(&work_path, &["branch", "-M", "main"]);
-            git(&work_path, &["remote", "add", "origin", upstream_path.to_str().unwrap()]);
+            git(
+                &work_path,
+                &["remote", "add", "origin", upstream_path.to_str().unwrap()],
+            );
             git(&work_path, &["push", "-u", "origin", "main"]);
 
             // Set upstream HEAD → main (makes origin/HEAD resolve to origin/main)
@@ -2122,23 +2128,38 @@ mod tests {
             git(&work_path, &["push", "-u", "origin", "feat/test-branch"]);
 
             let main_sha = git_output(&upstream_path, &["rev-parse", "refs/heads/main"]);
-            let feature_sha = git_output(&upstream_path, &["rev-parse", "refs/heads/feat/test-branch"]);
+            let feature_sha = git_output(
+                &upstream_path,
+                &["rev-parse", "refs/heads/feat/test-branch"],
+            );
             assert_ne!(main_sha, feature_sha, "main and feature must differ");
 
             // Gate bare repo with upstream as origin
             let gate_path = temp_dir.path().join("gate.git");
-            git(temp_dir.path(), &["init", "--bare", gate_path.to_str().unwrap()]);
-            git(&gate_path, &["remote", "add", "origin", upstream_path.to_str().unwrap()]);
+            git(
+                temp_dir.path(),
+                &["init", "--bare", gate_path.to_str().unwrap()],
+            );
+            git(
+                &gate_path,
+                &["remote", "add", "origin", upstream_path.to_str().unwrap()],
+            );
             git(&gate_path, &["fetch", "origin"]);
             git(&gate_path, &["config", "user.email", "test@test.com"]);
             git(&gate_path, &["config", "user.name", "Test"]);
 
             // Detached worktree from gate (matching production)
             let worktree_path = temp_dir.path().join("worktree");
-            git(&gate_path, &[
-                "worktree", "add", "--detach",
-                worktree_path.to_str().unwrap(), &feature_sha,
-            ]);
+            git(
+                &gate_path,
+                &[
+                    "worktree",
+                    "add",
+                    "--detach",
+                    worktree_path.to_str().unwrap(),
+                    &feature_sha,
+                ],
+            );
 
             // Verify detached HEAD — the precondition for the bug
             assert_eq!(
@@ -2210,8 +2231,8 @@ mod tests {
         fn push_stage(&self) -> Option<StepDefinition> {
             let airlock_bin = std::env::current_exe()
                 .ok()?
-                .parent()?  // target/debug/deps/
-                .parent()?  // target/debug/
+                .parent()? // target/debug/deps/
+                .parent()? // target/debug/
                 .join("airlock");
             if !airlock_bin.exists() {
                 return None;
@@ -2231,22 +2252,18 @@ mod tests {
         async fn run_rebase(&self) -> StageExecutionResult {
             let stage = self.resolve_rebase_stage().await;
             let env = self.stage_env();
-            execute_stage_command_with_streaming(
-                &stage, &env, Duration::from_secs(30), None, None,
-            )
-            .await
-            .expect("Executor should not error")
+            execute_stage_command_with_streaming(&stage, &env, Duration::from_secs(30), None, None)
+                .await
+                .expect("Executor should not error")
         }
 
         /// Run the push stage and return its result.
         async fn run_push(&self) -> StageExecutionResult {
             let stage = self.push_stage().expect("airlock binary must be built");
             let env = self.stage_env();
-            execute_stage_command_with_streaming(
-                &stage, &env, Duration::from_secs(30), None, None,
-            )
-            .await
-            .expect("Executor should not error")
+            execute_stage_command_with_streaming(&stage, &env, Duration::from_secs(30), None, None)
+                .await
+                .expect("Executor should not error")
         }
 
         /// Read the upstream SHA from rebase_state.json.
@@ -2343,9 +2360,11 @@ mod tests {
         // Verify rebase_state.json records feature branch SHA, not main
         let recorded = tb.rebase_state_sha();
         assert_eq!(
-            recorded, tb.feature_sha,
+            recorded,
+            tb.feature_sha,
             "Must record feature branch SHA ({}), not main ({}). Got: {}",
-            &tb.feature_sha[..12], &tb.main_sha[..12],
+            &tb.feature_sha[..12],
+            &tb.main_sha[..12],
             &recorded[..12.min(recorded.len())],
         );
 
@@ -2408,7 +2427,9 @@ mod tests {
             push_result.stdout, push_result.stderr,
         );
         assert!(
-            push_result.stderr.contains("changed since the rebase stage ran"),
+            push_result
+                .stderr
+                .contains("changed since the rebase stage ran"),
             "Should report upstream changed, got stderr: {}",
             push_result.stderr,
         );
