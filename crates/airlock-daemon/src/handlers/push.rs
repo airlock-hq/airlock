@@ -262,17 +262,29 @@ pub async fn process_coalesced_push(
 
     // Outside the DB lock: mark paused jobs from superseded runs as Skipped
     // and release their pool worktree slots.
+    // Use conditional update to avoid overwriting a status that changed between
+    // when we collected the jobs (under lock) and now.
     for (job_id, job_repo_id, worktree_path) in &paused_jobs_to_release {
         let ts = now();
-        {
+        let was_updated = {
             let db = ctx.db.lock().await;
-            let _ = db.update_job_status(
+            db.update_job_status_if(
                 job_id,
+                JobStatus::AwaitingApproval,
                 JobStatus::Skipped,
-                None,
                 Some(ts),
                 Some("Superseded by newer push"),
+            )
+            .unwrap_or(false)
+        };
+        if !was_updated {
+            // Job status changed between collection and update (e.g., user approved it).
+            // Skip pool release — the approval handler will handle cleanup.
+            debug!(
+                "Skipping pool release for job {} — status already changed from AwaitingApproval",
+                job_id
             );
+            continue;
         }
         if let Some(wt_path) = worktree_path {
             if let Some(lease) = ctx

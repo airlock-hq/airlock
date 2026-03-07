@@ -325,7 +325,14 @@ async fn execute_workflow_dag(
             }
 
             let (worktree_path, lease) =
-                resolve_job_worktree(ctx, job_key, run, repo, job_id_map).await;
+                match resolve_job_worktree(ctx, job_key, run, repo, job_id_map).await {
+                    Ok(result) => result,
+                    Err(e) => {
+                        fail_job_worktree(ctx, run, job_key, job_id_map, &mut job_statuses, &e)
+                            .await;
+                        continue;
+                    }
+                };
 
             let status = execute_single_job(
                 ctx,
@@ -356,10 +363,15 @@ async fn execute_workflow_dag(
                     continue;
                 }
 
-                let (worktree_path, lease) =
-                    resolve_job_worktree(ctx, job_key, run, repo, job_id_map).await;
-
-                wave_jobs.push((job_key.clone(), worktree_path, lease));
+                match resolve_job_worktree(ctx, job_key, run, repo, job_id_map).await {
+                    Ok((worktree_path, lease)) => {
+                        wave_jobs.push((job_key.clone(), worktree_path, lease));
+                    }
+                    Err(e) => {
+                        fail_job_worktree(ctx, run, job_key, job_id_map, &mut job_statuses, &e)
+                            .await;
+                    }
+                }
             }
 
             let spawned_keys: Vec<String> = wave_jobs.iter().map(|(k, _, _)| k.clone()).collect();
@@ -423,34 +435,7 @@ async fn execute_workflow_dag(
         }
     }
 
-    // Release pool leases — but only if no job using that worktree is paused
-    for lease in job_leases.values() {
-        let lease_path = &lease.path;
-        let any_holds = job_worktrees.iter().any(|(jk, wt)| {
-            wt == lease_path && job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval)
-        });
-
-        if !any_holds {
-            ctx.worktree_pool
-                .release(&run.repo_id, lease.slot_index)
-                .await;
-        }
-    }
-
-    // Clean up ephemeral worktrees (those without pool leases)
-    let leased_paths: std::collections::HashSet<&PathBuf> =
-        job_leases.values().map(|l| &l.path).collect();
-    for (jk, wt) in &job_worktrees {
-        if leased_paths.contains(wt) {
-            continue; // managed by pool
-        }
-        if job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval) {
-            continue; // still in use
-        }
-        if let Err(e) = airlock_core::remove_run_worktree(&repo.gate_path, wt) {
-            warn!("Failed to clean up ephemeral worktree {:?}: {}", wt, e);
-        }
-    }
+    release_leases_and_cleanup(ctx, run, repo, &job_leases, &job_worktrees, &job_statuses).await;
 
     // Emit final run result (skip if already emitted by mark_run_cancelled)
     if !cancelled {
@@ -465,17 +450,29 @@ async fn execute_workflow_dag(
 ///
 /// Returns `(PathBuf, Option<PoolLease>)` — the lease is `None` when
 /// pool acquisition fails and an ephemeral worktree is used as fallback.
+///
+/// Returns `Err` when both pool acquisition and ephemeral fallback fail.
 pub(super) async fn resolve_job_worktree(
     ctx: &Arc<HandlerContext>,
     job_key: &str,
     run: &Run,
     repo: &Repo,
     job_id_map: &HashMap<String, String>,
-) -> (PathBuf, Option<PoolLease>) {
+) -> Result<(PathBuf, Option<PoolLease>), String> {
+    // Reload head_sha from DB to pick up updates from prior jobs (e.g. freeze).
+    // The in-memory `run.head_sha` may be stale if an earlier job updated it.
+    let current_head_sha = {
+        let db = ctx.db.lock().await;
+        match db.get_run(&run.id) {
+            Ok(Some(r)) => r.head_sha,
+            _ => run.head_sha.clone(),
+        }
+    };
+
     // Acquire from pool
     match ctx
         .worktree_pool
-        .acquire(&run.repo_id, &repo.gate_path, &run.head_sha, &ctx.paths)
+        .acquire(&run.repo_id, &repo.gate_path, &current_head_sha, &ctx.paths)
         .await
     {
         Ok(lease) => {
@@ -494,7 +491,7 @@ pub(super) async fn resolve_job_worktree(
                 "Job '{}' acquired pool worktree slot {} at {:?}",
                 job_key, lease.slot_index, path
             );
-            (path, Some(lease))
+            Ok((path, Some(lease)))
         }
         Err(e) => {
             error!(
@@ -505,15 +502,20 @@ pub(super) async fn resolve_job_worktree(
                 .paths
                 .run_worktree(&run.repo_id, &run.id)
                 .with_extension(job_key);
-            if let Err(e2) =
-                airlock_core::create_run_worktree(&repo.gate_path, &ephemeral_wt, &run.head_sha)
+            match airlock_core::create_run_worktree(&repo.gate_path, &ephemeral_wt, &current_head_sha)
             {
-                error!(
-                    "Ephemeral worktree fallback also failed for job '{}': {}",
-                    job_key, e2
-                );
+                Ok(()) => Ok((ephemeral_wt, None)),
+                Err(e2) => {
+                    error!(
+                        "Ephemeral worktree fallback also failed for job '{}': {}",
+                        job_key, e2
+                    );
+                    Err(format!(
+                        "Failed to acquire worktree for job '{}': pool error: {}, ephemeral error: {}",
+                        job_key, e, e2
+                    ))
+                }
             }
-            (ephemeral_wt, None)
         }
     }
 }
@@ -573,6 +575,38 @@ pub(super) async fn skip_job(
     });
 
     job_statuses.insert(job_key.to_string(), JobStatus::Skipped);
+}
+
+/// Mark a job as failed due to worktree acquisition failure.
+pub(super) async fn fail_job_worktree(
+    ctx: &Arc<HandlerContext>,
+    run: &Run,
+    job_key: &str,
+    job_id_map: &HashMap<String, String>,
+    job_statuses: &mut HashMap<String, JobStatus>,
+    error_msg: &str,
+) {
+    error!("Job '{}' failed: {}", job_key, error_msg);
+
+    if let Some(job_id) = job_id_map.get(job_key) {
+        let db = ctx.db.lock().await;
+        let _ = db.update_job_status(
+            job_id,
+            JobStatus::Failed,
+            None,
+            Some(now_epoch()),
+            Some(error_msg),
+        );
+    }
+
+    ctx.emit(AirlockEvent::JobCompleted {
+        repo_id: run.repo_id.clone(),
+        run_id: run.id.clone(),
+        job_key: job_key.to_string(),
+        status: "failed".to_string(),
+    });
+
+    job_statuses.insert(job_key.to_string(), JobStatus::Failed);
 }
 
 /// Create a log streaming callback that both emits events and writes to disk.
@@ -643,6 +677,7 @@ pub(super) async fn execute_step_sequence(
     let mut job_success = true;
     let mut job_error: Option<String> = None;
     let mut paused_for_approval = false;
+    let mut effective_head_sha = params.run.head_sha.clone();
 
     for (i, step) in steps.iter().enumerate() {
         // Check cancellation before each step
@@ -724,7 +759,7 @@ pub(super) async fn execute_step_sequence(
             stage_name: &resolved_step.name,
             branch: &params.run.branch,
             base_sha: params.effective_base_sha,
-            head_sha: &params.run.head_sha,
+            head_sha: &effective_head_sha,
             worktree_path: params.worktree_path,
             repo_root: &params.repo.working_path,
             upstream_url: &params.repo.upstream_url,
@@ -795,6 +830,35 @@ pub(super) async fn execute_step_sequence(
                 {
                     let db = params.ctx.db.lock().await;
                     let _ = db.update_step_result(step_result);
+                }
+
+                // Check if the step produced a .head_sha artifact (e.g. from `airlock exec freeze`)
+                if res.status == StepStatus::Passed
+                    || res.status == StepStatus::AwaitingApproval
+                {
+                    let head_sha_path = env.artifacts.join(".head_sha");
+                    if head_sha_path.exists() {
+                        if let Ok(contents) = std::fs::read_to_string(&head_sha_path) {
+                            let new_sha = contents.trim().to_string();
+                            if !new_sha.is_empty() && new_sha != effective_head_sha {
+                                info!(
+                                    "Step '{}' updated head_sha: {} -> {}",
+                                    step.name,
+                                    &effective_head_sha
+                                        [..8.min(effective_head_sha.len())],
+                                    &new_sha[..8.min(new_sha.len())]
+                                );
+                                effective_head_sha = new_sha.clone();
+                                let db = params.ctx.db.lock().await;
+                                let _ = db.update_run_head_sha(
+                                    &params.run.id,
+                                    &new_sha,
+                                );
+                            }
+                        }
+                        // Consume the artifact so subsequent steps don't re-read it
+                        let _ = std::fs::remove_file(&head_sha_path);
+                    }
                 }
 
                 // Emit StepCompleted event
@@ -1160,7 +1224,21 @@ pub(super) async fn resume_dag_after_job_completion(
             let job_config = workflow.jobs.get(job_key).unwrap();
 
             let (worktree_path, lease) =
-                resolve_job_worktree(ctx, job_key, run, repo, &job_id_map).await;
+                match resolve_job_worktree(ctx, job_key, run, repo, &job_id_map).await {
+                    Ok(result) => result,
+                    Err(e) => {
+                        fail_job_worktree(
+                            ctx,
+                            run,
+                            job_key,
+                            &job_id_map,
+                            &mut job_statuses,
+                            &e,
+                        )
+                        .await;
+                        continue;
+                    }
+                };
 
             let status = execute_single_job(
                 ctx,
@@ -1184,9 +1262,22 @@ pub(super) async fn resume_dag_after_job_completion(
             let mut wave_jobs: Vec<(String, PathBuf, Option<PoolLease>)> = Vec::new();
 
             for job_key in &newly_runnable {
-                let (worktree_path, lease) =
-                    resolve_job_worktree(ctx, job_key, run, repo, &job_id_map).await;
-                wave_jobs.push((job_key.clone(), worktree_path, lease));
+                match resolve_job_worktree(ctx, job_key, run, repo, &job_id_map).await {
+                    Ok((worktree_path, lease)) => {
+                        wave_jobs.push((job_key.clone(), worktree_path, lease));
+                    }
+                    Err(e) => {
+                        fail_job_worktree(
+                            ctx,
+                            run,
+                            job_key,
+                            &job_id_map,
+                            &mut job_statuses,
+                            &e,
+                        )
+                        .await;
+                    }
+                }
             }
 
             let spawned_keys: Vec<String> = wave_jobs.iter().map(|(k, _, _)| k.clone()).collect();
@@ -1257,6 +1348,22 @@ pub(super) async fn resume_dag_after_job_completion(
         // Loop again to check if more jobs got unblocked
     }
 
+    release_leases_and_cleanup(ctx, run, repo, &job_leases, &job_worktrees, &job_statuses).await;
+}
+
+/// Release pool leases and clean up ephemeral worktrees after jobs finish.
+///
+/// Pool leases are held (not released) if any job using that worktree slot is
+/// still paused (`AwaitingApproval`). Ephemeral worktrees are removed unless
+/// they belong to a paused job or are tracked by the pool.
+async fn release_leases_and_cleanup(
+    ctx: &Arc<HandlerContext>,
+    run: &Run,
+    repo: &Repo,
+    job_leases: &HashMap<String, PoolLease>,
+    job_worktrees: &HashMap<String, PathBuf>,
+    job_statuses: &HashMap<String, JobStatus>,
+) {
     // Release pool leases — but only if no job using that worktree is paused
     for lease in job_leases.values() {
         let lease_path = &lease.path;
@@ -1274,7 +1381,7 @@ pub(super) async fn resume_dag_after_job_completion(
     // Clean up ephemeral worktrees (those without pool leases and not pool-managed)
     let leased_paths: std::collections::HashSet<&PathBuf> =
         job_leases.values().map(|l| &l.path).collect();
-    for (jk, wt) in &job_worktrees {
+    for (jk, wt) in job_worktrees {
         if leased_paths.contains(wt) {
             continue; // managed by pool (lease acquired in this call)
         }
@@ -1391,7 +1498,7 @@ pub(super) fn now_epoch() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use airlock_core::RefUpdate;
+    use airlock_core::{Database, RefUpdate};
 
     #[test]
     fn test_extract_branch_name_simple() {
@@ -1465,5 +1572,150 @@ mod tests {
         }];
 
         assert_eq!(extract_branch_name(&updates), None);
+    }
+
+    #[tokio::test]
+    async fn test_execute_step_sequence_reads_head_sha_artifact() {
+        use airlock_core::{
+            AirlockPaths, ApprovalMode, JobResult, JobStatus as JS, Repo, Run, StepDefinition,
+            StepResult, StepStatus,
+        };
+        use crate::handlers::HandlerContext;
+        use tokio::sync::watch;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = AirlockPaths::with_root(tmp.path().to_path_buf());
+        let db = Database::open_in_memory().unwrap();
+        let (shutdown_tx, _) = watch::channel(false);
+
+        let repo_id = "repo-head-sha";
+        let run_id = "run-head-sha";
+        let job_id = "job-head-sha";
+        let original_sha = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111";
+        let new_sha = "bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222";
+
+        // Create a worktree directory (just a temp dir, step doesn't use git)
+        let worktree_path = tmp.path().join("worktree");
+        std::fs::create_dir_all(&worktree_path).unwrap();
+
+        // Create a repo directory
+        let repo_root = tmp.path().join("repo");
+        std::fs::create_dir_all(&repo_root).unwrap();
+        let gate_path = tmp.path().join("gate.git");
+        std::fs::create_dir_all(&gate_path).unwrap();
+
+        let repo = Repo {
+            id: repo_id.to_string(),
+            working_path: repo_root.clone(),
+            upstream_url: "git@github.com:user/repo.git".to_string(),
+            gate_path: gate_path.clone(),
+            last_sync: None,
+            created_at: 1704067200,
+        };
+        db.insert_repo(&repo).unwrap();
+
+        // Insert run into DB
+        let run = Run {
+            id: run_id.to_string(),
+            repo_id: repo_id.to_string(),
+            ref_updates: vec![RefUpdate {
+                ref_name: "refs/heads/main".to_string(),
+                old_sha: "0000000000000000000000000000000000000000".to_string(),
+                new_sha: original_sha.to_string(),
+            }],
+            error: None,
+            superseded: false,
+            created_at: 1704067200,
+            branch: "refs/heads/main".to_string(),
+            base_sha: "0000000000000000000000000000000000000000".to_string(),
+            head_sha: original_sha.to_string(),
+            current_step: None,
+            updated_at: 1704067200,
+            workflow_file: "main.yml".to_string(),
+            workflow_name: None,
+        };
+        db.insert_run(&run).unwrap();
+
+        // Insert job result (FK for step_results)
+        let job_result = JobResult {
+            id: job_id.to_string(),
+            run_id: run_id.to_string(),
+            job_key: "build".to_string(),
+            name: None,
+            status: JS::Running,
+            job_order: 0,
+            started_at: Some(1704067200),
+            completed_at: None,
+            error: None,
+            worktree_path: None,
+        };
+        db.insert_job_result(&job_result).unwrap();
+
+        // Pre-create the artifacts dir since build_stage_environment will use it
+        let artifacts_dir = paths.run_artifacts(repo_id, run_id);
+        std::fs::create_dir_all(&artifacts_dir).unwrap();
+
+        // Step: write new SHA to .head_sha in artifacts dir
+        let step = StepDefinition {
+            name: "update-head".to_string(),
+            run: Some(format!(
+                "printf '%s' '{}' > \"$AIRLOCK_ARTIFACTS/.head_sha\"",
+                new_sha
+            )),
+            uses: None,
+            shell: Some("sh".to_string()),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: Some(10),
+        };
+
+        let step_result_id = "step-head-sha";
+        let mut step_results = vec![StepResult {
+            id: step_result_id.to_string(),
+            run_id: run_id.to_string(),
+            job_id: job_id.to_string(),
+            name: "update-head".to_string(),
+            status: StepStatus::Pending,
+            step_order: 0,
+            exit_code: None,
+            duration_ms: None,
+            error: None,
+            started_at: None,
+            completed_at: None,
+        }];
+        db.insert_step_result(&step_results[0]).unwrap();
+
+        let ctx = Arc::new(HandlerContext::new(paths, db, shutdown_tx));
+
+        let params = StepSequenceParams {
+            ctx: &ctx,
+            run: &run,
+            repo: &repo,
+            job_key: "build",
+            job_config_name: None,
+            worktree_path: &worktree_path,
+            effective_base_sha: &run.base_sha,
+            cancel: None,
+            clear_approval_for_step: None,
+            step_offset: 0,
+        };
+
+        let (status, error) = execute_step_sequence(&params, &[step], &mut step_results).await;
+
+        assert_eq!(status, JobStatus::Passed, "Job should pass: {:?}", error);
+
+        // Verify DB was updated with new head_sha
+        let db = ctx.db.lock().await;
+        let updated_run = db.get_run(run_id).unwrap().unwrap();
+        assert_eq!(
+            updated_run.head_sha, new_sha,
+            "DB head_sha should be updated to the new SHA written by the step"
+        );
+
+        // Verify .head_sha artifact was consumed (deleted)
+        assert!(
+            !artifacts_dir.join(".head_sha").exists(),
+            ".head_sha artifact should be consumed after reading"
+        );
     }
 }

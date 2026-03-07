@@ -190,6 +190,49 @@ impl Database {
         Ok(())
     }
 
+    /// Conditionally update a job result's status — only if the current status matches `expected`.
+    ///
+    /// Returns `true` if the update was applied, `false` if the status had already changed.
+    pub fn update_job_status_if(
+        &self,
+        id: &str,
+        expected: JobStatus,
+        new_status: JobStatus,
+        completed_at: Option<i64>,
+        error: Option<&str>,
+    ) -> Result<bool> {
+        let expected_str = job_status_to_string(expected);
+        let new_str = job_status_to_string(new_status);
+
+        let rows_affected = self
+            .conn
+            .execute(
+                "UPDATE job_results SET status = ?1, completed_at = ?2, error = ?3
+                 WHERE id = ?4 AND status = ?5",
+                params![new_str, completed_at, error, id, expected_str],
+            )
+            .map_err(|e| {
+                AirlockError::Database(format!("Failed to conditionally update job status: {}", e))
+            })?;
+
+        if rows_affected > 0 {
+            tracing::debug!(
+                "Conditionally updated job status: {} -> {} (was {})",
+                id,
+                new_str,
+                expected_str
+            );
+        } else {
+            tracing::debug!(
+                "Conditional update skipped for job {}: status was no longer {}",
+                id,
+                expected_str
+            );
+        }
+
+        Ok(rows_affected > 0)
+    }
+
     /// Delete all job results for a run.
     pub fn delete_job_results_for_run(&self, run_id: &str) -> Result<u32> {
         let rows_affected = self
