@@ -365,8 +365,7 @@ async fn resume_pipeline_after_approval(
                     .iter()
                     .any(|j| {
                         j.job_key != approved_job_key
-                            && j.worktree_path.as_deref()
-                                == Some(&*worktree_path.to_string_lossy())
+                            && j.worktree_path.as_deref() == Some(&*worktree_path.to_string_lossy())
                             && !j.status.is_final()
                     })
             };
@@ -490,8 +489,7 @@ async fn resume_pipeline_after_approval(
                     .iter()
                     .any(|j| {
                         j.job_key != approved_job_key
-                            && j.worktree_path.as_deref()
-                                == Some(&*worktree_path.to_string_lossy())
+                            && j.worktree_path.as_deref() == Some(&*worktree_path.to_string_lossy())
                             && !j.status.is_final()
                     })
             };
@@ -709,7 +707,13 @@ pub async fn handle_apply_patches(
                         }
                     }
                 }
-                Err(_) => "default".to_string(),
+                Err(e) => {
+                    return Response::error(
+                        id,
+                        error_codes::DATABASE_ERROR,
+                        format!("Failed to query jobs: {}", e),
+                    );
+                }
             }
         };
         find_job_worktree(&ctx.paths, &run, &job_key, &db)

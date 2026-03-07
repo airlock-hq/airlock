@@ -63,8 +63,9 @@ pub struct RunPermit {
 impl Drop for RunPermit {
     fn drop(&mut self) {
         // Remove this run from the running vec. We can't async in drop,
-        // so use try_lock. If the lock is held, the entry will be stale
-        // but harmless — it will be cleaned up on the next acquire.
+        // so use try_lock. If the lock is held, the stale entry is
+        // harmless — it holds no semaphore permit and will be ignored
+        // by future cancellation checks.
         if let Ok(mut slots) = self.slots.try_lock() {
             if let Some(slot) = slots.get_mut(&self.repo_id) {
                 slot.running.retain(|r| r.id != self.run_id);
@@ -101,7 +102,10 @@ impl RunQueue {
     pub async fn cancel_active(&self, repo_id: &str, ref_names: Option<&[String]>) {
         let mut slots = self.slots.lock().await;
         if let Some(slot) = slots.get_mut(repo_id) {
-            // Cancel running runs with overlapping refs (or all if None).
+            // Cancel and remove running runs. Unlike `acquire` (which keeps
+            // cancelled runs in the vec so their semaphore permit stays held
+            // until drop), here we remove immediately because no new run is
+            // waiting for the slot.
             slot.running.retain(|running| {
                 let should_cancel = match ref_names {
                     Some(refs) => refs_overlap(&running.refs, refs),

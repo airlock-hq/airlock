@@ -99,7 +99,7 @@ impl RepoPool {
         let to_remove = idle_count - max_idle;
         let mut removed = Vec::new();
 
-        // Collect indices of idle slots, highest index first
+        // Collect indices of idle slots, highest position first
         let mut idle_indices: Vec<usize> = self
             .slots
             .iter()
@@ -115,8 +115,7 @@ impl RepoPool {
             let slot = &self.slots[vec_idx];
             removed.push((slot.index, slot.path.clone()));
         }
-        // Sort descending so removal doesn't shift earlier indices
-        idle_indices.sort_unstable_by(|a, b| b.cmp(a));
+        // Already in descending order from reverse() + truncate() above
         for vec_idx in idle_indices {
             self.slots.remove(vec_idx);
         }

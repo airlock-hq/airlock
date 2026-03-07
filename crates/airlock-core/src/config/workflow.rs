@@ -63,7 +63,6 @@ pub struct JobConfig {
     /// Ordered list of steps to execute within this job.
     #[serde(default)]
     pub steps: Vec<StepDefinition>,
-
 }
 
 /// A helper type that deserializes from either a single string or a list of strings.

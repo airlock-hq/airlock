@@ -324,14 +324,8 @@ async fn execute_workflow_dag(
                 continue;
             }
 
-            let (worktree_path, lease) = resolve_job_worktree(
-                ctx,
-                job_key,
-                run,
-                repo,
-                job_id_map,
-            )
-            .await;
+            let (worktree_path, lease) =
+                resolve_job_worktree(ctx, job_key, run, repo, job_id_map).await;
 
             let status = execute_single_job(
                 ctx,
@@ -362,14 +356,8 @@ async fn execute_workflow_dag(
                     continue;
                 }
 
-                let (worktree_path, lease) = resolve_job_worktree(
-                    ctx,
-                    job_key,
-                    run,
-                    repo,
-                    job_id_map,
-                )
-                .await;
+                let (worktree_path, lease) =
+                    resolve_job_worktree(ctx, job_key, run, repo, job_id_map).await;
 
                 wave_jobs.push((job_key.clone(), worktree_path, lease));
             }
@@ -455,6 +443,21 @@ async fn execute_workflow_dag(
         }
     }
 
+    // Clean up ephemeral worktrees (those without pool leases)
+    let leased_paths: std::collections::HashSet<&PathBuf> =
+        job_leases.values().map(|l| &l.path).collect();
+    for (jk, wt) in &job_worktrees {
+        if leased_paths.contains(wt) {
+            continue; // managed by pool
+        }
+        if job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval) {
+            continue; // still in use
+        }
+        if let Err(e) = airlock_core::remove_run_worktree(&repo.gate_path, wt) {
+            warn!("Failed to clean up ephemeral worktree {:?}: {}", wt, e);
+        }
+    }
+
     // Emit final run result (skip if already emitted by mark_run_cancelled)
     if !cancelled {
         emit_run_final_status(ctx, run).await;
@@ -466,8 +469,8 @@ async fn execute_workflow_dag(
 /// Every job gets its own pool lease to avoid concurrent access to the same
 /// worktree in fan-out DAGs (e.g. `build -> {lint, test}`).
 ///
-/// Returns `(PathBuf, Option<PoolLease>)` — the lease is always `Some`
-/// (the caller is responsible for releasing it).
+/// Returns `(PathBuf, Option<PoolLease>)` — the lease is `None` when
+/// pool acquisition fails and an ephemeral worktree is used as fallback.
 pub(super) async fn resolve_job_worktree(
     ctx: &Arc<HandlerContext>,
     job_key: &str,
@@ -1157,14 +1160,8 @@ pub(super) async fn resume_dag_after_job_completion(
             let job_key = &newly_runnable[0];
             let job_config = workflow.jobs.get(job_key).unwrap();
 
-            let (worktree_path, lease) = resolve_job_worktree(
-                ctx,
-                job_key,
-                run,
-                repo,
-                &job_id_map,
-            )
-            .await;
+            let (worktree_path, lease) =
+                resolve_job_worktree(ctx, job_key, run, repo, &job_id_map).await;
 
             let status = execute_single_job(
                 ctx,
@@ -1188,14 +1185,8 @@ pub(super) async fn resume_dag_after_job_completion(
             let mut wave_jobs: Vec<(String, PathBuf, Option<PoolLease>)> = Vec::new();
 
             for job_key in &newly_runnable {
-                let (worktree_path, lease) = resolve_job_worktree(
-                    ctx,
-                    job_key,
-                    run,
-                    repo,
-                    &job_id_map,
-                )
-                .await;
+                let (worktree_path, lease) =
+                    resolve_job_worktree(ctx, job_key, run, repo, &job_id_map).await;
                 wave_jobs.push((job_key.clone(), worktree_path, lease));
             }
 
@@ -1278,6 +1269,21 @@ pub(super) async fn resume_dag_after_job_completion(
             ctx.worktree_pool
                 .release(&run.repo_id, lease.slot_index)
                 .await;
+        }
+    }
+
+    // Clean up ephemeral worktrees (those without pool leases)
+    let leased_paths: std::collections::HashSet<&PathBuf> =
+        job_leases.values().map(|l| &l.path).collect();
+    for (jk, wt) in &job_worktrees {
+        if leased_paths.contains(wt) {
+            continue; // managed by pool
+        }
+        if job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval) {
+            continue; // still in use
+        }
+        if let Err(e) = airlock_core::remove_run_worktree(&repo.gate_path, wt) {
+            warn!("Failed to clean up ephemeral worktree {:?}: {}", wt, e);
         }
     }
 }
