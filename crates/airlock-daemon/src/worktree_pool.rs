@@ -98,21 +98,28 @@ impl RepoPool {
 
         let to_remove = idle_count - max_idle;
         let mut removed = Vec::new();
-        let mut count = 0;
 
-        // Remove idle slots from the back (highest index first) to keep lower-index slots
-        self.slots.retain(|slot| {
-            if count >= to_remove {
-                return true;
-            }
-            if !slot.in_use {
-                removed.push((slot.index, slot.path.clone()));
-                count += 1;
-                false
-            } else {
-                true
-            }
-        });
+        // Collect indices of idle slots, highest index first
+        let mut idle_indices: Vec<usize> = self
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| !s.in_use)
+            .map(|(i, _)| i)
+            .collect();
+        idle_indices.reverse();
+        idle_indices.truncate(to_remove);
+
+        // Remove highest-index idle slots to keep lower-index slots
+        for &vec_idx in &idle_indices {
+            let slot = &self.slots[vec_idx];
+            removed.push((slot.index, slot.path.clone()));
+        }
+        // Sort descending so removal doesn't shift earlier indices
+        idle_indices.sort_unstable_by(|a, b| b.cmp(a));
+        for vec_idx in idle_indices {
+            self.slots.remove(vec_idx);
+        }
 
         removed
     }
@@ -592,15 +599,19 @@ mod tests {
         pool.release("test-repo", l2.slot_index).await;
         pool.release("test-repo", l3.slot_index).await;
 
-        // Shrink to max_idle=1
+        // Shrink to max_idle=1 — should keep the lowest-index slot (slot 0)
         pool.shrink("test-repo", &gate_path, Some(1)).await;
 
-        // Acquire should still work (1 idle slot left)
+        // Acquire should reuse slot 0 (the surviving lowest-index idle slot)
         let lease = pool
             .acquire("test-repo", &gate_path, &head_sha, &paths)
             .await
             .unwrap();
         assert!(lease.path.exists());
+        assert_eq!(
+            lease.slot_index, l1.slot_index,
+            "shrink should remove highest-index idle slots, keeping the lowest"
+        );
     }
 
     #[tokio::test]

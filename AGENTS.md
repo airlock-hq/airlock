@@ -84,6 +84,16 @@ Before committing, always run `make check` to catch CI failures early. This runs
 
 If lint fails, run `make fmt` to auto-fix formatting, and manually fix any lint errors (e.g. remove unused imports).
 
+## Rules
+
+Before implementing a fix, understand the full architecture constraints — especially shared resources (e.g., single shared worktree), plugin lifecycle ordering (e.g., window-state plugin restores after setup), and pipeline customizability (steps may not always run). Ask clarifying questions if unsure rather than assuming.
+
+When referencing external library APIs (Clerk, OpenAI SDK, etc.), verify against official documentation rather than relying on training data. APIs change between major versions. If unsure, say so and look up the docs.
+
+## Debugging
+
+When debugging production issues, systematically enumerate and test hypotheses rather than chasing the first plausible theory. Check environment variables, build configs (eas.json, .env), and server-side overrides before assuming code-level bugs.
+
 ## Testing Requirements
 
 After implementing new features, always write:
@@ -104,6 +114,10 @@ E2E tests must reflect **end-user-visible behavior**. Do things the way a real u
 - **Assert on user-visible outcomes.** Check what the user would see: Does `git branch -vv` show the right tracking? Does `git push origin main` go to the right place? Does `git remote -v` show the expected URLs? Don't just assert on internal state like database records or ref existence.
 - **Test full round trips.** If init changes something, test that eject reverses it correctly by running init then eject, not by manually constructing post-init state.
 - **Before writing any test, verify which code path the CLI actually uses.** The daemon handler and CLI command may have separate implementations. A test that only covers one is incomplete.
+
+Write real integration/E2E tests, not simulation tests. Tests should exercise actual behavior (real git repos, real subprocess calls) and use minimal timeouts (1ms not 100ms). Avoid running tests in parallel when they contend on shared resources like file locks.
+
+Use test-driven development when building new features or fixing bugs.
 
 ## Pipeline Step Scripts (defaults/)
 

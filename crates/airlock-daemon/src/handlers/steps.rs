@@ -350,7 +350,7 @@ async fn resume_pipeline_after_approval(
         resume_dag_after_job_completion(&ctx, &run, &repo, &workflow, approved_job_key, job_status)
             .await;
 
-        // Release pool slot for the approved job's worktree
+        // Release pool slot — but only if no other job still uses this worktree
         if !keep_worktrees {
             let worktree_path = {
                 let db = ctx.db.lock().await;
@@ -361,9 +361,23 @@ async fn resume_pipeline_after_approval(
                 .find_lease_by_path(&run.repo_id, &worktree_path)
                 .await
             {
-                ctx.worktree_pool
-                    .release(&run.repo_id, lease.slot_index)
-                    .await;
+                let any_holds = {
+                    let db = ctx.db.lock().await;
+                    db.get_job_results_for_run(&run.id)
+                        .unwrap_or_default()
+                        .iter()
+                        .any(|j| {
+                            j.job_key != approved_job_key
+                                && j.worktree_path.as_deref()
+                                    == Some(&*worktree_path.to_string_lossy())
+                                && !j.status.is_final()
+                        })
+                };
+                if !any_holds {
+                    ctx.worktree_pool
+                        .release(&run.repo_id, lease.slot_index)
+                        .await;
+                }
             }
         }
 
