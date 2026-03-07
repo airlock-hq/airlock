@@ -271,10 +271,7 @@ impl Database {
                 ))
             })
             .map_err(|e| {
-                AirlockError::Database(format!(
-                    "Failed to query awaiting approval jobs: {}",
-                    e
-                ))
+                AirlockError::Database(format!("Failed to query awaiting approval jobs: {}", e))
             })?;
 
         let mut results = Vec::new();

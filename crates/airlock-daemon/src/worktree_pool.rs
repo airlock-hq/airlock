@@ -76,7 +76,6 @@ impl RepoPool {
             slot.in_use = false;
         }
     }
-
 }
 
 /// Thread-safe pool of reusable worktrees, organized per repository.

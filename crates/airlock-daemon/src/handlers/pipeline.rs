@@ -502,8 +502,11 @@ pub(super) async fn resolve_job_worktree(
                 .paths
                 .run_worktree(&run.repo_id, &run.id)
                 .with_extension(job_key);
-            match airlock_core::create_run_worktree(&repo.gate_path, &ephemeral_wt, &current_head_sha)
-            {
+            match airlock_core::create_run_worktree(
+                &repo.gate_path,
+                &ephemeral_wt,
+                &current_head_sha,
+            ) {
                 Ok(()) => Ok((ephemeral_wt, None)),
                 Err(e2) => {
                     error!(
@@ -833,9 +836,7 @@ pub(super) async fn execute_step_sequence(
                 }
 
                 // Check if the step produced a .head_sha artifact (e.g. from `airlock exec freeze`)
-                if res.status == StepStatus::Passed
-                    || res.status == StepStatus::AwaitingApproval
-                {
+                if res.status == StepStatus::Passed || res.status == StepStatus::AwaitingApproval {
                     let head_sha_path = env.artifacts.join(".head_sha");
                     if head_sha_path.exists() {
                         if let Ok(contents) = std::fs::read_to_string(&head_sha_path) {
@@ -844,16 +845,12 @@ pub(super) async fn execute_step_sequence(
                                 info!(
                                     "Step '{}' updated head_sha: {} -> {}",
                                     step.name,
-                                    &effective_head_sha
-                                        [..8.min(effective_head_sha.len())],
+                                    &effective_head_sha[..8.min(effective_head_sha.len())],
                                     &new_sha[..8.min(new_sha.len())]
                                 );
                                 effective_head_sha = new_sha.clone();
                                 let db = params.ctx.db.lock().await;
-                                let _ = db.update_run_head_sha(
-                                    &params.run.id,
-                                    &new_sha,
-                                );
+                                let _ = db.update_run_head_sha(&params.run.id, &new_sha);
                             }
                         }
                         // Consume the artifact so subsequent steps don't re-read it
@@ -1227,15 +1224,8 @@ pub(super) async fn resume_dag_after_job_completion(
                 match resolve_job_worktree(ctx, job_key, run, repo, &job_id_map).await {
                     Ok(result) => result,
                     Err(e) => {
-                        fail_job_worktree(
-                            ctx,
-                            run,
-                            job_key,
-                            &job_id_map,
-                            &mut job_statuses,
-                            &e,
-                        )
-                        .await;
+                        fail_job_worktree(ctx, run, job_key, &job_id_map, &mut job_statuses, &e)
+                            .await;
                         continue;
                     }
                 };
@@ -1267,15 +1257,8 @@ pub(super) async fn resume_dag_after_job_completion(
                         wave_jobs.push((job_key.clone(), worktree_path, lease));
                     }
                     Err(e) => {
-                        fail_job_worktree(
-                            ctx,
-                            run,
-                            job_key,
-                            &job_id_map,
-                            &mut job_statuses,
-                            &e,
-                        )
-                        .await;
+                        fail_job_worktree(ctx, run, job_key, &job_id_map, &mut job_statuses, &e)
+                            .await;
                     }
                 }
             }
@@ -1576,11 +1559,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_step_sequence_reads_head_sha_artifact() {
+        use crate::handlers::HandlerContext;
         use airlock_core::{
             AirlockPaths, ApprovalMode, JobResult, JobStatus as JS, Repo, Run, StepDefinition,
             StepResult, StepStatus,
         };
-        use crate::handlers::HandlerContext;
         use tokio::sync::watch;
 
         let tmp = tempfile::tempdir().unwrap();
