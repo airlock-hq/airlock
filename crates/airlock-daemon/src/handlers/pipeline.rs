@@ -271,7 +271,7 @@ async fn create_job_and_step_records(
 /// Checks `cancel` between waves and before each job.
 ///
 /// Worktrees are acquired from the pool and released after completion,
-/// except for paused (AwaitingApproval) or keep_worktrees jobs.
+/// except for paused (AwaitingApproval) jobs.
 async fn execute_workflow_dag(
     ctx: &Arc<HandlerContext>,
     run: &Run,
@@ -439,23 +439,12 @@ async fn execute_workflow_dag(
         }
     }
 
-    // Release pool leases — but only if no job using that worktree is paused
-    // or has keep_worktrees set. An inherited job may still be using the
-    // acquiring job's worktree.
+    // Release pool leases — but only if no job using that worktree is paused.
+    // An inherited job may still be using the acquiring job's worktree.
     for (acquiring_job_key, lease) in &job_leases {
-        // Find all jobs sharing this worktree path
         let lease_path = &lease.path;
         let any_holds = job_worktrees.iter().any(|(jk, wt)| {
-            if wt != lease_path {
-                return false;
-            }
-            let is_paused = job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval);
-            let keep = workflow
-                .jobs
-                .get(jk)
-                .map(|c| c.keep_worktrees)
-                .unwrap_or(false);
-            is_paused || keep
+            wt == lease_path && job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval)
         });
 
         if !any_holds {
@@ -464,7 +453,7 @@ async fn execute_workflow_dag(
                 .await;
         } else {
             debug!(
-                "Keeping pool slot {} for job '{}' — still in use by paused/keep job",
+                "Keeping pool slot {} for job '{}' — still in use by paused job",
                 lease.slot_index, acquiring_job_key
             );
         }
@@ -1310,16 +1299,7 @@ pub(super) async fn resume_dag_after_job_completion(
     for lease in job_leases.values() {
         let lease_path = &lease.path;
         let any_holds = job_worktrees.iter().any(|(jk, wt)| {
-            if wt != lease_path {
-                return false;
-            }
-            let is_paused = job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval);
-            let keep = workflow
-                .jobs
-                .get(jk)
-                .map(|c| c.keep_worktrees)
-                .unwrap_or(false);
-            is_paused || keep
+            wt == lease_path && job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval)
         });
 
         if !any_holds {

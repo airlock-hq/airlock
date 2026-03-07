@@ -264,8 +264,6 @@ async fn resume_pipeline_after_approval(
     };
 
     let job_config = workflow.jobs.get(approved_job_key).unwrap().clone();
-    let keep_worktrees = job_config.keep_worktrees;
-
     // Use step_order directly as the index within the job.
     // This avoids misidentifying the step when duplicate step names exist.
     let approved_idx = approved_step_order as usize;
@@ -351,33 +349,31 @@ async fn resume_pipeline_after_approval(
             .await;
 
         // Release pool slot — but only if no other job still uses this worktree
-        if !keep_worktrees {
-            let worktree_path = {
+        let worktree_path = {
+            let db = ctx.db.lock().await;
+            find_job_worktree(&ctx.paths, &run, approved_job_key, &db)
+        };
+        if let Some(lease) = ctx
+            .worktree_pool
+            .find_lease_by_path(&run.repo_id, &worktree_path)
+            .await
+        {
+            let any_holds = {
                 let db = ctx.db.lock().await;
-                find_job_worktree(&ctx.paths, &run, approved_job_key, &db)
+                db.get_job_results_for_run(&run.id)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|j| {
+                        j.job_key != approved_job_key
+                            && j.worktree_path.as_deref()
+                                == Some(&*worktree_path.to_string_lossy())
+                            && !j.status.is_final()
+                    })
             };
-            if let Some(lease) = ctx
-                .worktree_pool
-                .find_lease_by_path(&run.repo_id, &worktree_path)
-                .await
-            {
-                let any_holds = {
-                    let db = ctx.db.lock().await;
-                    db.get_job_results_for_run(&run.id)
-                        .unwrap_or_default()
-                        .iter()
-                        .any(|j| {
-                            j.job_key != approved_job_key
-                                && j.worktree_path.as_deref()
-                                    == Some(&*worktree_path.to_string_lossy())
-                                && !j.status.is_final()
-                        })
-                };
-                if !any_holds {
-                    ctx.worktree_pool
-                        .release(&run.repo_id, lease.slot_index)
-                        .await;
-                }
+            if !any_holds {
+                ctx.worktree_pool
+                    .release(&run.repo_id, lease.slot_index)
+                    .await;
             }
         }
 
@@ -482,30 +478,27 @@ async fn resume_pipeline_after_approval(
         .await;
 
         // Release pool slot — but only if no other job still uses this worktree
-        if !keep_worktrees {
-            if let Some(lease) = ctx
-                .worktree_pool
-                .find_lease_by_path(&run.repo_id, &worktree_path)
-                .await
-            {
-                // Check if any other job sharing this worktree is still non-final
-                let any_holds = {
-                    let db = ctx.db.lock().await;
-                    db.get_job_results_for_run(&run.id)
-                        .unwrap_or_default()
-                        .iter()
-                        .any(|j| {
-                            j.job_key != approved_job_key
-                                && j.worktree_path.as_deref()
-                                    == Some(&*worktree_path.to_string_lossy())
-                                && !j.status.is_final()
-                        })
-                };
-                if !any_holds {
-                    ctx.worktree_pool
-                        .release(&run.repo_id, lease.slot_index)
-                        .await;
-                }
+        if let Some(lease) = ctx
+            .worktree_pool
+            .find_lease_by_path(&run.repo_id, &worktree_path)
+            .await
+        {
+            let any_holds = {
+                let db = ctx.db.lock().await;
+                db.get_job_results_for_run(&run.id)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|j| {
+                        j.job_key != approved_job_key
+                            && j.worktree_path.as_deref()
+                                == Some(&*worktree_path.to_string_lossy())
+                            && !j.status.is_final()
+                    })
+            };
+            if !any_holds {
+                ctx.worktree_pool
+                    .release(&run.repo_id, lease.slot_index)
+                    .await;
             }
         }
     }

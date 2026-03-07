@@ -190,7 +190,6 @@ fn test_dag_validation_cycle_detection() {
             name: None,
             needs: OneOrMany(vec!["b".to_string()]),
             steps: vec![],
-            keep_worktrees: false,
         },
     );
     jobs.insert(
@@ -199,7 +198,6 @@ fn test_dag_validation_cycle_detection() {
             name: None,
             needs: OneOrMany(vec!["a".to_string()]),
             steps: vec![],
-            keep_worktrees: false,
         },
     );
 
@@ -223,7 +221,6 @@ fn test_dag_validation_unknown_dependency() {
             name: None,
             needs: OneOrMany(vec!["nonexistent".to_string()]),
             steps: vec![],
-            keep_worktrees: false,
         },
     );
 
@@ -248,7 +245,6 @@ fn test_dag_execution_waves() {
             name: Some("Lint".to_string()),
             needs: OneOrMany(vec![]),
             steps: vec![],
-            keep_worktrees: false,
         },
     );
     jobs.insert(
@@ -257,7 +253,6 @@ fn test_dag_execution_waves() {
             name: Some("Test".to_string()),
             needs: OneOrMany(vec![]),
             steps: vec![],
-            keep_worktrees: false,
         },
     );
     jobs.insert(
@@ -266,7 +261,6 @@ fn test_dag_execution_waves() {
             name: Some("Deploy".to_string()),
             needs: OneOrMany(vec!["lint".to_string(), "test".to_string()]),
             steps: vec![],
-            keep_worktrees: false,
         },
     );
 
