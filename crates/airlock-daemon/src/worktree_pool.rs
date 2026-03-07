@@ -310,26 +310,17 @@ impl WorktreePool {
         }
 
         // Mark worktrees for AwaitingApproval jobs as in-use
-        if let Ok(all_runs) = db.list_all_runs(None) {
-            for run in &all_runs {
-                if let Ok(jobs) = db.get_job_results_for_run(&run.id) {
-                    for job in &jobs {
-                        if job.status == airlock_core::JobStatus::AwaitingApproval {
-                            if let Some(wt_path) = &job.worktree_path {
-                                // Find the matching slot and mark it in-use
-                                if let Some(pool) = pools.get_mut(&run.repo_id) {
-                                    let wt = PathBuf::from(wt_path);
-                                    for slot in &mut pool.slots {
-                                        if slot.path == wt {
-                                            slot.in_use = true;
-                                            debug!(
-                                                "Marked pool slot {} as in-use for paused job {} in repo {}",
-                                                slot.index, job.job_key, run.repo_id
-                                            );
-                                        }
-                                    }
-                                }
-                            }
+        if let Ok(paused_jobs) = db.get_awaiting_approval_jobs_with_worktrees() {
+            for (repo_id, job_key, wt_path) in &paused_jobs {
+                if let Some(pool) = pools.get_mut(repo_id) {
+                    let wt = PathBuf::from(wt_path);
+                    for slot in &mut pool.slots {
+                        if slot.path == wt {
+                            slot.in_use = true;
+                            debug!(
+                                "Marked pool slot {} as in-use for paused job {} in repo {}",
+                                slot.index, job_key, repo_id
+                            );
                         }
                     }
                 }

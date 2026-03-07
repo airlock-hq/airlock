@@ -203,6 +203,47 @@ impl Database {
         Ok(rows_affected as u32)
     }
 
+    /// Get all AwaitingApproval jobs that have a worktree_path, joined with their repo_id.
+    ///
+    /// Used by worktree pool initialization to mark in-use slots after a restart.
+    pub fn get_awaiting_approval_jobs_with_worktrees(
+        &self,
+    ) -> Result<Vec<(String, String, String)>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT r.repo_id, j.job_key, j.worktree_path
+                 FROM job_results j
+                 JOIN runs r ON j.run_id = r.id
+                 WHERE j.status = 'awaiting_approval' AND j.worktree_path IS NOT NULL",
+            )
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(|e| {
+                AirlockError::Database(format!(
+                    "Failed to query awaiting approval jobs: {}",
+                    e
+                ))
+            })?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            let row =
+                row.map_err(|e| AirlockError::Database(format!("Failed to read row: {}", e)))?;
+            results.push(row);
+        }
+
+        Ok(results)
+    }
+
     /// Update the worktree_path for a job result.
     pub fn update_job_worktree_path(&self, id: &str, worktree_path: &str) -> Result<()> {
         let rows_affected = self

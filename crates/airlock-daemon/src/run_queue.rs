@@ -6,8 +6,8 @@
 //! `CancellationToken`) and the new run supersedes it.
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
+use std::sync::{Arc, Mutex};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 
 /// Maximum number of concurrent runs per repository.
@@ -62,14 +62,9 @@ pub struct RunPermit {
 
 impl Drop for RunPermit {
     fn drop(&mut self) {
-        // Remove this run from the running vec. We can't async in drop,
-        // so use try_lock. If the lock is held, the stale entry is
-        // harmless — it holds no semaphore permit and will be ignored
-        // by future cancellation checks.
-        if let Ok(mut slots) = self.slots.try_lock() {
-            if let Some(slot) = slots.get_mut(&self.repo_id) {
-                slot.running.retain(|r| r.id != self.run_id);
-            }
+        let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(slot) = slots.get_mut(&self.repo_id) {
+            slot.running.retain(|r| r.id != self.run_id);
         }
     }
 }
@@ -99,8 +94,8 @@ impl RunQueue {
     ///
     /// Used when superseded runs need their tokens cancelled but no new
     /// pipeline run will be started (e.g., all refs were forwarded directly).
-    pub async fn cancel_active(&self, repo_id: &str, ref_names: Option<&[String]>) {
-        let mut slots = self.slots.lock().await;
+    pub fn cancel_active(&self, repo_id: &str, ref_names: Option<&[String]>) {
+        let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(slot) = slots.get_mut(repo_id) {
             // Cancel and remove running runs. Unlike `acquire` (which keeps
             // cancelled runs in the vec so their semaphore permit stays held
@@ -147,7 +142,7 @@ impl RunQueue {
     /// Returns a [`RunPermit`] whose `token` the pipeline should monitor.
     pub async fn acquire(&self, repo_id: &str, ref_names: &[String]) -> RunPermit {
         let (semaphore, token, run_id) = {
-            let mut slots = self.slots.lock().await;
+            let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
             let slot = slots
                 .entry(repo_id.to_string())
                 .or_insert_with(|| RepoSlot {
@@ -207,7 +202,7 @@ impl RunQueue {
 
         // Promote this run from pending to running now that it holds the permit.
         {
-            let mut slots = self.slots.lock().await;
+            let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(slot) = slots.get_mut(repo_id) {
                 slot.pending.retain(|p| p.id != run_id);
                 slot.running.push(TrackedRun {
@@ -348,10 +343,10 @@ mod tests {
         });
 
         sleep(Duration::from_millis(10)).await;
-        queue.cancel_active("repo-1", None).await;
+        queue.cancel_active("repo-1", None);
         h1.await.unwrap();
 
-        queue.cancel_active("repo-nonexistent", None).await;
+        queue.cancel_active("repo-nonexistent", None);
     }
 
     #[tokio::test]
@@ -429,7 +424,7 @@ mod tests {
         });
 
         sleep(Duration::from_millis(10)).await;
-        queue.cancel_active("repo-1", Some(&branch_other)).await;
+        queue.cancel_active("repo-1", Some(&branch_other));
         h1.await.unwrap();
     }
 
@@ -462,7 +457,7 @@ mod tests {
         });
 
         sleep(Duration::from_millis(10)).await;
-        queue.cancel_active("repo-1", Some(&branch_a)).await;
+        queue.cancel_active("repo-1", Some(&branch_a));
 
         h1.await.unwrap();
         h2.await.unwrap();

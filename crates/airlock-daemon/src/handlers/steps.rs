@@ -529,8 +529,7 @@ async fn finalize_job(
 /// Determine the worktree path for a job that was previously paused.
 ///
 /// 1. Check DB-stored `worktree_path` on the job result (pool recovery).
-/// 2. Fallback: scan pool-* directories for valid worktrees.
-/// 3. Legacy fallback: persistent worktree, job-specific extension, standard run worktree.
+/// 2. Legacy fallback: persistent worktree, job-specific extension, standard run worktree.
 fn find_job_worktree(
     paths: &airlock_core::AirlockPaths,
     run: &airlock_core::Run,

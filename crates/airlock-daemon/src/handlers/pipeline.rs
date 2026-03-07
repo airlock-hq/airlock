@@ -423,24 +423,11 @@ async fn execute_workflow_dag(
         }
     }
 
-    // Release pool leases — but only if no job using that worktree is paused.
-    // An inherited job may still be using the acquiring job's worktree.
-    for (acquiring_job_key, lease) in &job_leases {
-        let lease_path = &lease.path;
-        let any_holds = job_worktrees.iter().any(|(jk, wt)| {
-            wt == lease_path && job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval)
-        });
-
-        if !any_holds {
-            ctx.worktree_pool
-                .release(&run.repo_id, lease.slot_index)
-                .await;
-        } else {
-            debug!(
-                "Keeping pool slot {} for job '{}' — still in use by paused job",
-                lease.slot_index, acquiring_job_key
-            );
-        }
+    // Release pool leases — each job has its own pool slot.
+    for (_job_key, lease) in &job_leases {
+        ctx.worktree_pool
+            .release(&run.repo_id, lease.slot_index)
+            .await;
     }
 
     // Clean up ephemeral worktrees (those without pool leases)
@@ -489,7 +476,12 @@ pub(super) async fn resolve_job_worktree(
             // Store worktree_path in DB for crash recovery
             if let Some(job_id) = job_id_map.get(job_key) {
                 let db = ctx.db.lock().await;
-                let _ = db.update_job_worktree_path(job_id, &path.to_string_lossy());
+                if let Err(e) = db.update_job_worktree_path(job_id, &path.to_string_lossy()) {
+                    warn!(
+                        "Failed to persist worktree path for job '{}': {} (crash recovery may not find this worktree)",
+                        job_key, e
+                    );
+                }
             }
             debug!(
                 "Job '{}' acquired pool worktree slot {} at {:?}",

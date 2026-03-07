@@ -430,8 +430,7 @@ pub async fn process_coalesced_push(
         // If we superseded runs in the DB, cancel their runtime tokens too.
         if had_superseded {
             ctx.run_queue
-                .cancel_active(&repo.id, Some(&pipeline_ref_names))
-                .await;
+                .cancel_active(&repo.id, Some(&pipeline_ref_names));
         }
         return;
     }
