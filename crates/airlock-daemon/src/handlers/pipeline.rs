@@ -423,11 +423,18 @@ async fn execute_workflow_dag(
         }
     }
 
-    // Release pool leases — each job has its own pool slot.
-    for (_job_key, lease) in &job_leases {
-        ctx.worktree_pool
-            .release(&run.repo_id, lease.slot_index)
-            .await;
+    // Release pool leases — but only if no job using that worktree is paused
+    for lease in job_leases.values() {
+        let lease_path = &lease.path;
+        let any_holds = job_worktrees.iter().any(|(jk, wt)| {
+            wt == lease_path && job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval)
+        });
+
+        if !any_holds {
+            ctx.worktree_pool
+                .release(&run.repo_id, lease.slot_index)
+                .await;
+        }
     }
 
     // Clean up ephemeral worktrees (those without pool leases)

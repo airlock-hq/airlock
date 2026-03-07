@@ -493,7 +493,7 @@ async fn release_pool_slot_if_unheld(
                 .iter()
                 .any(|j| {
                     j.job_key != job_key
-                        && j.worktree_path.as_deref() == Some(&*worktree_path.to_string_lossy())
+                        && j.worktree_path.as_deref() == worktree_path.to_str()
                         && !j.status.is_final()
                 })
         };
