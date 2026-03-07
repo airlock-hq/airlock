@@ -353,28 +353,7 @@ async fn resume_pipeline_after_approval(
             let db = ctx.db.lock().await;
             find_job_worktree(&ctx.paths, &run, approved_job_key, &db)
         };
-        if let Some(lease) = ctx
-            .worktree_pool
-            .find_lease_by_path(&run.repo_id, &worktree_path)
-            .await
-        {
-            let any_holds = {
-                let db = ctx.db.lock().await;
-                db.get_job_results_for_run(&run.id)
-                    .unwrap_or_default()
-                    .iter()
-                    .any(|j| {
-                        j.job_key != approved_job_key
-                            && j.worktree_path.as_deref() == Some(&*worktree_path.to_string_lossy())
-                            && !j.status.is_final()
-                    })
-            };
-            if !any_holds {
-                ctx.worktree_pool
-                    .release(&run.repo_id, lease.slot_index)
-                    .await;
-            }
-        }
+        release_pool_slot_if_unheld(&ctx, &run, approved_job_key, &worktree_path).await;
 
         // Emit final run-level events
         emit_run_final_status(&ctx, &run).await;
@@ -391,6 +370,16 @@ async fn resume_pipeline_after_approval(
             "Worktree at {:?} no longer exists, cannot resume pipeline",
             worktree_path
         );
+        // Release the pool slot — the worktree is gone, no point holding it
+        if let Some(lease) = ctx
+            .worktree_pool
+            .find_lease_by_path(&run.repo_id, &worktree_path)
+            .await
+        {
+            ctx.worktree_pool
+                .release(&run.repo_id, lease.slot_index)
+                .await;
+        }
         let db = ctx.db.lock().await;
         let _ = db.update_run_error(
             &run.id,
@@ -477,32 +466,43 @@ async fn resume_pipeline_after_approval(
         .await;
 
         // Release pool slot — but only if no other job still uses this worktree
-        if let Some(lease) = ctx
-            .worktree_pool
-            .find_lease_by_path(&run.repo_id, &worktree_path)
-            .await
-        {
-            let any_holds = {
-                let db = ctx.db.lock().await;
-                db.get_job_results_for_run(&run.id)
-                    .unwrap_or_default()
-                    .iter()
-                    .any(|j| {
-                        j.job_key != approved_job_key
-                            && j.worktree_path.as_deref() == Some(&*worktree_path.to_string_lossy())
-                            && !j.status.is_final()
-                    })
-            };
-            if !any_holds {
-                ctx.worktree_pool
-                    .release(&run.repo_id, lease.slot_index)
-                    .await;
-            }
-        }
+        release_pool_slot_if_unheld(&ctx, &run, approved_job_key, &worktree_path).await;
     }
 
     // Emit final run-level events based on the state of all jobs
     emit_run_final_status(&ctx, &run).await;
+}
+
+/// Release a pool slot for a job's worktree, but only if no other non-final job
+/// still uses the same worktree path.
+async fn release_pool_slot_if_unheld(
+    ctx: &Arc<HandlerContext>,
+    run: &airlock_core::Run,
+    job_key: &str,
+    worktree_path: &std::path::Path,
+) {
+    if let Some(lease) = ctx
+        .worktree_pool
+        .find_lease_by_path(&run.repo_id, worktree_path)
+        .await
+    {
+        let any_holds = {
+            let db = ctx.db.lock().await;
+            db.get_job_results_for_run(&run.id)
+                .unwrap_or_default()
+                .iter()
+                .any(|j| {
+                    j.job_key != job_key
+                        && j.worktree_path.as_deref() == Some(&*worktree_path.to_string_lossy())
+                        && !j.status.is_final()
+                })
+        };
+        if !any_holds {
+            ctx.worktree_pool
+                .release(&run.repo_id, lease.slot_index)
+                .await;
+        }
+    }
 }
 
 /// Finalize a job's status in the database.

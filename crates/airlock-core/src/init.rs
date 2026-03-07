@@ -515,13 +515,14 @@ pub fn eject_repo(working_dir: &Path, paths: &AirlockPaths, db: &Database) -> Re
         .context("Failed to remove repo from database")?;
     debug!("Removed repo from database");
 
-    // Clean up persistent worktree (must happen after gate removal)
-    let worktree_dir = paths.repo_worktree(&repo.id);
+    // Clean up all worktrees (persistent, pool-*, sync, etc.)
+    // Must happen after gate removal.
+    let worktree_dir = paths.worktrees_dir().join(&repo.id);
     if worktree_dir.exists() {
         if let Err(e) = std::fs::remove_dir_all(&worktree_dir) {
-            warn!("Failed to remove persistent worktree: {}", e);
+            warn!("Failed to remove worktree directory: {}", e);
         } else {
-            debug!("Removed persistent worktree: {}", worktree_dir.display());
+            debug!("Removed worktree directory: {}", worktree_dir.display());
         }
     }
 

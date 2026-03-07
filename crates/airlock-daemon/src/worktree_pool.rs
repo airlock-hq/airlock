@@ -249,17 +249,19 @@ impl WorktreePool {
 
             let pool = pools.entry(repo_id.clone()).or_insert_with(RepoPool::new);
 
-            // Migrate legacy `persistent` worktree to pool-0 if it exists and pool-0 doesn't
+            // Remove legacy `persistent` worktree if it exists.
+            // fs::rename breaks git worktree back-references, so we remove it
+            // and let acquire() create a fresh pool-0 when needed.
             let persistent_path = repo_dir.join("persistent");
-            let pool_0_path = paths.pool_worktree(&repo_id, 0);
-            if persistent_path.exists() && !pool_0_path.exists() {
+            if persistent_path.exists() {
+                let gate_path = paths.repo_gate(&repo_id);
                 info!(
-                    "Migrating legacy persistent worktree to pool-0 for repo {}",
+                    "Removing legacy persistent worktree for repo {} (pool will recreate on demand)",
                     repo_id
                 );
-                if let Err(e) = std::fs::rename(&persistent_path, &pool_0_path) {
+                if let Err(e) = airlock_core::remove_worktree(&gate_path, &persistent_path) {
                     warn!(
-                        "Failed to migrate persistent worktree for repo {}: {}",
+                        "Failed to remove legacy persistent worktree for repo {}: {}",
                         repo_id, e
                     );
                     // Continue — don't block init on migration failure
@@ -672,17 +674,16 @@ mod tests {
         let db = Database::open_in_memory().unwrap();
         pool.init_from_disk(&paths, &db).await.unwrap();
 
-        // Persistent should be migrated to pool-0
+        // Persistent should be removed (not renamed — rename breaks git back-refs)
         assert!(!persistent_path.exists());
-        let pool_0 = paths.pool_worktree("test-repo", 0);
-        assert!(pool_0.exists());
 
-        // Should be able to acquire the migrated worktree
+        // pool-0 is created fresh on first acquire, not by migration
         let lease = pool
             .acquire("test-repo", &gate_path, &head_sha, &paths)
             .await
             .unwrap();
         assert_eq!(lease.slot_index, 0);
+        assert!(lease.path.exists());
     }
 
     #[tokio::test]
