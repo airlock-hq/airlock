@@ -437,16 +437,34 @@ async fn execute_workflow_dag(
         }
     }
 
-    // Release pool leases for completed jobs (not paused or keep_worktrees)
-    for (job_key, lease) in &job_leases {
-        let job_config = workflow.jobs.get(job_key);
-        let keep = job_config.map(|c| c.keep_worktrees).unwrap_or(false);
-        let is_paused = job_statuses.get(job_key) == Some(&JobStatus::AwaitingApproval);
+    // Release pool leases — but only if no job using that worktree is paused
+    // or has keep_worktrees set. An inherited job may still be using the
+    // acquiring job's worktree.
+    for (acquiring_job_key, lease) in &job_leases {
+        // Find all jobs sharing this worktree path
+        let lease_path = &lease.path;
+        let any_holds = job_worktrees.iter().any(|(jk, wt)| {
+            if wt != lease_path {
+                return false;
+            }
+            let is_paused = job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval);
+            let keep = workflow
+                .jobs
+                .get(jk)
+                .map(|c| c.keep_worktrees)
+                .unwrap_or(false);
+            is_paused || keep
+        });
 
-        if !keep && !is_paused {
+        if !any_holds {
             ctx.worktree_pool
                 .release(&run.repo_id, lease.slot_index)
                 .await;
+        } else {
+            debug!(
+                "Keeping pool slot {} for job '{}' — still in use by paused/keep job",
+                lease.slot_index, acquiring_job_key
+            );
         }
     }
 
@@ -478,6 +496,11 @@ pub(super) async fn resolve_job_worktree(
                 "Job '{}' inherits worktree from predecessor '{}'",
                 job_key, predecessor
             );
+            // Persist worktree_path for inherited jobs too (crash recovery)
+            if let Some(job_id) = job_id_map.get(job_key) {
+                let db = ctx.db.lock().await;
+                let _ = db.update_job_worktree_path(job_id, &wt.to_string_lossy());
+            }
             return (wt.clone(), None);
         }
     }
@@ -1279,13 +1302,23 @@ pub(super) async fn resume_dag_after_job_completion(
         // Loop again to check if more jobs got unblocked
     }
 
-    // Release pool leases for completed jobs (not paused or keep_worktrees)
-    for (job_key, lease) in &job_leases {
-        let job_config = workflow.jobs.get(job_key);
-        let keep = job_config.map(|c| c.keep_worktrees).unwrap_or(false);
-        let is_paused = job_statuses.get(job_key) == Some(&JobStatus::AwaitingApproval);
+    // Release pool leases — but only if no job using that worktree is paused
+    for lease in job_leases.values() {
+        let lease_path = &lease.path;
+        let any_holds = job_worktrees.iter().any(|(jk, wt)| {
+            if wt != lease_path {
+                return false;
+            }
+            let is_paused = job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval);
+            let keep = workflow
+                .jobs
+                .get(jk)
+                .map(|c| c.keep_worktrees)
+                .unwrap_or(false);
+            is_paused || keep
+        });
 
-        if !keep && !is_paused {
+        if !any_holds {
             ctx.worktree_pool
                 .release(&run.repo_id, lease.slot_index)
                 .await;

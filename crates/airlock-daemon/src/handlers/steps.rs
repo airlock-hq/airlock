@@ -461,13 +461,16 @@ async fn resume_pipeline_after_approval(
         )
         .await;
 
-        // Clean up ephemeral worktrees only (persistent worktree is kept)
+        // Release pool slot for the approved job's worktree
         if !keep_worktrees {
-            let persistent_wt = ctx.paths.repo_worktree(&run.repo_id);
-            if worktree_path != persistent_wt {
-                if let Err(e) = airlock_core::remove_worktree(&repo.gate_path, &worktree_path) {
-                    warn!("Failed to remove worktree: {}", e);
-                }
+            if let Some(lease) = ctx
+                .worktree_pool
+                .find_lease_by_path(&run.repo_id, &worktree_path)
+                .await
+            {
+                ctx.worktree_pool
+                    .release(&run.repo_id, lease.slot_index)
+                    .await;
             }
         }
     }
@@ -522,23 +525,9 @@ fn find_job_worktree(
         }
     }
 
-    // 2. Fallback: scan pool-* directories
-    let wt_dir = paths.worktrees_dir().join(&run.repo_id);
-    if wt_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&wt_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with("pool-")
-                    && entry.path().is_dir()
-                    && airlock_core::is_valid_worktree(&entry.path())
-                {
-                    return entry.path();
-                }
-            }
-        }
-    }
-
-    // 3. Legacy fallback: persistent worktree or run worktree
+    // 2. Legacy fallback: persistent worktree or run worktree
+    // Note: we do NOT scan pool-* directories blindly — with concurrent runs,
+    // an arbitrary pool worktree could belong to a different run.
     let persistent_path = paths.repo_worktree(&run.repo_id);
     if persistent_path.exists() {
         return persistent_path;

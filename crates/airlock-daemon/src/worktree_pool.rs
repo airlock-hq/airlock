@@ -398,7 +398,6 @@ impl WorktreePool {
 
     /// Find a lease for a worktree path that's already in-use (e.g., paused job's worktree).
     /// Returns None if the path is not tracked by the pool.
-    #[allow(dead_code)]
     pub async fn find_lease_by_path(
         &self,
         repo_id: &str,
