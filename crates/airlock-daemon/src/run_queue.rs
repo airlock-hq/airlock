@@ -97,11 +97,10 @@ impl RunQueue {
     pub fn cancel_active(&self, repo_id: &str, ref_names: Option<&[String]>) {
         let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(slot) = slots.get_mut(repo_id) {
-            // Cancel and remove running runs. Unlike `acquire` (which keeps
-            // cancelled runs in the vec so their semaphore permit stays held
-            // until drop), here we remove immediately because no new run is
-            // waiting for the slot.
-            slot.running.retain(|running| {
+            // Cancel running runs but keep them in the vec — the Drop impl
+            // on RunPermit removes them once the permit is actually dropped.
+            // Removing here would desync the vec from actual held permits.
+            for running in &slot.running {
                 let should_cancel = match ref_names {
                     Some(refs) => refs_overlap(&running.refs, refs),
                     None => true,
@@ -109,11 +108,8 @@ impl RunQueue {
                 if should_cancel {
                     tracing::info!("Cancelling active run for repo {}", repo_id);
                     running.token.cancel();
-                    false
-                } else {
-                    true
                 }
-            });
+            }
 
             // Also cancel pending runs with overlapping refs.
             slot.pending.retain(|p| {

@@ -13,9 +13,6 @@ use std::path::PathBuf;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
-/// Maximum number of idle worktrees to keep per repo (beyond this, shrink removes excess).
-const DEFAULT_MAX_IDLE: usize = 2;
-
 /// A lease on a pool worktree slot. The caller must explicitly release it
 /// back to the pool when done (or keep it for paused jobs).
 #[derive(Debug, Clone)]
@@ -80,40 +77,6 @@ impl RepoPool {
         }
     }
 
-    /// Remove excess idle slots beyond `max_idle`. Returns the paths that should
-    /// be removed from disk.
-    fn shrink(&mut self, max_idle: usize) -> Vec<(usize, PathBuf)> {
-        let idle_count = self.slots.iter().filter(|s| !s.in_use).count();
-        if idle_count <= max_idle {
-            return Vec::new();
-        }
-
-        let to_remove = idle_count - max_idle;
-        let mut removed = Vec::new();
-
-        // Collect indices of idle slots, highest position first
-        let mut idle_indices: Vec<usize> = self
-            .slots
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| !s.in_use)
-            .map(|(i, _)| i)
-            .collect();
-        idle_indices.reverse();
-        idle_indices.truncate(to_remove);
-
-        // Remove highest-index idle slots to keep lower-index slots
-        for &vec_idx in &idle_indices {
-            let slot = &self.slots[vec_idx];
-            removed.push((slot.index, slot.path.clone()));
-        }
-        // Already in descending order from reverse() + truncate() above
-        for vec_idx in idle_indices {
-            self.slots.remove(vec_idx);
-        }
-
-        removed
-    }
 }
 
 /// Thread-safe pool of reusable worktrees, organized per repository.
@@ -345,48 +308,6 @@ impl WorktreePool {
         Ok(())
     }
 
-    /// Remove excess idle worktrees beyond `max_idle` for a specific repo.
-    pub async fn shrink(
-        &self,
-        repo_id: &str,
-        gate_path: &std::path::Path,
-        max_idle: Option<usize>,
-    ) {
-        let max_idle = max_idle.unwrap_or(DEFAULT_MAX_IDLE);
-
-        let to_remove = {
-            let mut pools = self.inner.lock().await;
-            if let Some(pool) = pools.get_mut(repo_id) {
-                pool.shrink(max_idle)
-            } else {
-                return;
-            }
-        };
-
-        for (index, path) in to_remove {
-            debug!(
-                "Shrinking pool slot {} for repo {} at {:?}",
-                index, repo_id, path
-            );
-            if let Err(e) = airlock_core::remove_worktree(gate_path, &path) {
-                warn!("Failed to remove excess pool worktree {:?}: {}", path, e);
-            }
-        }
-    }
-
-    /// Shrink all repos' pools to the default idle limit.
-    pub async fn shrink_all(&self, paths: &AirlockPaths) {
-        let repo_ids: Vec<String> = {
-            let pools = self.inner.lock().await;
-            pools.keys().cloned().collect()
-        };
-
-        for repo_id in repo_ids {
-            let gate_path = paths.repo_gate(&repo_id);
-            self.shrink(&repo_id, &gate_path, None).await;
-        }
-    }
-
     /// Find a lease for a worktree path that's already in-use (e.g., paused job's worktree).
     /// Returns None if the path is not tracked by the pool.
     pub async fn find_lease_by_path(
@@ -557,45 +478,6 @@ mod tests {
         assert_ne!(lease1.path, lease2.path);
         assert!(lease1.path.exists());
         assert!(lease2.path.exists());
-    }
-
-    #[tokio::test]
-    async fn test_shrink_removes_excess_idle_slots() {
-        let (_tmp, paths, gate_path, head_sha) = setup();
-        let pool = WorktreePool::new();
-
-        // Create 3 slots
-        let l1 = pool
-            .acquire("test-repo", &gate_path, &head_sha, &paths)
-            .await
-            .unwrap();
-        let l2 = pool
-            .acquire("test-repo", &gate_path, &head_sha, &paths)
-            .await
-            .unwrap();
-        let l3 = pool
-            .acquire("test-repo", &gate_path, &head_sha, &paths)
-            .await
-            .unwrap();
-
-        // Release all
-        pool.release("test-repo", l1.slot_index).await;
-        pool.release("test-repo", l2.slot_index).await;
-        pool.release("test-repo", l3.slot_index).await;
-
-        // Shrink to max_idle=1 — should keep the lowest-index slot (slot 0)
-        pool.shrink("test-repo", &gate_path, Some(1)).await;
-
-        // Acquire should reuse slot 0 (the surviving lowest-index idle slot)
-        let lease = pool
-            .acquire("test-repo", &gate_path, &head_sha, &paths)
-            .await
-            .unwrap();
-        assert!(lease.path.exists());
-        assert_eq!(
-            lease.slot_index, l1.slot_index,
-            "shrink should remove highest-index idle slots, keeping the lowest"
-        );
     }
 
     #[tokio::test]
