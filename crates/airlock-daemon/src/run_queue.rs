@@ -154,18 +154,19 @@ impl RunQueue {
                 });
 
             // Cancel running runs with overlapping refs (same branch pushed again).
-            slot.running.retain(|running| {
+            // Keep them in the vec — the Drop impl on RunPermit removes them once
+            // the permit is actually dropped. Removing here would free the semaphore
+            // slot before the old run finishes, allowing two same-branch runs to
+            // execute concurrently.
+            for running in &slot.running {
                 if refs_overlap(&running.refs, ref_names) {
                     tracing::info!(
                         "Cancelling active run for repo {} (overlapping refs) to make way for new run",
                         repo_id
                     );
                     running.token.cancel();
-                    false
-                } else {
-                    true
                 }
-            });
+            }
 
             // Cancel any pending runs with overlapping refs.
             slot.pending.retain(|p| {

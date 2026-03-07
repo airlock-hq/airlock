@@ -327,8 +327,6 @@ async fn execute_workflow_dag(
             let (worktree_path, lease) = resolve_job_worktree(
                 ctx,
                 job_key,
-                job_config,
-                &job_worktrees,
                 run,
                 repo,
                 job_id_map,
@@ -367,8 +365,6 @@ async fn execute_workflow_dag(
                 let (worktree_path, lease) = resolve_job_worktree(
                     ctx,
                     job_key,
-                    job_config,
-                    &job_worktrees,
                     run,
                     repo,
                     job_id_map,
@@ -465,39 +461,20 @@ async fn execute_workflow_dag(
     }
 }
 
-/// Determine the worktree path for a job based on inheritance rules.
+/// Determine the worktree path for a job by acquiring a pool slot.
 ///
-/// - Single predecessor → inherit that predecessor's worktree (no pool acquire).
-/// - All other cases → acquire from pool.
+/// Every job gets its own pool lease to avoid concurrent access to the same
+/// worktree in fan-out DAGs (e.g. `build -> {lint, test}`).
 ///
-/// Returns `(PathBuf, Option<PoolLease>)` — the lease is `Some` when a new pool
-/// slot was acquired (the caller is responsible for releasing it).
+/// Returns `(PathBuf, Option<PoolLease>)` — the lease is always `Some`
+/// (the caller is responsible for releasing it).
 pub(super) async fn resolve_job_worktree(
     ctx: &Arc<HandlerContext>,
     job_key: &str,
-    job_config: &JobConfig,
-    job_worktrees: &HashMap<String, PathBuf>,
     run: &Run,
     repo: &Repo,
     job_id_map: &HashMap<String, String>,
 ) -> (PathBuf, Option<PoolLease>) {
-    // Single predecessor → inherit worktree (no new pool acquire)
-    if job_config.needs.len() == 1 {
-        let predecessor = &job_config.needs[0];
-        if let Some(wt) = job_worktrees.get(predecessor.as_str()) {
-            debug!(
-                "Job '{}' inherits worktree from predecessor '{}'",
-                job_key, predecessor
-            );
-            // Persist worktree_path for inherited jobs too (crash recovery)
-            if let Some(job_id) = job_id_map.get(job_key) {
-                let db = ctx.db.lock().await;
-                let _ = db.update_job_worktree_path(job_id, &wt.to_string_lossy());
-            }
-            return (wt.clone(), None);
-        }
-    }
-
     // Acquire from pool
     match ctx
         .worktree_pool
@@ -1183,8 +1160,6 @@ pub(super) async fn resume_dag_after_job_completion(
             let (worktree_path, lease) = resolve_job_worktree(
                 ctx,
                 job_key,
-                job_config,
-                &job_worktrees,
                 run,
                 repo,
                 &job_id_map,
@@ -1213,12 +1188,9 @@ pub(super) async fn resume_dag_after_job_completion(
             let mut wave_jobs: Vec<(String, PathBuf, Option<PoolLease>)> = Vec::new();
 
             for job_key in &newly_runnable {
-                let job_config = workflow.jobs.get(job_key).unwrap();
                 let (worktree_path, lease) = resolve_job_worktree(
                     ctx,
                     job_key,
-                    job_config,
-                    &job_worktrees,
                     run,
                     repo,
                     &job_id_map,
