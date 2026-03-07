@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.54](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.53...airlock-v0.1.54) (2026-03-07)
+
+
+### Features
+
+* pool worktrees for concurrent runs ([#35](https://github.com/airlock-hq/airlock/issues/35)) ([609af03](https://github.com/airlock-hq/airlock/commit/609af0380a99575fc0b4104061ebca9da5aed349))
+
 ## [0.1.53](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.52...airlock-v0.1.53) (2026-03-06)
 
 
