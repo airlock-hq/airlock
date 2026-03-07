@@ -86,7 +86,7 @@ If lint fails, run `make fmt` to auto-fix formatting, and manually fix any lint 
 
 ## Rules
 
-Before implementing a fix, understand the full architecture constraints — especially shared resources (e.g., single shared worktree), plugin lifecycle ordering (e.g., window-state plugin restores after setup), and pipeline customizability (steps may not always run). Ask clarifying questions if unsure rather than assuming.
+Before implementing a fix, understand the full architecture constraints — especially shared resources (e.g., worktree pool concurrency), plugin lifecycle ordering (e.g., window-state plugin restores after setup), and pipeline customizability (steps may not always run). Ask clarifying questions if unsure rather than assuming.
 
 When referencing external library APIs (Clerk, OpenAI SDK, etc.), verify against official documentation rather than relying on training data. APIs change between major versions. If unsure, say so and look up the docs.
 
@@ -172,7 +172,7 @@ Airlock stores its data in `~/.airlock/`:
 ~/.airlock/
 ├── state.sqlite    # Main database (repos, runs, stage_results, sync_log)
 ├── repos/          # Gate bare repos for each enrolled repository
-├── worktrees/      # Temporary worktrees for pipeline execution
+├── worktrees/      # Pool worktrees for pipeline execution (worktrees/{repo_id}/pool-{N})
 ├── artifacts/      # Stage output artifacts (logs, etc.)
 ├── locks/          # File locks for concurrent access
 └── socket          # Unix socket for daemon IPC
