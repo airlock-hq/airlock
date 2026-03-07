@@ -353,8 +353,8 @@ mod tests {
         let branch_b = refs(&["refs/heads/feature-b"]);
 
         // Use barriers to synchronize: both tasks signal when they've acquired
-        let (tx1, mut rx1) = tokio::sync::oneshot::channel::<()>();
-        let (tx2, mut rx2) = tokio::sync::oneshot::channel::<()>();
+        let (tx1, rx1) = tokio::sync::oneshot::channel::<()>();
+        let (tx2, rx2) = tokio::sync::oneshot::channel::<()>();
         // Release channels to let tasks finish
         let (done_tx1, done_rx1) = tokio::sync::oneshot::channel::<()>();
         let (done_tx2, done_rx2) = tokio::sync::oneshot::channel::<()>();
