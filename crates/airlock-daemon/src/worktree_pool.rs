@@ -80,14 +80,6 @@ impl RepoPool {
         }
     }
 
-    /// Mark a slot as in-use (for recovering paused jobs on restart).
-    #[allow(dead_code)]
-    fn mark_in_use(&mut self, slot_index: usize) {
-        if let Some(slot) = self.slots.iter_mut().find(|s| s.index == slot_index) {
-            slot.in_use = true;
-        }
-    }
-
     /// Remove excess idle slots beyond `max_idle`. Returns the paths that should
     /// be removed from disk.
     fn shrink(&mut self, max_idle: usize) -> Vec<(usize, PathBuf)> {

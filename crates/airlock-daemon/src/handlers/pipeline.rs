@@ -1272,15 +1272,25 @@ pub(super) async fn resume_dag_after_job_completion(
         }
     }
 
-    // Clean up ephemeral worktrees (those without pool leases)
+    // Clean up ephemeral worktrees (those without pool leases and not pool-managed)
     let leased_paths: std::collections::HashSet<&PathBuf> =
         job_leases.values().map(|l| &l.path).collect();
     for (jk, wt) in &job_worktrees {
         if leased_paths.contains(wt) {
-            continue; // managed by pool
+            continue; // managed by pool (lease acquired in this call)
         }
         if job_statuses.get(jk) == Some(&JobStatus::AwaitingApproval) {
             continue; // still in use
+        }
+        // Check if the pool tracks this worktree (e.g. from a previously completed job).
+        // Pool worktrees must not be deleted — they're reused across runs.
+        if ctx
+            .worktree_pool
+            .find_lease_by_path(&run.repo_id, wt)
+            .await
+            .is_some()
+        {
+            continue; // pool-managed worktree from a prior job
         }
         if let Err(e) = airlock_core::remove_run_worktree(&repo.gate_path, wt) {
             warn!("Failed to clean up ephemeral worktree {:?}: {}", wt, e);
