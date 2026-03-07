@@ -350,14 +350,20 @@ async fn resume_pipeline_after_approval(
         resume_dag_after_job_completion(&ctx, &run, &repo, &workflow, approved_job_key, job_status)
             .await;
 
-        // Clean up ephemeral worktrees only (persistent worktree is kept)
+        // Release pool slot for the approved job's worktree
         if !keep_worktrees {
-            let worktree_path = ctx.paths.run_worktree(&run.repo_id, &run.id);
-            let persistent_wt = ctx.paths.repo_worktree(&run.repo_id);
-            if worktree_path != persistent_wt {
-                if let Err(e) = airlock_core::remove_worktree(&repo.gate_path, &worktree_path) {
-                    warn!("Failed to remove worktree: {}", e);
-                }
+            let worktree_path = {
+                let db = ctx.db.lock().await;
+                find_job_worktree(&ctx.paths, &run, approved_job_key, &db)
+            };
+            if let Some(lease) = ctx
+                .worktree_pool
+                .find_lease_by_path(&run.repo_id, &worktree_path)
+                .await
+            {
+                ctx.worktree_pool
+                    .release(&run.repo_id, lease.slot_index)
+                    .await;
             }
         }
 
@@ -461,16 +467,31 @@ async fn resume_pipeline_after_approval(
         )
         .await;
 
-        // Release pool slot for the approved job's worktree
+        // Release pool slot — but only if no other job still uses this worktree
         if !keep_worktrees {
             if let Some(lease) = ctx
                 .worktree_pool
                 .find_lease_by_path(&run.repo_id, &worktree_path)
                 .await
             {
-                ctx.worktree_pool
-                    .release(&run.repo_id, lease.slot_index)
-                    .await;
+                // Check if any other job sharing this worktree is still non-final
+                let any_holds = {
+                    let db = ctx.db.lock().await;
+                    db.get_job_results_for_run(&run.id)
+                        .unwrap_or_default()
+                        .iter()
+                        .any(|j| {
+                            j.job_key != approved_job_key
+                                && j.worktree_path.as_deref()
+                                    == Some(&*worktree_path.to_string_lossy())
+                                && !j.status.is_final()
+                        })
+                };
+                if !any_holds {
+                    ctx.worktree_pool
+                        .release(&run.repo_id, lease.slot_index)
+                        .await;
+                }
             }
         }
     }
@@ -613,20 +634,78 @@ pub async fn handle_apply_patches(
         }
     }
 
-    // Find the worktree for the paused job. Check DB-stored worktree_path first,
-    // then fall back to pool-* scan and legacy paths.
+    // Determine which paused job's worktree to target.
+    // If job_key is provided, use it directly. Otherwise, find the paused job —
+    // but error if multiple jobs are paused (ambiguous).
     let worktree_path = {
         let db = ctx.db.lock().await;
-        // Find the paused (AwaitingApproval) job for this run
-        let paused_job_key = match db.get_job_results_for_run(&run.id) {
-            Ok(jobs) => jobs
-                .iter()
-                .find(|j| j.status == airlock_core::JobStatus::AwaitingApproval)
-                .map(|j| j.job_key.clone()),
-            Err(_) => None,
+        let job_key = if let Some(ref key) = params.job_key {
+            // Validate the specified job is actually paused
+            match db.get_job_results_for_run(&run.id) {
+                Ok(jobs) => {
+                    let job = jobs.iter().find(|j| j.job_key == *key);
+                    match job {
+                        Some(j) if j.status == airlock_core::JobStatus::AwaitingApproval => {
+                            key.clone()
+                        }
+                        Some(_) => {
+                            return Response::error(
+                                id,
+                                error_codes::INVALID_PARAMS,
+                                format!("Job '{}' is not awaiting approval", key),
+                            );
+                        }
+                        None => {
+                            return Response::error(
+                                id,
+                                error_codes::INVALID_PARAMS,
+                                format!("Job '{}' not found in run", key),
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    return Response::error(
+                        id,
+                        error_codes::DATABASE_ERROR,
+                        format!("Failed to query jobs: {}", e),
+                    );
+                }
+            }
+        } else {
+            // No job_key specified — find paused jobs
+            match db.get_job_results_for_run(&run.id) {
+                Ok(jobs) => {
+                    let paused: Vec<_> = jobs
+                        .iter()
+                        .filter(|j| j.status == airlock_core::JobStatus::AwaitingApproval)
+                        .collect();
+                    match paused.len() {
+                        0 => {
+                            return Response::error(
+                                id,
+                                error_codes::INVALID_PARAMS,
+                                "No jobs are awaiting approval".to_string(),
+                            );
+                        }
+                        1 => paused[0].job_key.clone(),
+                        _ => {
+                            let keys: Vec<_> = paused.iter().map(|j| j.job_key.as_str()).collect();
+                            return Response::error(
+                                id,
+                                error_codes::INVALID_PARAMS,
+                                format!(
+                                    "Multiple jobs awaiting approval: {}. Specify job_key.",
+                                    keys.join(", ")
+                                ),
+                            );
+                        }
+                    }
+                }
+                Err(_) => "default".to_string(),
+            }
         };
-        let job_key = paused_job_key.as_deref().unwrap_or("default");
-        find_job_worktree(&ctx.paths, &run, job_key, &db)
+        find_job_worktree(&ctx.paths, &run, &job_key, &db)
     };
     if !worktree_path.exists() {
         return Response::error(
@@ -1561,15 +1640,20 @@ mod tests {
             workflow_name: None,
         };
 
+        // Create persistent worktree (simulating what the pipeline does)
+        let persistent_wt = ctx.paths.repo_worktree("repo1");
+        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
+
         {
             let db = ctx.db.lock().await;
             db.insert_repo(&repo).unwrap();
             db.insert_run(&run).unwrap();
+            // Insert a paused job so apply_patches can find the worktree
+            let mut job = create_test_job_result("job1", "run1", "default");
+            job.status = JobStatus::AwaitingApproval;
+            job.worktree_path = Some(persistent_wt.to_string_lossy().to_string());
+            db.insert_job_result(&job).unwrap();
         }
-
-        // Create persistent worktree (simulating what the pipeline does)
-        let persistent_wt = ctx.paths.repo_worktree("repo1");
-        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
 
         // Create a patch artifact inside the artifacts dir
         let artifacts_dir = ctx.paths.artifacts_dir();
@@ -1691,15 +1775,19 @@ mod tests {
             workflow_name: None,
         };
 
+        // Create a persistent worktree (simulating what the pipeline does)
+        let persistent_wt = ctx.paths.repo_worktree("repo1");
+        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
+
         {
             let db = ctx.db.lock().await;
             db.insert_repo(&repo).unwrap();
             db.insert_run(&run).unwrap();
+            let mut job = create_test_job_result("job1", "run1", "default");
+            job.status = JobStatus::AwaitingApproval;
+            job.worktree_path = Some(persistent_wt.to_string_lossy().to_string());
+            db.insert_job_result(&job).unwrap();
         }
-
-        // Create a persistent worktree (simulating what the pipeline does)
-        let persistent_wt = ctx.paths.repo_worktree("repo1");
-        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
 
         // Verify the worktree HEAD matches the original SHA
         let wt_head_before = std::process::Command::new("git")
@@ -1795,15 +1883,19 @@ mod tests {
             workflow_name: None,
         };
 
+        // Create persistent worktree (simulating what the pipeline does)
+        let persistent_wt = ctx.paths.repo_worktree("repo1");
+        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
+
         {
             let db = ctx.db.lock().await;
             db.insert_repo(&repo).unwrap();
             db.insert_run(&run).unwrap();
+            let mut job = create_test_job_result("job1", "run1", "default");
+            job.status = JobStatus::AwaitingApproval;
+            job.worktree_path = Some(persistent_wt.to_string_lossy().to_string());
+            db.insert_job_result(&job).unwrap();
         }
-
-        // Create persistent worktree (simulating what the pipeline does)
-        let persistent_wt = ctx.paths.repo_worktree("repo1");
-        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
 
         // Create a patch with garbage diff that won't apply
         let artifacts_dir = ctx.paths.artifacts_dir();
@@ -1878,15 +1970,19 @@ mod tests {
             workflow_name: None,
         };
 
+        // Create persistent worktree (simulating what the pipeline does)
+        let persistent_wt = ctx.paths.repo_worktree("repo1");
+        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
+
         {
             let db = ctx.db.lock().await;
             db.insert_repo(&repo).unwrap();
             db.insert_run(&run).unwrap();
+            let mut job = create_test_job_result("job1", "run1", "default");
+            job.status = JobStatus::AwaitingApproval;
+            job.worktree_path = Some(persistent_wt.to_string_lossy().to_string());
+            db.insert_job_result(&job).unwrap();
         }
-
-        // Create persistent worktree (simulating what the pipeline does)
-        let persistent_wt = ctx.paths.repo_worktree("repo1");
-        airlock_core::create_run_worktree(&gate_path, &persistent_wt, &head_sha).unwrap();
 
         let artifacts_dir = ctx.paths.artifacts_dir();
         let patches_dir = artifacts_dir.join("repo1").join("run1").join("patches");

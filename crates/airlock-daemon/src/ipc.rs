@@ -343,6 +343,12 @@ pub struct ApplyPatchesParams {
     /// Run ID to apply patches to.
     pub run_id: String,
 
+    /// Key of the job whose worktree should receive the patches.
+    /// Required when multiple jobs may be paused concurrently.
+    /// When omitted, falls back to the first AwaitingApproval job found.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job_key: Option<String>,
+
     /// Paths to the patch artifact JSON files to apply.
     pub patch_paths: Vec<String>,
 }

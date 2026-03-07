@@ -293,6 +293,7 @@ async fn execute_workflow_dag(
     // Maps job_key → PathBuf for worktree path lookup (including inherited)
     let mut job_worktrees: HashMap<String, PathBuf> = HashMap::new();
 
+    let mut cancelled = false;
     for (wave_idx, wave) in waves.iter().enumerate() {
         // Check cancellation before each wave
         if cancel.is_cancelled() {
@@ -303,6 +304,7 @@ async fn execute_workflow_dag(
                 }
             }
             mark_run_cancelled(ctx, run).await;
+            cancelled = true;
             break;
         }
 
@@ -468,8 +470,10 @@ async fn execute_workflow_dag(
         }
     }
 
-    // Emit final run result
-    emit_run_final_status(ctx, run).await;
+    // Emit final run result (skip if already emitted by mark_run_cancelled)
+    if !cancelled {
+        emit_run_final_status(ctx, run).await;
+    }
 }
 
 /// Determine the worktree path for a job based on inheritance rules.
