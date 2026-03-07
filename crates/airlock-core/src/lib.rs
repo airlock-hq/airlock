@@ -77,7 +77,7 @@ pub use types::{
     StepResult, StepStatus, SyncLog, TourResult, TourStep,
 };
 pub use worktree::{
-    create_run_worktree, list_worktrees, remove_run_worktree, remove_worktree,
+    create_run_worktree, is_valid_worktree, list_worktrees, remove_run_worktree, remove_worktree,
     reset_persistent_worktree,
 };
 

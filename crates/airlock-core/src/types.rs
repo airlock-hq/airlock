@@ -262,6 +262,10 @@ pub struct JobResult {
     /// Error message if the job failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+
+    /// Path to the worktree used by this job (for pool recovery on restart).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_path: Option<String>,
 }
 
 /// A repository enrolled in Airlock.

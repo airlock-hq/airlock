@@ -374,6 +374,7 @@ mod tests {
             started_at: None,
             completed_at: None,
             error: None,
+            worktree_path: None,
         })
         .unwrap();
 

@@ -44,6 +44,7 @@ pub const CREATE_JOB_RESULTS_TABLE: &str = r#"
         started_at INTEGER,
         completed_at INTEGER,
         error TEXT,
+        worktree_path TEXT,
         FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
     )
 "#;
@@ -210,4 +211,9 @@ pub const MIGRATE_V8_CREATE_STEP_RESULTS: &str = r#"
 /// Migration v8: Drop old stage_results table.
 pub const MIGRATE_V8_DROP_STAGE_RESULTS: &str = r#"
     DROP TABLE IF EXISTS stage_results
+"#;
+
+/// Migration v9: Add worktree_path column to job_results for pool recovery.
+pub const MIGRATE_V9_ADD_WORKTREE_PATH: &str = r#"
+    ALTER TABLE job_results ADD COLUMN worktree_path TEXT
 "#;

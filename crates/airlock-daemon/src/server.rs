@@ -247,6 +247,17 @@ impl Server {
             self.shutdown_tx.clone(),
         ));
 
+        // Initialize worktree pool from disk state (recover from crash/restart)
+        {
+            let db = ctx.db.lock().await;
+            if let Err(e) = ctx.worktree_pool.init_from_disk(&ctx.paths, &db).await {
+                warn!("Failed to initialize worktree pool from disk: {}", e);
+            }
+            drop(db);
+            // Shrink pools to default idle limit
+            ctx.worktree_pool.shrink_all(&ctx.paths).await;
+        }
+
         // Create the listener with platform-specific socket name
         let listener = self.create_listener(&socket_name_str)?;
 

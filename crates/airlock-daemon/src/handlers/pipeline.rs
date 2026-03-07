@@ -12,6 +12,7 @@ use super::HandlerContext;
 use crate::ipc::AirlockEvent;
 use crate::pipeline::LogStreamCallback;
 use crate::stage_loader::StageLoader;
+use crate::worktree_pool::PoolLease;
 use airlock_core::{
     filter_workflows_for_branch, load_workflows_from_tree, validate_job_dag, ApprovalMode,
     JobConfig, JobResult, JobStatus, RefUpdate, Repo, Run, StepDefinition, StepResult, StepStatus,
@@ -222,6 +223,7 @@ async fn create_job_and_step_records(
                 started_at: None,
                 completed_at: None,
                 error: None,
+                worktree_path: None,
             };
 
             if let Err(e) = db.insert_job_result(&job_result) {
@@ -267,6 +269,9 @@ async fn create_job_and_step_records(
 ///
 /// Jobs within a wave execute in parallel. Waves execute sequentially.
 /// Checks `cancel` between waves and before each job.
+///
+/// Worktrees are acquired from the pool and released after completion,
+/// except for paused (AwaitingApproval) or keep_worktrees jobs.
 async fn execute_workflow_dag(
     ctx: &Arc<HandlerContext>,
     run: &Run,
@@ -276,29 +281,29 @@ async fn execute_workflow_dag(
     job_id_map: &HashMap<String, String>,
     cancel: &CancellationToken,
 ) {
-    let paths = ctx.paths.clone();
-
     // Create run artifacts directory
-    if let Err(e) = crate::pipeline::create_run_artifacts_dir(&paths, &run.repo_id, &run.id) {
+    if let Err(e) = crate::pipeline::create_run_artifacts_dir(&ctx.paths, &run.repo_id, &run.id) {
         warn!("Failed to create run artifacts directory: {}", e);
     }
 
-    // Track job statuses and worktree paths for inheritance
+    // Track job statuses and leases for worktree inheritance and cleanup
     let mut job_statuses: HashMap<String, JobStatus> = HashMap::new();
+    // Maps job_key → PoolLease for jobs that acquired a worktree from the pool
+    let mut job_leases: HashMap<String, PoolLease> = HashMap::new();
+    // Maps job_key → PathBuf for worktree path lookup (including inherited)
     let mut job_worktrees: HashMap<String, PathBuf> = HashMap::new();
 
     for (wave_idx, wave) in waves.iter().enumerate() {
         // Check cancellation before each wave
         if cancel.is_cancelled() {
             info!("Run {} cancelled before wave {}", run.id, wave_idx + 1);
-            // Mark all remaining jobs as skipped
             for remaining_wave in &waves[wave_idx..] {
                 for jk in remaining_wave {
                     skip_job(ctx, run, jk, job_id_map, &mut job_statuses).await;
                 }
             }
             mark_run_cancelled(ctx, run).await;
-            return;
+            break;
         }
 
         debug!(
@@ -309,18 +314,24 @@ async fn execute_workflow_dag(
         );
 
         if wave.len() == 1 {
-            // Single job in wave — execute directly (no spawn overhead)
             let job_key = &wave[0];
             let job_config = workflow.jobs.get(job_key).unwrap();
 
-            // Check if this job should be skipped (dependency failed)
             if should_skip_job(job_key, job_config, &job_statuses) {
                 skip_job(ctx, run, job_key, job_id_map, &mut job_statuses).await;
                 continue;
             }
 
-            let worktree_path =
-                resolve_job_worktree(job_key, job_config, &job_worktrees, &paths, run, repo);
+            let (worktree_path, lease) = resolve_job_worktree(
+                ctx,
+                job_key,
+                job_config,
+                &job_worktrees,
+                run,
+                repo,
+                job_id_map,
+            )
+            .await;
 
             let status = execute_single_job(
                 ctx,
@@ -334,14 +345,15 @@ async fn execute_workflow_dag(
             )
             .await;
 
-            job_worktrees.insert(job_key.clone(), worktree_path.clone());
+            job_worktrees.insert(job_key.clone(), worktree_path);
+            if let Some(l) = lease {
+                job_leases.insert(job_key.clone(), l);
+            }
             job_statuses.insert(job_key.clone(), status);
         } else {
-            // Multiple jobs in wave — execute in parallel using tokio::JoinSet
             let mut join_set = tokio::task::JoinSet::new();
+            let mut wave_jobs: Vec<(String, PathBuf, Option<PoolLease>)> = Vec::new();
 
-            // Collect job details before spawning
-            let mut wave_jobs: Vec<(String, PathBuf)> = Vec::new();
             for job_key in wave {
                 let job_config = workflow.jobs.get(job_key).unwrap();
 
@@ -350,15 +362,28 @@ async fn execute_workflow_dag(
                     continue;
                 }
 
-                let worktree_path =
-                    resolve_job_worktree(job_key, job_config, &job_worktrees, &paths, run, repo);
+                let (worktree_path, lease) = resolve_job_worktree(
+                    ctx,
+                    job_key,
+                    job_config,
+                    &job_worktrees,
+                    run,
+                    repo,
+                    job_id_map,
+                )
+                .await;
 
-                wave_jobs.push((job_key.clone(), worktree_path));
+                wave_jobs.push((job_key.clone(), worktree_path, lease));
             }
 
-            let spawned_keys: Vec<String> = wave_jobs.iter().map(|(k, _)| k.clone()).collect();
+            let spawned_keys: Vec<String> = wave_jobs.iter().map(|(k, _, _)| k.clone()).collect();
 
-            for (job_key, worktree_path) in wave_jobs {
+            for (job_key, worktree_path, lease) in wave_jobs {
+                if let Some(l) = lease {
+                    job_leases.insert(job_key.clone(), l);
+                }
+                job_worktrees.insert(job_key.clone(), worktree_path.clone());
+
                 let ctx = ctx.clone();
                 let run = run.clone();
                 let repo = repo.clone();
@@ -378,15 +403,13 @@ async fn execute_workflow_dag(
                         &cancel,
                     )
                     .await;
-                    (job_key, worktree_path, status)
+                    (job_key, status)
                 });
             }
 
-            // Collect results
             while let Some(result) = join_set.join_next().await {
                 match result {
-                    Ok((job_key, worktree_path, status)) => {
-                        job_worktrees.insert(job_key.clone(), worktree_path);
+                    Ok((job_key, status)) => {
                         job_statuses.insert(job_key, status);
                     }
                     Err(e) => {
@@ -395,7 +418,6 @@ async fn execute_workflow_dag(
                 }
             }
 
-            // Mark any spawned jobs that didn't return a result (panicked) as Failed
             for key in &spawned_keys {
                 if !job_statuses.contains_key(key) {
                     error!("Job '{}' panicked — marking as failed", key);
@@ -415,22 +437,16 @@ async fn execute_workflow_dag(
         }
     }
 
-    // Clean up ephemeral worktrees only. The persistent per-repo worktree
-    // is kept alive so build caches survive across runs.
-    let persistent_wt = paths.repo_worktree(&run.repo_id);
-    for (job_key, worktree_path) in &job_worktrees {
-        // Never remove the persistent worktree
-        if *worktree_path == persistent_wt {
-            continue;
-        }
+    // Release pool leases for completed jobs (not paused or keep_worktrees)
+    for (job_key, lease) in &job_leases {
         let job_config = workflow.jobs.get(job_key);
         let keep = job_config.map(|c| c.keep_worktrees).unwrap_or(false);
         let is_paused = job_statuses.get(job_key) == Some(&JobStatus::AwaitingApproval);
 
-        if !keep && !is_paused && worktree_path.exists() {
-            if let Err(e) = airlock_core::remove_worktree(&repo.gate_path, worktree_path) {
-                warn!("Failed to remove worktree for job '{}': {}", job_key, e);
-            }
+        if !keep && !is_paused {
+            ctx.worktree_pool
+                .release(&run.repo_id, lease.slot_index)
+                .await;
         }
     }
 
@@ -440,19 +456,21 @@ async fn execute_workflow_dag(
 
 /// Determine the worktree path for a job based on inheritance rules.
 ///
-/// - The first/only job (no predecessors, empty worktree map) uses the
-///   persistent per-repo worktree so build caches survive across runs.
-/// - Jobs with exactly one predecessor inherit that predecessor's worktree.
-/// - Jobs with multiple predecessors get a fresh ephemeral worktree.
-pub(super) fn resolve_job_worktree(
+/// - Single predecessor → inherit that predecessor's worktree (no pool acquire).
+/// - All other cases → acquire from pool.
+///
+/// Returns `(PathBuf, Option<PoolLease>)` — the lease is `Some` when a new pool
+/// slot was acquired (the caller is responsible for releasing it).
+pub(super) async fn resolve_job_worktree(
+    ctx: &Arc<HandlerContext>,
     job_key: &str,
     job_config: &JobConfig,
     job_worktrees: &HashMap<String, PathBuf>,
-    paths: &airlock_core::AirlockPaths,
     run: &Run,
     repo: &Repo,
-) -> PathBuf {
-    // Single predecessor → inherit worktree
+    job_id_map: &HashMap<String, String>,
+) -> (PathBuf, Option<PoolLease>) {
+    // Single predecessor → inherit worktree (no new pool acquire)
     if job_config.needs.len() == 1 {
         let predecessor = &job_config.needs[0];
         if let Some(wt) = job_worktrees.get(predecessor.as_str()) {
@@ -460,22 +478,38 @@ pub(super) fn resolve_job_worktree(
                 "Job '{}' inherits worktree from predecessor '{}'",
                 job_key, predecessor
             );
-            return wt.clone();
+            return (wt.clone(), None);
         }
     }
 
-    // No predecessors or multiple predecessors → fresh worktree
-    // For the first/only job, use the persistent per-repo worktree
-    if job_config.needs.is_empty() && job_worktrees.is_empty() {
-        let wt = paths.repo_worktree(&run.repo_id);
-        if let Err(e) = airlock_core::reset_persistent_worktree(&repo.gate_path, &wt, &run.head_sha)
-        {
+    // Acquire from pool
+    match ctx
+        .worktree_pool
+        .acquire(&run.repo_id, &repo.gate_path, &run.head_sha, &ctx.paths)
+        .await
+    {
+        Ok(lease) => {
+            let path = lease.path.clone();
+            // Store worktree_path in DB for crash recovery
+            if let Some(job_id) = job_id_map.get(job_key) {
+                let db = ctx.db.lock().await;
+                let _ = db.update_job_worktree_path(job_id, &path.to_string_lossy());
+            }
+            debug!(
+                "Job '{}' acquired pool worktree slot {} at {:?}",
+                job_key, lease.slot_index, path
+            );
+            (path, Some(lease))
+        }
+        Err(e) => {
             error!(
-                "Failed to reset persistent worktree for job '{}': {}, falling back to ephemeral worktree",
+                "Failed to acquire pool worktree for job '{}': {}, falling back to ephemeral",
                 job_key, e
             );
-            // Fall back to an ephemeral worktree instead of returning a broken path
-            let ephemeral_wt = paths.run_worktree(&run.repo_id, &run.id);
+            let ephemeral_wt = ctx
+                .paths
+                .run_worktree(&run.repo_id, &run.id)
+                .with_extension(job_key);
             if let Err(e2) =
                 airlock_core::create_run_worktree(&repo.gate_path, &ephemeral_wt, &run.head_sha)
             {
@@ -484,21 +518,9 @@ pub(super) fn resolve_job_worktree(
                     job_key, e2
                 );
             }
-            return ephemeral_wt;
-        }
-        return wt;
-    }
-
-    // Multiple predecessors or non-first job without inheritance → ephemeral worktree
-    let wt = paths
-        .run_worktree(&run.repo_id, &run.id)
-        .with_extension(job_key);
-    if !wt.exists() {
-        if let Err(e) = airlock_core::create_run_worktree(&repo.gate_path, &wt, &run.head_sha) {
-            error!("Failed to create worktree for job '{}': {}", job_key, e);
+            (ephemeral_wt, None)
         }
     }
-    wt
 }
 
 /// Check if a job should be skipped due to failed dependencies.
@@ -1050,8 +1072,6 @@ pub(super) async fn resume_dag_after_job_completion(
     completed_job_key: &str,
     completed_job_status: JobStatus,
 ) {
-    let paths = ctx.paths.clone();
-
     // Reload run from DB to get the latest head_sha. Between when the caller
     // loaded the run and now, apply_patches may have updated head_sha.
     let run = {
@@ -1070,10 +1090,11 @@ pub(super) async fn resume_dag_after_job_completion(
     };
     let run = &run;
 
-    // Build current job statuses from DB
+    // Build current job statuses, worktree paths from DB
     let mut job_statuses: HashMap<String, JobStatus> = HashMap::new();
     let mut job_id_map: HashMap<String, String> = HashMap::new();
     let mut job_worktrees: HashMap<String, PathBuf> = HashMap::new();
+    let mut job_leases: HashMap<String, PoolLease> = HashMap::new();
 
     {
         let db = ctx.db.lock().await;
@@ -1082,6 +1103,9 @@ pub(super) async fn resume_dag_after_job_completion(
                 for job in &jobs {
                     job_statuses.insert(job.job_key.clone(), job.status);
                     job_id_map.insert(job.job_key.clone(), job.id.clone());
+                    if let Some(ref wt_path) = job.worktree_path {
+                        job_worktrees.insert(job.job_key.clone(), PathBuf::from(wt_path));
+                    }
                 }
             }
             Err(e) => {
@@ -1093,23 +1117,6 @@ pub(super) async fn resume_dag_after_job_completion(
 
     // Make sure the completed job's status is up-to-date in our map
     job_statuses.insert(completed_job_key.to_string(), completed_job_status);
-
-    // Populate worktree paths for completed jobs (they may exist on disk)
-    let persistent_wt_path = paths.repo_worktree(&run.repo_id);
-    for job_key in job_statuses.keys() {
-        // Check persistent worktree first (new default)
-        if persistent_wt_path.exists() {
-            job_worktrees.insert(job_key.clone(), persistent_wt_path.clone());
-        }
-        let wt = paths.run_worktree(&run.repo_id, &run.id);
-        if wt.exists() {
-            job_worktrees.insert(job_key.clone(), wt.clone());
-        }
-        let job_wt = wt.with_extension(job_key.as_str());
-        if job_wt.exists() {
-            job_worktrees.insert(job_key.clone(), job_wt);
-        }
-    }
 
     // Find jobs that are still Pending and check if their dependencies are now all satisfied
     let mut newly_runnable: Vec<String> = Vec::new();
@@ -1157,8 +1164,16 @@ pub(super) async fn resume_dag_after_job_completion(
             let job_key = &newly_runnable[0];
             let job_config = workflow.jobs.get(job_key).unwrap();
 
-            let worktree_path =
-                resolve_job_worktree(job_key, job_config, &job_worktrees, &paths, run, repo);
+            let (worktree_path, lease) = resolve_job_worktree(
+                ctx,
+                job_key,
+                job_config,
+                &job_worktrees,
+                run,
+                repo,
+                &job_id_map,
+            )
+            .await;
 
             let status = execute_single_job(
                 ctx,
@@ -1173,23 +1188,43 @@ pub(super) async fn resume_dag_after_job_completion(
             .await;
 
             job_worktrees.insert(job_key.clone(), worktree_path);
+            if let Some(l) = lease {
+                job_leases.insert(job_key.clone(), l);
+            }
             job_statuses.insert(job_key.clone(), status);
         } else {
-            // Multiple jobs — execute in parallel
-            let mut join_set = tokio::task::JoinSet::new();
-            let spawned_keys: Vec<String> = newly_runnable.clone();
+            // Multiple jobs — acquire worktrees before spawning
+            let mut wave_jobs: Vec<(String, PathBuf, Option<PoolLease>)> = Vec::new();
 
             for job_key in &newly_runnable {
                 let job_config = workflow.jobs.get(job_key).unwrap();
-                let worktree_path =
-                    resolve_job_worktree(job_key, job_config, &job_worktrees, &paths, run, repo);
+                let (worktree_path, lease) = resolve_job_worktree(
+                    ctx,
+                    job_key,
+                    job_config,
+                    &job_worktrees,
+                    run,
+                    repo,
+                    &job_id_map,
+                )
+                .await;
+                wave_jobs.push((job_key.clone(), worktree_path, lease));
+            }
+
+            let spawned_keys: Vec<String> = wave_jobs.iter().map(|(k, _, _)| k.clone()).collect();
+
+            let mut join_set = tokio::task::JoinSet::new();
+            for (job_key, worktree_path, lease) in wave_jobs {
+                if let Some(l) = lease {
+                    job_leases.insert(job_key.clone(), l);
+                }
+                job_worktrees.insert(job_key.clone(), worktree_path.clone());
 
                 let ctx = ctx.clone();
                 let run = run.clone();
                 let repo = repo.clone();
-                let job_config = job_config.clone();
+                let job_config = workflow.jobs.get(&job_key).unwrap().clone();
                 let job_id_map = job_id_map.clone();
-                let job_key = job_key.clone();
                 let no_cancel = no_cancel.clone();
 
                 join_set.spawn(async move {
@@ -1204,14 +1239,13 @@ pub(super) async fn resume_dag_after_job_completion(
                         &no_cancel,
                     )
                     .await;
-                    (job_key, worktree_path, status)
+                    (job_key, status)
                 });
             }
 
             while let Some(result) = join_set.join_next().await {
                 match result {
-                    Ok((job_key, worktree_path, status)) => {
-                        job_worktrees.insert(job_key.clone(), worktree_path);
+                    Ok((job_key, status)) => {
                         job_statuses.insert(job_key, status);
                     }
                     Err(e) => {
@@ -1245,27 +1279,16 @@ pub(super) async fn resume_dag_after_job_completion(
         // Loop again to check if more jobs got unblocked
     }
 
-    // Clean up ephemeral worktrees for newly completed jobs.
-    // The persistent per-repo worktree is never removed.
-    let persistent_wt = paths.repo_worktree(&run.repo_id);
-    for (job_key, worktree_path) in &job_worktrees {
-        if *worktree_path == persistent_wt {
-            continue;
-        }
+    // Release pool leases for completed jobs (not paused or keep_worktrees)
+    for (job_key, lease) in &job_leases {
         let job_config = workflow.jobs.get(job_key);
         let keep = job_config.map(|c| c.keep_worktrees).unwrap_or(false);
         let is_paused = job_statuses.get(job_key) == Some(&JobStatus::AwaitingApproval);
 
-        if !keep && !is_paused && worktree_path.exists() {
-            let status = job_statuses.get(job_key);
-            if status.map(|s| s.is_final()).unwrap_or(false) {
-                if let Err(e) = airlock_core::remove_worktree(&repo.gate_path, worktree_path) {
-                    warn!(
-                        "Failed to remove worktree for job '{}' during DAG resume: {}",
-                        job_key, e
-                    );
-                }
-            }
+        if !keep && !is_paused {
+            ctx.worktree_pool
+                .release(&run.repo_id, lease.slot_index)
+                .await;
         }
     }
 }

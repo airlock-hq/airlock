@@ -144,6 +144,7 @@ fn test_status_shows_active_runs() {
         started_at: None,
         completed_at: None,
         error: None,
+        worktree_path: None,
     })
     .unwrap();
     // Give run1 a running stage
@@ -189,6 +190,7 @@ fn test_status_shows_active_runs() {
         started_at: None,
         completed_at: None,
         error: None,
+        worktree_path: None,
     })
     .unwrap();
     // Give run2 a pending stage (no stages = active)
@@ -273,6 +275,7 @@ fn test_e2e_status_shows_pending_runs_count() {
             started_at: None,
             completed_at: None,
             error: None,
+            worktree_path: None,
         })
         .unwrap();
         db.insert_step_result(&StepResult {
@@ -320,6 +323,7 @@ fn test_e2e_status_shows_pending_runs_count() {
             started_at: None,
             completed_at: None,
             error: None,
+            worktree_path: None,
         })
         .unwrap();
         db.insert_step_result(&StepResult {
@@ -366,6 +370,7 @@ fn test_e2e_status_shows_pending_runs_count() {
         started_at: None,
         completed_at: None,
         error: None,
+        worktree_path: None,
     })
     .unwrap();
     db.insert_step_result(&StepResult {
@@ -841,6 +846,7 @@ fn test_e2e_status_in_each_repo_shows_correct_information() {
                 started_at: None,
                 completed_at: None,
                 error: None,
+                worktree_path: None,
             })
             .unwrap();
             db.insert_step_result(&StepResult {
@@ -889,6 +895,7 @@ fn test_e2e_status_in_each_repo_shows_correct_information() {
                 started_at: None,
                 completed_at: None,
                 error: None,
+                worktree_path: None,
             })
             .unwrap();
             db.insert_step_result(&StepResult {

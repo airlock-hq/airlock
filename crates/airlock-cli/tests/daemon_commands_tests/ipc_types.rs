@@ -63,6 +63,7 @@ fn seed_database(paths: &airlock_core::AirlockPaths) -> (String, String, String,
         started_at: Some(now),
         completed_at: Some(now + 5),
         error: None,
+        worktree_path: None,
     })
     .expect("Failed to insert job result");
 

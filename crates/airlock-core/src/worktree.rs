@@ -123,7 +123,7 @@ pub fn remove_run_worktree(gate_path: &Path, worktree_path: &Path) -> Result<()>
 ///
 /// If that target directory doesn't exist (e.g., the gate repo was deleted
 /// and recreated), the worktree is stale and must be recreated.
-fn is_valid_worktree(worktree_path: &Path) -> bool {
+pub fn is_valid_worktree(worktree_path: &Path) -> bool {
     let dot_git = worktree_path.join(".git");
     if dot_git.is_dir() {
         // A regular .git directory (not a worktree link) — treat as valid

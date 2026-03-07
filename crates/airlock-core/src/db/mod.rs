@@ -30,7 +30,7 @@ use std::path::Path;
 /// Version 6: Removed artifacts_path column (artifacts now at run level)
 /// Version 7: Added superseded column to runs
 /// Version 8: Add workflow tracking to runs, add job_results table, replace stage_results with step_results
-const SCHEMA_VERSION: i32 = 8;
+const SCHEMA_VERSION: i32 = 9;
 
 /// Database connection wrapper for Airlock state management.
 pub struct Database {
@@ -391,6 +391,19 @@ impl Database {
                 .map_err(|e| {
                     AirlockError::Database(format!(
                         "Failed to create step_results job index: {}",
+                        e
+                    ))
+                })?;
+        }
+
+        // Version 9: Add worktree_path column to job_results for pool recovery
+        if from_version < 9 {
+            tracing::info!("Migrating to schema version 9: adding worktree_path to job_results");
+            self.conn
+                .execute(schema::MIGRATE_V9_ADD_WORKTREE_PATH, [])
+                .map_err(|e| {
+                    AirlockError::Database(format!(
+                        "Failed to add worktree_path column to job_results: {}",
                         e
                     ))
                 })?;

@@ -1,40 +1,46 @@
-//! Per-repo run serialization queue.
+//! Per-repo run queue with concurrent execution support.
 //!
-//! Ensures only one pipeline run executes at a time for each repository.
-//! When a new run arrives for a repo that already has an active run,
-//! the active run is cancelled (via its `CancellationToken`) and the new
-//! run waits for the semaphore permit to become available.
+//! Allows up to `MAX_CONCURRENT_RUNS` pipeline runs to execute concurrently
+//! for the same repository (e.g., different branches). When a new run arrives
+//! for the same branch as an active run, the active run is cancelled (via its
+//! `CancellationToken`) and the new run supersedes it.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 
-/// A run tracked by the queue — either running or waiting for the permit.
+/// Maximum number of concurrent runs per repository.
+const MAX_CONCURRENT_RUNS: usize = 8;
+
+/// A run tracked by the queue — either running or waiting for a permit.
 struct TrackedRun {
     id: u64,
     token: CancellationToken,
     refs: Vec<String>,
 }
 
-/// Per-repository slot holding a semaphore (capacity 1) and tracked runs.
+/// Per-repository slot holding a semaphore and tracked runs.
 struct RepoSlot {
-    /// Only one run at a time can hold the permit.
+    /// Up to MAX_CONCURRENT_RUNS permits available.
     semaphore: Arc<Semaphore>,
     /// Monotonically increasing ID for runs in this slot.
     next_id: u64,
-    /// The run currently holding the semaphore permit.
-    running: Option<TrackedRun>,
-    /// Runs waiting for the semaphore permit, in arrival order.
+    /// Runs currently holding semaphore permits.
+    running: Vec<TrackedRun>,
+    /// Runs waiting for a semaphore permit, in arrival order.
     pending: Vec<TrackedRun>,
 }
 
-/// Serializes pipeline runs within each repository.
+type SlotMap = Arc<Mutex<HashMap<String, RepoSlot>>>;
+
+/// Serializes and manages pipeline runs within each repository.
 ///
-/// Multiple repos can run in parallel, but within a single repo only one
-/// run executes at a time. Newer runs cancel older ones.
+/// Multiple repos can run in parallel. Within a single repo, up to
+/// `MAX_CONCURRENT_RUNS` runs can execute concurrently. Newer runs
+/// targeting the same branch cancel older ones on that branch.
 pub struct RunQueue {
-    slots: Mutex<HashMap<String, RepoSlot>>,
+    slots: SlotMap,
 }
 
 /// Guard returned by [`RunQueue::acquire`].
@@ -44,14 +50,33 @@ pub struct RunQueue {
 pub struct RunPermit {
     /// The pipeline should check `token.is_cancelled()` periodically.
     pub token: CancellationToken,
+    /// Internal run ID for cleanup from the running vec.
+    run_id: u64,
+    /// Repo ID for cleanup.
+    repo_id: String,
+    /// Reference to the queue's slot map for cleanup on drop.
+    slots: SlotMap,
     /// Dropping this releases the slot for the next run.
     _permit: OwnedSemaphorePermit,
+}
+
+impl Drop for RunPermit {
+    fn drop(&mut self) {
+        // Remove this run from the running vec. We can't async in drop,
+        // so use try_lock. If the lock is held, the entry will be stale
+        // but harmless — it will be cleaned up on the next acquire.
+        if let Ok(mut slots) = self.slots.try_lock() {
+            if let Some(slot) = slots.get_mut(&self.repo_id) {
+                slot.running.retain(|r| r.id != self.run_id);
+            }
+        }
+    }
 }
 
 impl Default for RunQueue {
     fn default() -> Self {
         Self {
-            slots: Mutex::new(HashMap::new()),
+            slots: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -66,28 +91,31 @@ impl RunQueue {
         Self::default()
     }
 
-    /// Cancel the active run for `repo_id` without acquiring a new slot.
+    /// Cancel active runs for `repo_id` without acquiring a new slot.
     ///
-    /// When `ref_names` is provided, only cancels if the active run has
-    /// overlapping refs. When `None`, cancels unconditionally.
+    /// When `ref_names` is provided, only cancels runs with overlapping refs.
+    /// When `None`, cancels all active and pending runs unconditionally.
     ///
     /// Used when superseded runs need their tokens cancelled but no new
     /// pipeline run will be started (e.g., all refs were forwarded directly).
     pub async fn cancel_active(&self, repo_id: &str, ref_names: Option<&[String]>) {
         let mut slots = self.slots.lock().await;
         if let Some(slot) = slots.get_mut(repo_id) {
-            // Cancel the running run if refs overlap (or unconditionally).
-            let cancel_running = match (&slot.running, ref_names) {
-                (Some(running), Some(refs)) => refs_overlap(&running.refs, refs),
-                (Some(_), None) => true,
-                (None, _) => false,
-            };
-            if cancel_running {
-                if let Some(running) = slot.running.take() {
+            // Cancel running runs with overlapping refs (or all if None).
+            slot.running.retain(|running| {
+                let should_cancel = match ref_names {
+                    Some(refs) => refs_overlap(&running.refs, refs),
+                    None => true,
+                };
+                if should_cancel {
                     tracing::info!("Cancelling active run for repo {}", repo_id);
                     running.token.cancel();
+                    false
+                } else {
+                    true
                 }
-            }
+            });
+
             // Also cancel pending runs with overlapping refs.
             slot.pending.retain(|p| {
                 let should_cancel = match ref_names {
@@ -105,12 +133,12 @@ impl RunQueue {
         }
     }
 
-    /// Acquire the run slot for `repo_id`.
+    /// Acquire a run slot for `repo_id`.
     ///
     /// `ref_names` are the refs this run will process (e.g.
-    /// `["refs/heads/main"]`). If the active run has overlapping refs, it
-    /// is cancelled so the new run supersedes it. If refs don't overlap,
-    /// the new run queues behind without cancelling.
+    /// `["refs/heads/main"]`). If any active run has overlapping refs, it
+    /// is cancelled so the new run supersedes it. Runs with non-overlapping
+    /// refs continue undisturbed.
     ///
     /// Returns a [`RunPermit`] whose `token` the pipeline should monitor.
     pub async fn acquire(&self, repo_id: &str, ref_names: &[String]) -> RunPermit {
@@ -119,26 +147,25 @@ impl RunQueue {
             let slot = slots
                 .entry(repo_id.to_string())
                 .or_insert_with(|| RepoSlot {
-                    semaphore: Arc::new(Semaphore::new(1)),
+                    semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_RUNS)),
                     next_id: 0,
-                    running: None,
+                    running: Vec::new(),
                     pending: Vec::new(),
                 });
 
-            // Only cancel the running run if refs overlap (same branch pushed again).
-            let cancel_running = match &slot.running {
-                Some(r) => refs_overlap(&r.refs, ref_names),
-                None => false,
-            };
-            if cancel_running {
-                if let Some(running) = slot.running.take() {
+            // Cancel running runs with overlapping refs (same branch pushed again).
+            slot.running.retain(|running| {
+                if refs_overlap(&running.refs, ref_names) {
                     tracing::info!(
                         "Cancelling active run for repo {} (overlapping refs) to make way for new run",
                         repo_id
                     );
                     running.token.cancel();
+                    false
+                } else {
+                    true
                 }
-            }
+            });
 
             // Cancel any pending runs with overlapping refs.
             slot.pending.retain(|p| {
@@ -167,7 +194,7 @@ impl RunQueue {
             (slot.semaphore.clone(), token, run_id)
         };
 
-        // Wait until the previous run releases its permit.
+        // Wait until a permit is available.
         let permit = semaphore
             .acquire_owned()
             .await
@@ -178,7 +205,7 @@ impl RunQueue {
             let mut slots = self.slots.lock().await;
             if let Some(slot) = slots.get_mut(repo_id) {
                 slot.pending.retain(|p| p.id != run_id);
-                slot.running = Some(TrackedRun {
+                slot.running.push(TrackedRun {
                     id: run_id,
                     token: token.clone(),
                     refs: ref_names.to_vec(),
@@ -188,6 +215,9 @@ impl RunQueue {
 
         RunPermit {
             token,
+            run_id,
+            repo_id: repo_id.to_string(),
+            slots: Arc::clone(&self.slots),
             _permit: permit,
         }
     }
@@ -273,23 +303,19 @@ mod tests {
         let b = branch.clone();
         let h1 = tokio::spawn(async move {
             let permit = q.acquire("repo-1", &b).await;
-            // Simulate a long-running pipeline that checks for cancellation
             loop {
                 if permit.token.is_cancelled() {
                     break;
                 }
                 sleep(Duration::from_millis(5)).await;
             }
-            // Token should be cancelled
             assert!(permit.token.is_cancelled());
         });
 
-        // Give h1 time to acquire
         sleep(Duration::from_millis(10)).await;
 
         let q = queue.clone();
         let h2 = tokio::spawn(async move {
-            // Same branch — should cancel h1's token
             let permit = q.acquire("repo-1", &branch).await;
             assert!(!permit.token.is_cancelled());
             drop(permit);
@@ -304,11 +330,9 @@ mod tests {
         let queue = Arc::new(RunQueue::new());
         let branch = refs(&["refs/heads/main"]);
 
-        // Acquire a slot and hold it
         let q = queue.clone();
         let h1 = tokio::spawn(async move {
             let permit = q.acquire("repo-1", &branch).await;
-            // Wait for cancellation
             loop {
                 if permit.token.is_cancelled() {
                     break;
@@ -318,49 +342,66 @@ mod tests {
             assert!(permit.token.is_cancelled());
         });
 
-        // Give h1 time to acquire
         sleep(Duration::from_millis(10)).await;
-
-        // cancel_active with None should cancel unconditionally
         queue.cancel_active("repo-1", None).await;
-
         h1.await.unwrap();
 
-        // cancel_active on a non-existent repo should be a no-op
         queue.cancel_active("repo-nonexistent", None).await;
     }
 
     #[tokio::test]
-    async fn test_queue_different_branches() {
-        // When two runs target different branches of the same repo,
-        // the second should queue (wait) without cancelling the first.
+    async fn test_concurrent_different_branches_same_repo() {
         let queue = Arc::new(RunQueue::new());
+        let running = Arc::new(AtomicU32::new(0));
         let branch_a = refs(&["refs/heads/feature-a"]);
         let branch_b = refs(&["refs/heads/feature-b"]);
 
+        // Use barriers to synchronize: both tasks signal when they've acquired
+        let (tx1, mut rx1) = tokio::sync::oneshot::channel::<()>();
+        let (tx2, mut rx2) = tokio::sync::oneshot::channel::<()>();
+        // Release channels to let tasks finish
+        let (done_tx1, done_rx1) = tokio::sync::oneshot::channel::<()>();
+        let (done_tx2, done_rx2) = tokio::sync::oneshot::channel::<()>();
+
         let q = queue.clone();
+        let r = running.clone();
         let h1 = tokio::spawn(async move {
             let permit = q.acquire("repo-1", &branch_a).await;
-            // Should NOT be cancelled by branch-b's acquire
-            sleep(Duration::from_millis(60)).await;
+            r.fetch_add(1, Ordering::SeqCst);
+            let _ = tx1.send(());
+            let _ = done_rx1.await;
             assert!(
                 !permit.token.is_cancelled(),
                 "branch-a run should not be cancelled by branch-b"
             );
+            r.fetch_sub(1, Ordering::SeqCst);
             drop(permit);
         });
-
-        // Give h1 time to acquire
-        sleep(Duration::from_millis(10)).await;
 
         let q = queue.clone();
+        let r = running.clone();
         let h2 = tokio::spawn(async move {
-            // Different branch — should NOT cancel h1, just wait
             let permit = q.acquire("repo-1", &branch_b).await;
+            r.fetch_add(1, Ordering::SeqCst);
+            let _ = tx2.send(());
+            let _ = done_rx2.await;
             assert!(!permit.token.is_cancelled());
+            r.fetch_sub(1, Ordering::SeqCst);
             drop(permit);
         });
 
+        // Wait for both to signal they're running
+        let _ = rx1.await;
+        let _ = rx2.await;
+        assert_eq!(
+            running.load(Ordering::SeqCst),
+            2,
+            "Both branches should run concurrently within same repo"
+        );
+
+        // Let them finish
+        let _ = done_tx1.send(());
+        let _ = done_tx2.send(());
         h1.await.unwrap();
         h2.await.unwrap();
     }
@@ -371,11 +412,9 @@ mod tests {
         let branch_main = refs(&["refs/heads/main"]);
         let branch_other = refs(&["refs/heads/other"]);
 
-        // Acquire a slot running main
         let q = queue.clone();
         let h1 = tokio::spawn(async move {
             let permit = q.acquire("repo-1", &branch_main).await;
-            // Wait a bit — should NOT be cancelled by a non-overlapping cancel
             sleep(Duration::from_millis(60)).await;
             assert!(
                 !permit.token.is_cancelled(),
@@ -384,29 +423,21 @@ mod tests {
             drop(permit);
         });
 
-        // Give h1 time to acquire
         sleep(Duration::from_millis(10)).await;
-
-        // cancel_active with different refs should be a no-op
         queue.cancel_active("repo-1", Some(&branch_other)).await;
-
         h1.await.unwrap();
     }
 
-    /// Regression: cancel_active must target the *running* run, not a
-    /// queued run that overwrote the slot metadata.
     #[tokio::test]
     async fn test_cancel_active_with_queued_non_overlapping_run() {
         let queue = Arc::new(RunQueue::new());
         let branch_a = refs(&["refs/heads/feature-a"]);
         let branch_b = refs(&["refs/heads/feature-b"]);
 
-        // Run A acquires the permit for branch-a.
         let q = queue.clone();
         let ba = branch_a.clone();
         let h1 = tokio::spawn(async move {
             let permit = q.acquire("repo-1", &ba).await;
-            // Wait for cancellation
             loop {
                 if permit.token.is_cancelled() {
                     break;
@@ -416,10 +447,8 @@ mod tests {
             assert!(permit.token.is_cancelled());
         });
 
-        // Give h1 time to acquire the permit.
         sleep(Duration::from_millis(10)).await;
 
-        // Run B queues behind A with non-overlapping branch-b.
         let q = queue.clone();
         let h2 = tokio::spawn(async move {
             let permit = q.acquire("repo-1", &branch_b).await;
@@ -427,14 +456,68 @@ mod tests {
             drop(permit);
         });
 
-        // Give h2 time to enter the pending queue.
         sleep(Duration::from_millis(10)).await;
-
-        // cancel_active targeting branch-a must cancel the *running* run A,
-        // not be confused by queued run B's metadata.
         queue.cancel_active("repo-1", Some(&branch_a)).await;
 
         h1.await.unwrap();
         h2.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_max_concurrent_reached_queues() {
+        let queue = Arc::new(RunQueue::new());
+        let acquired = Arc::new(AtomicU32::new(0));
+
+        // Use a barrier: each task signals when acquired, waits for release
+        let (release_tx, _) = tokio::sync::broadcast::channel::<()>(1);
+        let mut ready_rxs = Vec::new();
+
+        let mut handles = Vec::new();
+        for i in 0..MAX_CONCURRENT_RUNS {
+            let q = queue.clone();
+            let a = acquired.clone();
+            let branch = refs(&[&format!("refs/heads/branch-{}", i)]);
+            let (ready_tx, ready_rx) = tokio::sync::oneshot::channel::<()>();
+            ready_rxs.push(ready_rx);
+            let mut release = release_tx.subscribe();
+            handles.push(tokio::spawn(async move {
+                let _permit = q.acquire("repo-1", &branch).await;
+                a.fetch_add(1, Ordering::SeqCst);
+                let _ = ready_tx.send(());
+                let _ = release.recv().await;
+                a.fetch_sub(1, Ordering::SeqCst);
+            }));
+        }
+
+        // Wait for all MAX_CONCURRENT_RUNS tasks to acquire
+        for rx in ready_rxs {
+            let _ = rx.await;
+        }
+        assert_eq!(acquired.load(Ordering::SeqCst), MAX_CONCURRENT_RUNS as u32);
+
+        // Try to acquire one more — should block since all permits are held
+        let q = queue.clone();
+        let a = acquired.clone();
+        let extra_branch = refs(&["refs/heads/extra"]);
+        let extra = tokio::spawn(async move {
+            let _permit = q.acquire("repo-1", &extra_branch).await;
+            a.fetch_add(1, Ordering::SeqCst);
+            a.fetch_sub(1, Ordering::SeqCst);
+        });
+
+        // Give the extra task a moment to try acquiring (it should be blocked)
+        sleep(Duration::from_millis(5)).await;
+        assert_eq!(
+            acquired.load(Ordering::SeqCst),
+            MAX_CONCURRENT_RUNS as u32,
+            "Extra run should be blocked"
+        );
+
+        // Release all held permits
+        let _ = release_tx.send(());
+        for h in handles {
+            h.await.unwrap();
+        }
+        extra.await.unwrap();
     }
 }

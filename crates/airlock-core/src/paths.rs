@@ -129,6 +129,18 @@ impl AirlockPaths {
         self.worktrees_dir().join(repo_id).join("persistent")
     }
 
+    /// Get the path for a pool worktree slot.
+    ///
+    /// Pool worktrees are reusable slots that preserve build caches across runs.
+    /// Multiple pool slots allow concurrent pipeline runs for the same repo.
+    ///
+    /// Format: `~/.airlock/worktrees/{repo_id}/pool-{index}`
+    pub fn pool_worktree(&self, repo_id: &str, index: usize) -> PathBuf {
+        self.worktrees_dir()
+            .join(repo_id)
+            .join(format!("pool-{}", index))
+    }
+
     /// Get the path for a run's worktree (stage-based pipeline).
     /// Format: `~/.airlock/worktrees/{repo_id}/{run_id}`
     pub fn run_worktree(&self, repo_id: &str, run_id: &str) -> PathBuf {

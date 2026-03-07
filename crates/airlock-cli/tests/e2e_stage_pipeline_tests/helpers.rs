@@ -178,6 +178,7 @@ pub(super) fn create_test_job(
         } else {
             None
         },
+        worktree_path: None,
     };
     db.insert_job_result(&result).unwrap();
     job_id

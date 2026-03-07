@@ -137,6 +137,7 @@ mod tests {
             started_at: None,
             completed_at: None,
             error: None,
+            worktree_path: None,
         })
         .unwrap();
         db.insert_step_result(&StepResult {
@@ -214,6 +215,7 @@ mod tests {
             started_at: None,
             completed_at: None,
             error: None,
+            worktree_path: None,
         })
         .unwrap();
         db.insert_step_result(&StepResult {

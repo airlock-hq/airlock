@@ -15,6 +15,7 @@ mod run_queue;
 mod server;
 mod stage_loader;
 mod sync;
+mod worktree_pool;
 
 use server::Server;
 

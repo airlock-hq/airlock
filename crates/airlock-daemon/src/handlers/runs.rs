@@ -336,7 +336,7 @@ pub async fn handle_reprocess_run(
     let ref_names: Vec<String> = run.ref_updates.iter().map(|u| u.ref_name.clone()).collect();
     tokio::spawn(async move {
         let permit = ctx.run_queue.acquire(&run.repo_id, &ref_names).await;
-        execute_pipeline(ctx.clone(), run, repo, permit.token).await;
+        execute_pipeline(ctx.clone(), run, repo, permit.token.clone()).await;
     });
 
     let result = ReprocessRunResult {

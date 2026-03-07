@@ -17,3 +17,6 @@ pub mod run_queue;
 
 // Stage loader for reusable stages
 pub mod stage_loader;
+
+// Per-repo pool of reusable worktrees
+pub mod worktree_pool;

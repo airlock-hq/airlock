@@ -367,7 +367,10 @@ async fn resume_pipeline_after_approval(
     }
 
     // Get worktree path (should still exist since we preserved it when paused)
-    let worktree_path = find_job_worktree(&ctx.paths, &run, approved_job_key);
+    let worktree_path = {
+        let db = ctx.db.lock().await;
+        find_job_worktree(&ctx.paths, &run, approved_job_key, &db)
+    };
     if !worktree_path.exists() {
         error!(
             "Worktree at {:?} no longer exists, cannot resume pipeline",
@@ -496,14 +499,46 @@ async fn finalize_job(
 
 /// Determine the worktree path for a job that was previously paused.
 ///
-/// Checks the persistent worktree, job-specific extension path, and the
-/// standard run worktree path (in that priority order).
+/// 1. Check DB-stored `worktree_path` on the job result (pool recovery).
+/// 2. Fallback: scan pool-* directories for valid worktrees.
+/// 3. Legacy fallback: persistent worktree, job-specific extension, standard run worktree.
 fn find_job_worktree(
     paths: &airlock_core::AirlockPaths,
     run: &airlock_core::Run,
     job_key: &str,
+    db: &airlock_core::Database,
 ) -> std::path::PathBuf {
-    // Check persistent worktree first (new default for first/only jobs)
+    // 1. Check DB-stored worktree_path
+    if let Ok(jobs) = db.get_job_results_for_run(&run.id) {
+        for job in &jobs {
+            if job.job_key == job_key {
+                if let Some(ref wt_path) = job.worktree_path {
+                    let p = std::path::PathBuf::from(wt_path);
+                    if p.exists() {
+                        return p;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Fallback: scan pool-* directories
+    let wt_dir = paths.worktrees_dir().join(&run.repo_id);
+    if wt_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&wt_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with("pool-")
+                    && entry.path().is_dir()
+                    && airlock_core::is_valid_worktree(&entry.path())
+                {
+                    return entry.path();
+                }
+            }
+        }
+    }
+
+    // 3. Legacy fallback: persistent worktree or run worktree
     let persistent_path = paths.repo_worktree(&run.repo_id);
     if persistent_path.exists() {
         return persistent_path;
@@ -512,7 +547,6 @@ fn find_job_worktree(
     let standard_path = paths.run_worktree(&run.repo_id, &run.id);
     let job_specific_path = standard_path.with_extension(job_key);
 
-    // Prefer job-specific path if it exists, otherwise fall back to standard
     if job_specific_path.exists() {
         job_specific_path
     } else {
@@ -590,16 +624,22 @@ pub async fn handle_apply_patches(
         }
     }
 
-    // Find the actual run worktree (persistent or standard) and apply patches
-    // directly there, just like the freeze stage does. The pipeline is paused at
-    // an approval gate so no step is running in the worktree.
-    let persistent_wt = ctx.paths.repo_worktree(&run.repo_id);
-    let standard_wt = ctx.paths.run_worktree(&run.repo_id, &run.id);
-    let worktree_path = if persistent_wt.exists() {
-        persistent_wt
-    } else if standard_wt.exists() {
-        standard_wt
-    } else {
+    // Find the worktree for the paused job. Check DB-stored worktree_path first,
+    // then fall back to pool-* scan and legacy paths.
+    let worktree_path = {
+        let db = ctx.db.lock().await;
+        // Find the paused (AwaitingApproval) job for this run
+        let paused_job_key = match db.get_job_results_for_run(&run.id) {
+            Ok(jobs) => jobs
+                .iter()
+                .find(|j| j.status == airlock_core::JobStatus::AwaitingApproval)
+                .map(|j| j.job_key.clone()),
+            Err(_) => None,
+        };
+        let job_key = paused_job_key.as_deref().unwrap_or("default");
+        find_job_worktree(&ctx.paths, &run, job_key, &db)
+    };
+    if !worktree_path.exists() {
         return Response::error(
             id,
             error_codes::GIT_ERROR,
@@ -1066,6 +1106,7 @@ mod tests {
             started_at: Some(1704067200),
             completed_at: None,
             error: None,
+            worktree_path: None,
         }
     }
 

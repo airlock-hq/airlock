@@ -1157,6 +1157,7 @@ mod tests {
                 started_at: Some(1704067200),
                 completed_at: Some(1704067210),
                 error: Some("step failed".to_string()),
+                worktree_path: None,
             };
             db.insert_job_result(&job).unwrap();
 
@@ -1307,6 +1308,7 @@ mod tests {
             started_at: Some(1704067200),
             completed_at: Some(1704067210),
             error: Some("step failed".to_string()),
+            worktree_path: None,
         };
         db.insert_job_result(&job).unwrap();
 
@@ -1503,6 +1505,7 @@ mod tests {
             started_at: Some(1704067200),
             completed_at: Some(1704067210),
             error: None,
+            worktree_path: None,
         };
         db.insert_job_result(&job).unwrap();
 
@@ -1641,6 +1644,7 @@ mod tests {
                 started_at: Some(1704067200),
                 completed_at: Some(1704067210),
                 error: Some("lint failed".to_string()),
+                worktree_path: None,
             };
             db.insert_job_result(&job).unwrap();
         }

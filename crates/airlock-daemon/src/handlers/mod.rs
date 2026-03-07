@@ -16,6 +16,7 @@ mod util;
 use crate::ipc::{error_codes, methods, AirlockEvent, Response, ShutdownResult};
 use crate::push_coalescer::PushCoalescer;
 use crate::run_queue::RunQueue;
+use crate::worktree_pool::WorktreePool;
 use airlock_core::{AirlockPaths, Database};
 use std::sync::Arc;
 use tokio::sync::{broadcast, watch, Mutex};
@@ -43,6 +44,9 @@ pub struct HandlerContext {
     /// Per-repo run serialization queue.
     pub run_queue: RunQueue,
 
+    /// Per-repo pool of reusable worktrees.
+    pub worktree_pool: Arc<WorktreePool>,
+
     /// Shutdown signal sender for graceful shutdown.
     pub shutdown_tx: watch::Sender<bool>,
 
@@ -59,6 +63,7 @@ impl HandlerContext {
             db: Mutex::new(db),
             coalescer: PushCoalescer::new(),
             run_queue: RunQueue::new(),
+            worktree_pool: Arc::new(WorktreePool::new()),
             shutdown_tx,
             event_tx,
         }

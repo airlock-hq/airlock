@@ -10,7 +10,7 @@ mod tests {
     use std::path::PathBuf;
 
     /// Current database schema version for migrations.
-    const SCHEMA_VERSION: i32 = 8;
+    const SCHEMA_VERSION: i32 = 9;
 
     fn create_test_repo(id: &str) -> Repo {
         Repo {
@@ -56,6 +56,7 @@ mod tests {
             started_at: None,
             completed_at: None,
             error: None,
+            worktree_path: None,
         }
     }
 
@@ -104,10 +105,10 @@ mod tests {
     }
 
     #[test]
-    fn test_schema_version_8() {
+    fn test_schema_version_9() {
         let db = Database::open_in_memory().unwrap();
         let version = db.get_schema_version().unwrap();
-        assert_eq!(version, 8);
+        assert_eq!(version, 9);
     }
 
     #[test]
