@@ -99,6 +99,7 @@ test:
 check:
 	cargo fmt --check
 	cargo clippy --workspace --exclude airlock-app -- -D warnings
+	@if [ ! -d node_modules ]; then echo "Installing dependencies..." && npm ci; fi
 	npm run lint
 	npm run format:check
 
