@@ -37,6 +37,22 @@ run: |
     exit 0
   fi
 
+  # Strip Mermaid styling so GitHub's native renderer can apply its own dark/light theming
+  if [[ -f "$AIRLOCK_ARTIFACTS/description.json" ]]; then
+    RAW_DIAGRAM=$(cat "$AIRLOCK_ARTIFACTS/description.json" | airlock exec json mermaid_diagram 2>/dev/null || echo "")
+    if [[ -n "$RAW_DIAGRAM" ]]; then
+      CLEAN_DIAGRAM=$(echo "$RAW_DIAGRAM" | sed -E \
+        -e '/^[[:space:]]*classDef /d' \
+        -e '/^[[:space:]]*class .* subgraphStyle[[:space:]]*$/d' \
+        -e 's/:::[a-zA-Z0-9_-]+//g')
+      TEMP_FILE=$(mktemp)
+      cat "$AIRLOCK_ARTIFACTS/description.json" | airlock exec json \
+        --set "mermaid_diagram=$CLEAN_DIAGRAM" \
+        > "$TEMP_FILE"
+      mv "$TEMP_FILE" "$AIRLOCK_ARTIFACTS/description.json"
+    fi
+  fi
+
   # Build prompt for agent
   PROMPT="You are a software developer assistant called Airlock. You are creating a pull request (or merge request) for a code change.
 
