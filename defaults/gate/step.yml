@@ -1,0 +1,133 @@
+description: Assess change risk and pause for human approval when it meets the configured threshold
+shell: bash
+env:
+  AIRLOCK_RISK_THRESHOLD: medium
+run: |
+  set -euo pipefail
+
+  RISK_APPROVAL_THRESHOLD="${AIRLOCK_RISK_THRESHOLD:-medium}"
+
+  TEST_VERDICT=$(cat "$AIRLOCK_ARTIFACTS/test_result.json" | airlock exec json verdict)
+  TEST_SUMMARY=$(cat "$AIRLOCK_ARTIFACTS/test_result.json" | airlock exec json summary)
+  CRITIQUE_SEVERITY=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json max_severity)
+  CRITIQUE_COMMENT_COUNT=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json comment_count)
+  CRITIQUE_SUMMARY=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json summary)
+
+  PROMPT="You are Airlock's risk assessment agent. Assess the implementation risk of this code change.
+
+  ## Change Context
+  Base SHA: $AIRLOCK_BASE_SHA
+  Head SHA: $AIRLOCK_HEAD_SHA
+
+  ## Signals You Must Consider
+  - Test verdict: $TEST_VERDICT
+  - Test summary: $TEST_SUMMARY
+  - Critique max severity: $CRITIQUE_SEVERITY
+  - Critique comment count: $CRITIQUE_COMMENT_COUNT
+  - Critique summary: $CRITIQUE_SUMMARY
+
+  ## Assessment Criteria
+  Evaluate all of these together:
+  1. Test result quality and whether failures/skips increase risk
+  2. Critique comments and their severity
+  3. Whether the change is mostly cosmetic or fundamental to system behavior/architecture
+  4. How much ambiguity exists in the implementation choices, assumptions, or unresolved tradeoffs
+
+  ## Output Rules
+  - Return a single overall risk level: low, medium, or high
+  - Low means the change is well-bounded, mostly cosmetic or otherwise straightforward, with little ambiguity
+  - Medium means the change has meaningful behavioral impact, notable uncertainty, or concerning signals that deserve human review
+  - High means the change is fundamental, risky, ambiguous, or has strong negative signals from tests or critique
+  - Be decisive. Do not hedge between two levels.
+
+  ## Output Format
+  Respond with JSON:
+  {
+    \"risk_level\": \"low\" | \"medium\" | \"high\",
+    \"summary\": \"Brief summary of the risk assessment\",
+    \"rationale\": \"Short explanation of why this risk level was chosen\",
+    \"system_impact\": \"cosmetic\" | \"moderate\" | \"fundamental\",
+    \"ambiguity\": \"low\" | \"medium\" | \"high\"
+  }"
+
+  SCHEMA='{"type":"object","properties":{"risk_level":{"type":"string","enum":["low","medium","high"]},"summary":{"type":"string"},"rationale":{"type":"string"},"system_impact":{"type":"string","enum":["cosmetic","moderate","fundamental"]},"ambiguity":{"type":"string","enum":["low","medium","high"]}},"required":["risk_level","summary","rationale","system_impact","ambiguity"]}'
+
+  RESPONSE=$(airlock exec agent "$PROMPT" --output-schema "$SCHEMA")
+
+  RISK_LEVEL=$(echo "$RESPONSE" | airlock exec json risk_level)
+  SUMMARY=$(echo "$RESPONSE" | airlock exec json summary)
+  RATIONALE=$(echo "$RESPONSE" | airlock exec json rationale)
+  SYSTEM_IMPACT=$(echo "$RESPONSE" | airlock exec json system_impact)
+  AMBIGUITY=$(echo "$RESPONSE" | airlock exec json ambiguity)
+
+  case "$RISK_LEVEL" in
+    low) RISK_SCORE=1 ;;
+    medium) RISK_SCORE=2 ;;
+    high) RISK_SCORE=3 ;;
+    *)
+      echo "Unknown risk level: $RISK_LEVEL"
+      exit 1
+      ;;
+  esac
+
+  case "$RISK_APPROVAL_THRESHOLD" in
+    never)
+      SHOULD_AWAIT="false"
+      DECISION="Human approval disabled"
+      ;;
+    low) THRESHOLD_SCORE=1 ;;
+    medium) THRESHOLD_SCORE=2 ;;
+    high) THRESHOLD_SCORE=3 ;;
+    *)
+      echo "Unknown risk threshold: $RISK_APPROVAL_THRESHOLD"
+      exit 1
+      ;;
+  esac
+
+  if [ "$RISK_APPROVAL_THRESHOLD" != "never" ]; then
+    if [ "$RISK_SCORE" -ge "$THRESHOLD_SCORE" ]; then
+      SHOULD_AWAIT="true"
+      DECISION="Awaiting human approval"
+    else
+      SHOULD_AWAIT="false"
+      DECISION="No human approval required"
+    fi
+  fi
+
+  mkdir -p "$AIRLOCK_ARTIFACTS"
+  echo '{}' | airlock exec json \
+    --set "risk_level=$RISK_LEVEL" \
+    --set "summary=$SUMMARY" \
+    --set "rationale=$RATIONALE" \
+    --set "system_impact=$SYSTEM_IMPACT" \
+    --set "ambiguity=$AMBIGUITY" \
+    --set "approval_threshold=$RISK_APPROVAL_THRESHOLD" \
+    --set "await_human_approval=$SHOULD_AWAIT" \
+    --set "test_verdict=$TEST_VERDICT" \
+    --set "critique_max_severity=$CRITIQUE_SEVERITY" \
+    --set "critique_comment_count=$CRITIQUE_COMMENT_COUNT" \
+    > "$AIRLOCK_ARTIFACTS/risk_assessment.json"
+
+  cat << EOF | airlock artifact content --title "Risk Assessment"
+  **Risk Level:** $RISK_LEVEL
+  **Approval Threshold:** $RISK_APPROVAL_THRESHOLD
+  **Decision:** $DECISION
+
+  ## Summary
+  $SUMMARY
+
+  ## Rationale
+  $RATIONALE
+
+  ## Signals
+  - Test verdict: $TEST_VERDICT
+  - Critique severity: $CRITIQUE_SEVERITY
+  - Critique comments: $CRITIQUE_COMMENT_COUNT
+  - System impact: $SYSTEM_IMPACT
+  - Ambiguity: $AMBIGUITY
+  EOF
+
+  if [ "$SHOULD_AWAIT" = "true" ]; then
+    echo "Risk level $RISK_LEVEL meets threshold $RISK_APPROVAL_THRESHOLD. Awaiting human review."
+    airlock exec await
+  fi

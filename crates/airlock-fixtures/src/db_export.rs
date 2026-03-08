@@ -609,6 +609,7 @@ fn determine_artifact_type(filename: &str) -> String {
     match filename {
         "description.json" | "description.md" => "description".to_string(),
         "test_result.json" => "test_results".to_string(),
+        "risk_assessment.json" => "risk_assessment".to_string(),
         "push_result.json" => "push".to_string(),
         "pr_result.json" => "pr".to_string(),
         "tour.json" => "tour".to_string(),

@@ -1682,6 +1682,7 @@ mod tests {
             )),
             uses: None,
             shell: Some("sh".to_string()),
+            env: Default::default(),
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: Some(10),

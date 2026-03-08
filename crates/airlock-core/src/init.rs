@@ -58,13 +58,10 @@ jobs:
     needs: [critique, test]
     steps:
       - name: review
-        run: |
-          verdict=$(cat "$AIRLOCK_ARTIFACTS/test_result.json" | airlock exec json verdict)
-          severity=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json max_severity)
-          if [ "$verdict" != "pass" ] || [ "$severity" = "error" ]; then
-            echo "Tests failed or critical issues found. Awaiting human review."
-            airlock exec await
-          fi
+        uses: airlock-hq/airlock/defaults/gate@main
+        env:
+          # Change to never, low, medium, or high to control when human approval is required.
+          AIRLOCK_RISK_THRESHOLD: medium
 
   describe:
     name: Describe
@@ -727,5 +724,24 @@ mod tests {
         assert_ne!(id_similar_1, id_similar_2);
         assert_ne!(id_similar_1, id_similar_3);
         assert_ne!(id_similar_2, id_similar_3);
+    }
+
+    #[test]
+    fn test_default_workflow_gate_uses_agent_risk_assessment() {
+        let config = crate::parse_workflow_config(DEFAULT_WORKFLOW_YAML).unwrap();
+        let gate = config.jobs.get("gate").expect("default workflow should have gate job");
+        let review = gate
+            .steps
+            .iter()
+            .find(|step| step.name == "review")
+            .expect("gate job should have review step");
+        assert_eq!(
+            review.uses.as_deref(),
+            Some("airlock-hq/airlock/defaults/gate@main")
+        );
+        assert_eq!(
+            review.env.get("AIRLOCK_RISK_THRESHOLD"),
+            Some(&"medium".to_string())
+        );
     }
 }

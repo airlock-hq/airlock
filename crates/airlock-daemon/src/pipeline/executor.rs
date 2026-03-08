@@ -571,11 +571,16 @@ pub async fn execute_stage_command_with_streaming(
 
     // Build and spawn the command, falling back to sh if the login shell fails
     let spawn_shell = |shell: &str, args: &[String]| {
+        let mut process_env = env.to_env_vars();
+        for (key, value) in &stage.env {
+            process_env.insert(key.clone(), value.clone());
+        }
+
         let mut cmd = Command::new(shell);
         cmd.args(args)
             .arg(run_command)
             .current_dir(&env.worktree)
-            .envs(env.to_env_vars())
+            .envs(process_env)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         cmd
@@ -1125,6 +1130,7 @@ mod tests {
             run: Some(run.to_string()),
             uses: None,
             shell: None,
+            env: Default::default(),
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
@@ -1284,6 +1290,26 @@ mod tests {
 
         assert!(result.passed);
         assert!(result.stdout.contains("run-123"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_stage_command_with_step_env_vars() {
+        let temp_dir = TempDir::new().unwrap();
+        let env = create_test_env(&temp_dir);
+
+        let mut stage = create_test_stage("test", "echo $AIRLOCK_RISK_THRESHOLD");
+        stage.env.insert(
+            "AIRLOCK_RISK_THRESHOLD".to_string(),
+            "high".to_string(),
+        );
+
+        let result =
+            execute_stage_command_with_streaming(&stage, &env, Duration::from_secs(10), None, None)
+                .await
+                .unwrap();
+
+        assert!(result.passed);
+        assert!(result.stdout.contains("high"));
     }
 
     #[tokio::test]
@@ -2228,6 +2254,7 @@ mod tests {
                 uses: Some("airlock-hq/airlock/defaults/rebase@main".to_string()),
                 run: None,
                 shell: None,
+                env: Default::default(),
                 continue_on_error: false,
                 require_approval: ApprovalMode::Never,
                 timeout: None,
@@ -2254,6 +2281,7 @@ mod tests {
                 name: "push".to_string(),
                 run: Some(format!("{} exec push", airlock_bin.display())),
                 shell: Some("bash".to_string()),
+                env: Default::default(),
                 continue_on_error: false,
                 require_approval: ApprovalMode::Never,
                 timeout: None,

@@ -33,13 +33,10 @@ jobs:
     needs: [critique, test]
     steps:
       - name: review
-        run: |
-          verdict=$(cat "$AIRLOCK_ARTIFACTS/test_result.json" | airlock exec json verdict)
-          severity=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json max_severity)
-          if [ "$verdict" != "pass" ] || [ "$severity" = "error" ]; then
-            echo "Tests failed or critical issues found. Awaiting human review."
-            airlock exec await
-          fi
+        uses: airlock-hq/airlock/defaults/gate@main
+        env:
+          # Change to never, low, medium, or high to control when human approval is required.
+          AIRLOCK_RISK_THRESHOLD: medium
 
   describe:
     name: Describe

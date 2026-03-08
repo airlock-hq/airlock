@@ -97,6 +97,7 @@ fn test_step_definition_serialization_and_defaults() {
         run: Some("npm test".to_string()),
         uses: None,
         shell: Some("bash".to_string()),
+        env: Default::default(),
         continue_on_error: true,
         require_approval: ApprovalMode::Never,
         timeout: None,
@@ -142,6 +143,7 @@ fn test_step_definition_effective_run() {
         run: Some("npm test".to_string()),
         uses: None,
         shell: None,
+        env: Default::default(),
         continue_on_error: false,
         require_approval: ApprovalMode::Never,
         timeout: None,
@@ -155,6 +157,7 @@ fn test_step_definition_effective_run() {
         run: None,
         uses: Some("owner/repo/lint@v1".to_string()),
         shell: None,
+        env: Default::default(),
         continue_on_error: false,
         require_approval: ApprovalMode::Never,
         timeout: None,
@@ -182,6 +185,21 @@ uses: airlock-hq/airlock/defaults/lint@main
 "#;
     let step2: StepDefinition = serde_yaml::from_str(yaml2).unwrap();
     assert!(!step2.apply_patch);
+}
+
+#[test]
+fn test_step_definition_env_yaml() {
+    let yaml = r#"
+name: gate
+uses: airlock-hq/airlock/defaults/gate@main
+env:
+  AIRLOCK_RISK_THRESHOLD: high
+"#;
+    let step: StepDefinition = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(
+        step.env.get("AIRLOCK_RISK_THRESHOLD"),
+        Some(&"high".to_string())
+    );
 }
 
 // =========================================================================

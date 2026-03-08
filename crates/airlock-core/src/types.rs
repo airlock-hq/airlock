@@ -1,6 +1,7 @@
 //! Core data types for Airlock.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 // =============================================================================
@@ -154,6 +155,10 @@ pub struct StepDefinition {
     /// When explicitly set, uses the specified shell with `-c`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shell: Option<String>,
+
+    /// Environment variables for this step.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
 
     /// Continue pipeline if this step fails. Defaults to false.
     #[serde(default, rename = "continue-on-error")]

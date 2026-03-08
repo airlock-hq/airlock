@@ -27,6 +27,7 @@
 use airlock_core::{AirlockPaths, ApprovalMode, StepDefinition};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use tracing::{debug, info, warn};
@@ -39,6 +40,7 @@ const BUNDLED_TEST: &str = include_str!("../../../defaults/test/step.yml");
 const BUNDLED_DESCRIBE: &str = include_str!("../../../defaults/describe/step.yml");
 const BUNDLED_PUSH: &str = include_str!("../../../defaults/push/step.yml");
 const BUNDLED_CRITIQUE: &str = include_str!("../../../defaults/critique/step.yml");
+const BUNDLED_GATE: &str = include_str!("../../../defaults/gate/step.yml");
 const BUNDLED_CREATE_PR: &str = include_str!("../../../defaults/create-pr/step.yml");
 
 /// TTL for mutable ref caches (branches, semver-major). 1 hour.
@@ -97,6 +99,9 @@ pub struct StageYaml {
     /// Shell to use. When omitted, the executor uses the user's login shell.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shell: Option<String>,
+    /// Default environment variables for this reusable step.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
     /// Continue pipeline if this step fails.
     #[serde(default, alias = "continue_on_error", rename = "continue-on-error")]
     pub continue_on_error: bool,
@@ -131,6 +136,7 @@ fn get_bundled_default(reference: &StageReference) -> Option<&'static str> {
         "defaults/describe" => Some(BUNDLED_DESCRIBE),
         "defaults/push" => Some(BUNDLED_PUSH),
         "defaults/critique" => Some(BUNDLED_CRITIQUE),
+        "defaults/gate" => Some(BUNDLED_GATE),
         "defaults/create-pr" => Some(BUNDLED_CREATE_PR),
         _ => None,
     }
@@ -200,7 +206,7 @@ impl StageLoader {
             debug!("Using bundled default for {}", use_ref);
             let stage_yaml: StageYaml = serde_yaml::from_str(bundled_yaml)
                 .with_context(|| format!("Failed to parse bundled YAML for {}", use_ref))?;
-            return Ok(self.merge_stage(stage, &stage_yaml, None));
+            return self.merge_stage(stage, &stage_yaml, None);
         }
 
         // Get cached path or fetch from GitHub
@@ -219,7 +225,7 @@ impl StageLoader {
         };
         let stage_yaml = self.read_stage_yaml(&yaml_path)?;
 
-        Ok(self.merge_stage(stage, &stage_yaml, Some(&stage_dir)))
+        self.merge_stage(stage, &stage_yaml, Some(&stage_dir))
     }
 
     /// Merge inline step properties with the resolved stage YAML.
@@ -231,15 +237,22 @@ impl StageLoader {
         stage: &StepDefinition,
         stage_yaml: &StageYaml,
         stage_dir: Option<&Path>,
-    ) -> StepDefinition {
-        let resolved_run = if stage.run.is_some() {
-            stage.run.clone()
+    ) -> Result<StepDefinition> {
+        let base_run = if let Some(run) = stage.run.clone() {
+            run
         } else if let Some(dir) = stage_dir {
-            Some(resolve_run_path(&stage_yaml.run, dir))
+            resolve_run_path(&stage_yaml.run, dir)
         } else {
             // Bundled default — use run command as-is (inline scripts)
-            Some(stage_yaml.run.clone())
+            stage_yaml.run.clone()
         };
+
+        let resolved_run = Some(base_run);
+
+        let mut merged_env = stage_yaml.env.clone();
+        for (key, value) in &stage.env {
+            merged_env.insert(key.clone(), value.clone());
+        }
 
         let resolved = StepDefinition {
             name: stage.name.clone(),
@@ -247,6 +260,7 @@ impl StageLoader {
             uses: stage.uses.clone(),
             // Inline shell overrides if explicitly set, otherwise use step.yml's shell
             shell: stage.shell.clone().or_else(|| stage_yaml.shell.clone()),
+            env: merged_env,
             continue_on_error: stage.continue_on_error || stage_yaml.continue_on_error,
             require_approval: if stage.require_approval != ApprovalMode::Never {
                 stage.require_approval
@@ -258,7 +272,7 @@ impl StageLoader {
         };
 
         debug!("Resolved action '{}': {:?}", stage.name, resolved);
-        resolved
+        Ok(resolved)
     }
 
     /// Get the cached action directory or fetch from GitHub.
@@ -823,6 +837,17 @@ description: Run ESLint
     }
 
     #[test]
+    fn test_action_yml_parsing_env() {
+        let yaml = r#"
+run: echo "$MODE"
+env:
+  MODE: safe
+"#;
+        let stage_yaml: StageYaml = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(stage_yaml.env.get("MODE"), Some(&"safe".to_string()));
+    }
+
+    #[test]
     fn test_action_yml_parsing_if_patches() {
         let yaml = r#"
 run: airlock exec push
@@ -893,6 +918,7 @@ continue-on-error: true
             run: None,
             uses: Some("owner/repo/defaults/lint@v1".to_string()),
             shell: None,
+            env: Default::default(),
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
@@ -933,6 +959,7 @@ continue_on_error: true
             run: None,
             uses: Some("owner/repo/defaults/lint@v1".to_string()),
             shell: None,
+            env: Default::default(),
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
@@ -978,6 +1005,7 @@ continue_on_error: true
             run: None,
             uses: Some("owner/repo/defaults/lint@v1".to_string()),
             shell: None,
+            env: Default::default(),
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
@@ -1015,6 +1043,7 @@ shell: bash
             run: Some("npm run lint:strict".to_string()), // Override
             uses: Some("owner/repo/defaults/lint@v1".to_string()),
             shell: Some("zsh".to_string()), // Override shell
+            env: Default::default(),
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
@@ -1026,6 +1055,42 @@ shell: bash
         // Inline properties should override
         assert_eq!(resolved.run, Some("npm run lint:strict".to_string()));
         assert_eq!(resolved.shell, Some("zsh".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_step_merges_env() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().to_path_buf());
+
+        let cache_dir = temp_dir
+            .path()
+            .join("owner")
+            .join("repo")
+            .join("defaults_gate@v1");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+
+        let yaml_content = r#"
+run: echo "$MODE"
+env:
+  MODE: safe
+"#;
+        std::fs::write(cache_dir.join("step.yml"), yaml_content).unwrap();
+
+        let stage = StepDefinition {
+            name: "gate".to_string(),
+            run: None,
+            uses: Some("owner/repo/defaults/gate@v1".to_string()),
+            env: [("MODE".to_string(), "strict".to_string())].into_iter().collect(),
+            shell: None,
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let resolved = loader.resolve_stage(&stage).await.unwrap();
+        assert_eq!(resolved.run, Some("echo \"$MODE\"".to_string()));
+        assert_eq!(resolved.env.get("MODE"), Some(&"strict".to_string()));
     }
 
     // --- Bundled defaults tests ---
@@ -1040,6 +1105,7 @@ shell: bash
             "defaults/describe",
             "defaults/push",
             "defaults/critique",
+            "defaults/gate",
             "defaults/create-pr",
         ];
         for path in &defaults {
@@ -1100,12 +1166,23 @@ shell: bash
             BUNDLED_DESCRIBE,
             BUNDLED_PUSH,
             BUNDLED_CRITIQUE,
+            BUNDLED_GATE,
             BUNDLED_CREATE_PR,
         ];
         for yaml_str in &defaults {
             let parsed: Result<StageYaml, _> = serde_yaml::from_str(yaml_str);
             assert!(parsed.is_ok(), "Failed to parse bundled YAML: {:?}", parsed);
         }
+    }
+
+    #[test]
+    fn test_bundled_gate_supports_never_threshold() {
+        let gate: StageYaml = serde_yaml::from_str(BUNDLED_GATE).unwrap();
+        assert_eq!(
+            gate.env.get("AIRLOCK_RISK_THRESHOLD"),
+            Some(&"medium".to_string())
+        );
+        assert!(gate.run.contains("never)"));
     }
 
     #[tokio::test]
@@ -1119,6 +1196,7 @@ shell: bash
             run: None,
             uses: Some("airlock-hq/airlock/defaults/lint@main".to_string()),
             shell: None,
+            env: Default::default(),
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
