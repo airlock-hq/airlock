@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.57](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.56...airlock-v0.1.57) (2026-03-08)
+
+
+### Features
+
+* support stopping a run ([7977200](https://github.com/airlock-hq/airlock/commit/7977200148355602eb6fa675113ead1bb7a245e8))
+
+
+### Bug Fixes
+
+* useAllRuns refresh ([345fafe](https://github.com/airlock-hq/airlock/commit/345fafecf3dc5111fd28ef735b05446d30e90419))
+
 ## [0.1.56](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.55...airlock-v0.1.56) (2026-03-08)
 
 
