@@ -107,6 +107,9 @@ pub struct StageYaml {
     /// When omitted, the executor applies a default timeout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
+    /// Auto-apply pending patches after this step passes.
+    #[serde(default, alias = "apply_patch", rename = "apply-patch")]
+    pub apply_patch: bool,
     /// Description of what this action does.
     #[serde(default)]
     pub description: Option<String>,
@@ -251,6 +254,7 @@ impl StageLoader {
                 stage_yaml.require_approval
             },
             timeout: stage.timeout.or(stage_yaml.timeout),
+            apply_patch: stage.apply_patch || stage_yaml.apply_patch,
         };
 
         debug!("Resolved action '{}': {:?}", stage.name, resolved);
@@ -892,6 +896,7 @@ continue-on-error: true
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
+            apply_patch: false,
         };
 
         let resolved = loader.resolve_stage(&stage).await.unwrap();
@@ -931,6 +936,7 @@ continue_on_error: true
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
+            apply_patch: false,
         };
 
         let resolved = loader.resolve_stage(&stage).await.unwrap();
@@ -975,6 +981,7 @@ continue_on_error: true
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
+            apply_patch: false,
         };
 
         let resolved = loader.resolve_stage(&stage).await.unwrap();
@@ -1011,6 +1018,7 @@ shell: bash
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
+            apply_patch: false,
         };
 
         let resolved = loader.resolve_stage(&stage).await.unwrap();
@@ -1114,6 +1122,7 @@ shell: bash
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
+            apply_patch: false,
         };
 
         let resolved = loader.resolve_stage(&stage).await.unwrap();

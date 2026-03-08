@@ -7,6 +7,13 @@ run: |
   DIFF=$(git diff --no-color "$AIRLOCK_BASE_SHA" "$AIRLOCK_HEAD_SHA")
   if [[ -z "$DIFF" ]]; then
       echo "No changes to critique"
+      # Write empty result for downstream gate
+      mkdir -p "$AIRLOCK_ARTIFACTS"
+      echo '{}' | airlock exec json \
+        --set "max_severity=none" \
+        --set "comment_count=0" \
+        --set "summary=No changes to critique" \
+        > "$AIRLOCK_ARTIFACTS/critique_result.json"
       exit 0
   fi
 
@@ -65,3 +72,23 @@ run: |
       airlock artifact comment --batch-file "$BATCH_FILE"
       rm -f "$BATCH_FILE"
   fi
+
+  # Compute max_severity from comments for downstream gate step
+  mkdir -p "$AIRLOCK_ARTIFACTS"
+  COMMENT_COUNT=$(echo "$COMMENTS" | airlock exec json . | grep -c '"severity"' || echo "0")
+
+  # Determine max severity: error > warning > info > none
+  MAX_SEVERITY="none"
+  if echo "$COMMENTS" | grep -q '"severity":\s*"error"'; then
+      MAX_SEVERITY="error"
+  elif echo "$COMMENTS" | grep -q '"severity":\s*"warning"'; then
+      MAX_SEVERITY="warning"
+  elif echo "$COMMENTS" | grep -q '"severity":\s*"info"'; then
+      MAX_SEVERITY="info"
+  fi
+
+  echo '{}' | airlock exec json \
+    --set "max_severity=$MAX_SEVERITY" \
+    --set "comment_count=$COMMENT_COUNT" \
+    --set "summary=$SUMMARY" \
+    > "$AIRLOCK_ARTIFACTS/critique_result.json"

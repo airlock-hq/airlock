@@ -66,24 +66,16 @@ run: |
   # Determine status text for the artifact
   case "$VERDICT" in
       pass)
-          STATUS="✅ Tests Passed"
-          EXIT_CODE=0
-          PASSED="true"
+          STATUS="Tests Passed"
           ;;
       fail)
-          STATUS="❌ Tests Failed"
-          EXIT_CODE=1
-          PASSED="false"
+          STATUS="Tests Failed"
           ;;
       skip)
-          STATUS="⏭️ Tests Skipped"
-          EXIT_CODE=0
-          PASSED="true"
+          STATUS="Tests Skipped"
           ;;
       *)
-          STATUS="⚠️ Unknown verdict: $VERDICT"
-          EXIT_CODE=1
-          PASSED="false"
+          STATUS="Unknown verdict: $VERDICT"
           ;;
   esac
 
@@ -107,14 +99,13 @@ run: |
   EOF
   fi
 
-  # Write test_result.json for compatibility
+  # Write test_result.json for downstream steps (e.g., gate)
   echo '{}' | airlock exec json \
     --set "verdict=$VERDICT" \
     --set "summary=$SUMMARY" \
     --set "details=$DETAILS" \
-    --set "passed=$PASSED" \
-    --set "exit_code=$EXIT_CODE" \
-    --set "tested_at=$(date +%s)" \
     > "$AIRLOCK_ARTIFACTS/test_result.json"
 
-  exit $EXIT_CODE
+  # Always exit 0 — the verdict is in the artifact, not the exit code.
+  # Downstream gate step reads test_result.json to decide whether to pause.
+  exit 0

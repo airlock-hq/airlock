@@ -27,6 +27,7 @@ pub mod gui;
 pub mod init;
 pub mod ipc;
 pub mod jj;
+pub mod patches;
 pub mod paths;
 pub mod provider;
 pub mod service;

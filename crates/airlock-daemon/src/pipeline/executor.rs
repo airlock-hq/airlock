@@ -878,17 +878,28 @@ pub async fn execute_stage_with_log_callback(
 
     // Determine final status
     if exec_result.passed {
-        let should_pause = match stage.require_approval {
-            ApprovalMode::Always => true,
-            ApprovalMode::IfPatches => has_pending_patches(&env.artifacts),
-            ApprovalMode::Never => false,
-        };
-        if should_pause {
-            // Stage passed but requires approval before proceeding
+        // Check for `airlock exec await` marker (takes precedence over require-approval)
+        let await_marker = env.logs_dir.join(".awaiting");
+        if await_marker.exists() {
+            let _ = std::fs::remove_file(&await_marker);
             stage_result.status = StepStatus::AwaitingApproval;
-            info!("Stage '{}' completed and awaiting approval", stage.name);
+            info!(
+                "Stage '{}' requested approval via `airlock exec await`",
+                stage.name
+            );
         } else {
-            stage_result.status = StepStatus::Passed;
+            let should_pause = match stage.require_approval {
+                ApprovalMode::Always => true,
+                ApprovalMode::IfPatches => has_pending_patches(&env.artifacts),
+                ApprovalMode::Never => false,
+            };
+            if should_pause {
+                // Stage passed but requires approval before proceeding
+                stage_result.status = StepStatus::AwaitingApproval;
+                info!("Stage '{}' completed and awaiting approval", stage.name);
+            } else {
+                stage_result.status = StepStatus::Passed;
+            }
         }
     } else {
         // Stage failed
@@ -1117,6 +1128,7 @@ mod tests {
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
+            apply_patch: false,
         }
     }
 
@@ -2219,6 +2231,7 @@ mod tests {
                 continue_on_error: false,
                 require_approval: ApprovalMode::Never,
                 timeout: None,
+                apply_patch: false,
             };
             loader
                 .resolve_stage(&unresolved)
@@ -2245,6 +2258,7 @@ mod tests {
                 require_approval: ApprovalMode::Never,
                 timeout: None,
                 uses: None,
+                apply_patch: false,
             })
         }
 

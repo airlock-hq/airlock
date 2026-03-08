@@ -13,19 +13,8 @@
 //!   airlock exec freeze
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
 use std::path::PathBuf;
-use std::process::Command;
-use tracing::{debug, info, warn};
-
-/// Patch artifact structure (must match artifact/patch.rs).
-#[derive(Debug, Deserialize)]
-struct PatchArtifact {
-    /// Title for this patch.
-    title: String,
-    /// The unified diff content.
-    diff: String,
-}
+use tracing::info;
 
 /// Execute the `freeze` command.
 ///
@@ -33,7 +22,6 @@ struct PatchArtifact {
 pub async fn freeze() -> Result<()> {
     info!("Executing freeze stage...");
 
-    // Get required environment variables
     let artifacts_dir = std::env::var("AIRLOCK_ARTIFACTS").context(
         "AIRLOCK_ARTIFACTS environment variable not set. This command must be run within a pipeline stage.",
     )?;
@@ -44,234 +32,31 @@ pub async fn freeze() -> Result<()> {
     )?;
     let worktree_path = PathBuf::from(&worktree);
 
-    // Check if patches directory exists
-    let patches_dir = artifacts_path.join("patches");
-    if !patches_dir.exists() {
-        info!("No patches directory found, nothing to freeze");
-        return Ok(());
-    }
+    match airlock_core::patches::apply_pending_patches(&worktree_path, &artifacts_path)? {
+        Some(new_sha) => {
+            // Write new SHA to artifacts
+            let head_sha_path = artifacts_path.join(".head_sha");
+            std::fs::write(&head_sha_path, &new_sha)
+                .with_context(|| format!("Failed to write .head_sha to {:?}", head_sha_path))?;
 
-    // Read and apply patches
-    let patches = read_patches(&patches_dir)?;
-    if patches.is_empty() {
-        info!("No patches found, nothing to freeze");
-        return Ok(());
-    }
-
-    info!("Found {} patches to apply", patches.len());
-
-    // Create applied directory for moving patches after successful apply
-    let applied_dir = patches_dir.join("applied");
-    std::fs::create_dir_all(&applied_dir).with_context(|| {
-        format!(
-            "Failed to create applied patches directory: {:?}",
-            applied_dir
-        )
-    })?;
-
-    // Apply each patch
-    let mut applied_titles = Vec::new();
-    for (path, patch) in &patches {
-        debug!("Applying patch '{}' from {:?}", patch.title, path);
-
-        if patch.diff.trim().is_empty() {
-            debug!("Skipping empty patch '{}'", patch.title);
-            continue;
+            info!(
+                "Freeze complete. New HEAD: {}",
+                &new_sha[..12.min(new_sha.len())]
+            );
         }
-
-        apply_patch(&worktree_path, &patch.diff)
-            .with_context(|| format!("Failed to apply patch '{}' from {:?}", patch.title, path))?;
-
-        // Move applied patch to patches/applied/
-        if let Some(filename) = path.file_name() {
-            let dest = applied_dir.join(filename);
-            std::fs::rename(path, &dest).with_context(|| {
-                format!("Failed to move applied patch {:?} to {:?}", path, dest)
-            })?;
-            debug!("Moved applied patch to {:?}", dest);
-        }
-
-        applied_titles.push(patch.title.clone());
-        info!("Applied patch: {}", patch.title);
-    }
-
-    if applied_titles.is_empty() {
-        info!("All patches were empty, nothing to commit");
-        return Ok(());
-    }
-
-    // Stage all changes
-    stage_all_changes(&worktree_path)?;
-
-    // Check if there are changes to commit
-    if !has_staged_changes(&worktree_path)? {
-        info!("No changes to commit after applying patches");
-        return Ok(());
-    }
-
-    // Create commit
-    let commit_message = format!("Airlock: auto-fixes from {}", applied_titles.join(", "));
-    let new_sha = create_commit(&worktree_path, &commit_message)?;
-
-    info!(
-        "Created freeze commit: {}",
-        &new_sha[..12.min(new_sha.len())]
-    );
-
-    // Write new SHA to artifacts
-    let head_sha_path = artifacts_path.join(".head_sha");
-    std::fs::write(&head_sha_path, &new_sha)
-        .with_context(|| format!("Failed to write .head_sha to {:?}", head_sha_path))?;
-
-    info!(
-        "Freeze complete. New HEAD: {}",
-        &new_sha[..12.min(new_sha.len())]
-    );
-
-    Ok(())
-}
-
-/// Read all patches from the patches directory.
-fn read_patches(patches_dir: &PathBuf) -> Result<Vec<(PathBuf, PatchArtifact)>> {
-    let mut patches = Vec::new();
-
-    let entries = std::fs::read_dir(patches_dir)
-        .with_context(|| format!("Failed to read patches directory: {:?}", patches_dir))?;
-
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-
-        // Skip non-JSON files
-        if path.extension().is_none_or(|e| e != "json") {
-            continue;
-        }
-
-        let content = std::fs::read_to_string(&path)
-            .with_context(|| format!("Failed to read patch file: {:?}", path))?;
-
-        let patch: PatchArtifact = serde_json::from_str(&content)
-            .with_context(|| format!("Failed to parse patch file: {:?}", path))?;
-
-        patches.push((path, patch));
-    }
-
-    // Sort by filename for deterministic order
-    patches.sort_by(|a, b| a.0.cmp(&b.0));
-
-    Ok(patches)
-}
-
-/// Apply a unified diff patch to the worktree.
-fn apply_patch(worktree: &PathBuf, diff: &str) -> Result<()> {
-    // Write diff to a temporary file
-    let temp_dir = std::env::temp_dir();
-    let temp_patch = temp_dir.join(format!("airlock-patch-{}.diff", uuid::Uuid::new_v4()));
-
-    std::fs::write(&temp_patch, diff)
-        .with_context(|| format!("Failed to write temporary patch file: {:?}", temp_patch))?;
-
-    // Apply the patch using git apply
-    let output = Command::new("git")
-        .args(["apply", "--3way"])
-        .arg(&temp_patch)
-        .current_dir(worktree)
-        .output()
-        .context("Failed to execute git apply")?;
-
-    // Clean up temp file
-    let _ = std::fs::remove_file(&temp_patch);
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        // Try without --3way for simpler patches
-        debug!("git apply --3way failed, trying without --3way: {}", stderr);
-
-        let temp_patch2 = temp_dir.join(format!("airlock-patch-{}.diff", uuid::Uuid::new_v4()));
-        std::fs::write(&temp_patch2, diff)?;
-
-        let output2 = Command::new("git")
-            .args(["apply"])
-            .arg(&temp_patch2)
-            .current_dir(worktree)
-            .output()
-            .context("Failed to execute git apply")?;
-
-        let _ = std::fs::remove_file(&temp_patch2);
-
-        if !output2.status.success() {
-            let stderr2 = String::from_utf8_lossy(&output2.stderr);
-            anyhow::bail!("git apply failed: {}", stderr2);
+        None => {
+            info!("No patches to apply, nothing to freeze");
         }
     }
 
     Ok(())
-}
-
-/// Stage all changes in the worktree.
-fn stage_all_changes(worktree: &PathBuf) -> Result<()> {
-    let output = Command::new("git")
-        .args(["add", "-A"])
-        .current_dir(worktree)
-        .output()
-        .context("Failed to execute git add")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        warn!("git add warning: {}", stderr);
-    }
-
-    Ok(())
-}
-
-/// Check if there are staged changes to commit.
-fn has_staged_changes(worktree: &PathBuf) -> Result<bool> {
-    let output = Command::new("git")
-        .args(["diff", "--cached", "--quiet"])
-        .current_dir(worktree)
-        .output()
-        .context("Failed to execute git diff --cached")?;
-
-    // Exit code 0 = no changes, 1 = changes exist
-    Ok(!output.status.success())
-}
-
-/// Create a commit with the given message.
-fn create_commit(worktree: &PathBuf, message: &str) -> Result<String> {
-    let output = Command::new("git")
-        .args(["commit", "-m", message])
-        .current_dir(worktree)
-        .output()
-        .context("Failed to execute git commit")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("git commit failed: {}", stderr);
-    }
-
-    // Get the new HEAD SHA
-    let sha_output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(worktree)
-        .output()
-        .context("Failed to execute git rev-parse HEAD")?;
-
-    if !sha_output.status.success() {
-        let stderr = String::from_utf8_lossy(&sha_output.stderr);
-        anyhow::bail!("git rev-parse HEAD failed: {}", stderr);
-    }
-
-    let sha = String::from_utf8_lossy(&sha_output.stdout)
-        .trim()
-        .to_string();
-
-    Ok(sha)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serial_test::serial;
+    use std::process::Command;
     use tempfile::TempDir;
 
     fn setup_git_repo(temp_dir: &TempDir) -> PathBuf {

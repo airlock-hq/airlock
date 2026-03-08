@@ -168,6 +168,12 @@ pub struct StepDefinition {
     /// When omitted, the executor applies a default timeout (60 minutes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
+
+    /// Auto-apply pending patches after this step passes.
+    /// When `true`, the executor applies all patches from `$AIRLOCK_ARTIFACTS/patches/`
+    /// and commits them, similar to running `airlock exec freeze`.
+    #[serde(default, rename = "apply-patch")]
+    pub apply_patch: bool,
 }
 
 impl StepDefinition {

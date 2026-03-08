@@ -858,8 +858,35 @@ pub(super) async fn execute_step_sequence(
                     }
                 }
 
+                // Auto-apply patches if apply-patch is set on the step
+                if resolved_step.apply_patch && step_result.status == StepStatus::Passed {
+                    match airlock_core::patches::apply_pending_patches(
+                        params.worktree_path,
+                        &env.artifacts,
+                    ) {
+                        Ok(Some(new_sha)) => {
+                            info!(
+                                "apply-patch '{}': HEAD -> {}",
+                                step.name,
+                                &new_sha[..8.min(new_sha.len())]
+                            );
+                            effective_head_sha = new_sha.clone();
+                            let db = params.ctx.db.lock().await;
+                            let _ = db.update_run_head_sha(&params.run.id, &new_sha);
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            warn!("apply-patch '{}' failed: {}", step.name, e);
+                            step_result.status = StepStatus::Failed;
+                            step_result.error = Some(format!("apply-patch failed: {}", e));
+                            let db = params.ctx.db.lock().await;
+                            let _ = db.update_step_result(step_result);
+                        }
+                    }
+                }
+
                 // Emit StepCompleted event
-                let status_str = step_status_str(res.status);
+                let status_str = step_status_str(step_result.status);
                 params.ctx.emit(AirlockEvent::StepCompleted {
                     repo_id: params.run.repo_id.clone(),
                     run_id: params.run.id.clone(),
@@ -870,7 +897,7 @@ pub(super) async fn execute_step_sequence(
                 });
 
                 // Check if we should pause for approval
-                if crate::pipeline::should_pause_for_approval(&res) {
+                if crate::pipeline::should_pause_for_approval(step_result) {
                     info!(
                         "Job '{}' paused at step '{}' awaiting approval",
                         params.job_key, step.name
@@ -880,17 +907,17 @@ pub(super) async fn execute_step_sequence(
                 }
 
                 // Check if we should continue
-                if !crate::pipeline::should_continue_pipeline(&resolved_step, &res) {
+                if !crate::pipeline::should_continue_pipeline(&resolved_step, step_result) {
                     error!(
                         "Job '{}' stopped at step '{}' due to failure",
                         params.job_key, step.name
                     );
                     job_success = false;
-                    job_error = res.error.clone();
+                    job_error = step_result.error.clone();
                     break;
                 }
 
-                if res.status == StepStatus::Failed {
+                if step_result.status == StepStatus::Failed {
                     warn!(
                         "Step '{}' in job '{}' failed but continue_on_error=true, continuing",
                         step.name, params.job_key
@@ -1650,6 +1677,7 @@ mod tests {
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: Some(10),
+            apply_patch: false,
         };
 
         let step_result_id = "step-head-sha";

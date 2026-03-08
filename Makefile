@@ -59,7 +59,7 @@ frontend-dev:
 # On exit (Ctrl+C), the production daemon is restored.
 dev:
 	@launchctl bootout gui/$$(id -u)/dev.airlock.daemon 2>/dev/null || true
-	@cargo build --bin airlockd
+	@cargo build --bin airlockd --bin airlock
 	@cleanup() { \
 		pkill -P $$DAEMON_PID 2>/dev/null; kill $$DAEMON_PID 2>/dev/null; \
 		pkill -P $$VITE_PID 2>/dev/null; kill $$VITE_PID 2>/dev/null; \

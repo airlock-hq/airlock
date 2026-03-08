@@ -9,6 +9,7 @@
 //! - `json` - JSON helper for extracting/modifying JSON data
 
 mod agent;
+mod await_approval;
 mod freeze;
 mod json;
 mod push;
@@ -21,6 +22,7 @@ mod helpers;
 mod tests;
 
 pub use agent::agent;
+pub use await_approval::await_approval;
 pub use freeze::freeze;
 pub use json::{json, JsonArgs};
 pub use push::push;

@@ -759,13 +759,13 @@ fn test_init_creates_default_config() {
     assert!(config_content.contains("jobs:"));
     assert!(config_content.contains("steps:"));
     assert!(config_content.contains("name: lint"));
-    assert!(config_content.contains("name: freeze"));
     assert!(config_content.contains("name: describe"));
     assert!(config_content.contains("name: test"));
     assert!(config_content.contains("name: critique"));
     assert!(config_content.contains("name: push"));
     assert!(config_content.contains("name: create-pr"));
-    assert!(config_content.contains("require-approval: true"));
+    assert!(config_content.contains("name: review"));
+    assert!(config_content.contains("airlock exec await"));
 }
 
 #[test]
@@ -797,7 +797,7 @@ fn test_init_overwrites_existing_config() {
     let config_content = fs::read_to_string(&workflow_path).unwrap();
     assert!(!config_content.contains("custom-stage"));
     assert!(config_content.contains("name: describe"));
-    assert!(config_content.contains("require-approval: true"));
+    assert!(config_content.contains("airlock exec await"));
 }
 
 #[test]

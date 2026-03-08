@@ -100,6 +100,7 @@ fn test_step_definition_serialization_and_defaults() {
         continue_on_error: true,
         require_approval: ApprovalMode::Never,
         timeout: None,
+        apply_patch: false,
     };
 
     let json = serde_json::to_string(&step).unwrap();
@@ -109,6 +110,7 @@ fn test_step_definition_serialization_and_defaults() {
     assert_eq!(parsed.shell, Some("bash".to_string()));
     assert!(parsed.continue_on_error);
     assert_eq!(parsed.require_approval, ApprovalMode::Never);
+    assert!(!parsed.apply_patch);
 
     // Defaults applied when fields are missing
     let minimal: StepDefinition =
@@ -117,6 +119,7 @@ fn test_step_definition_serialization_and_defaults() {
     assert_eq!(minimal.shell, None);
     assert!(!minimal.continue_on_error);
     assert_eq!(minimal.require_approval, ApprovalMode::Never);
+    assert!(!minimal.apply_patch);
 
     // Reusable action reference (uses instead of run)
     let reusable: StepDefinition = serde_json::from_str(
@@ -142,6 +145,7 @@ fn test_step_definition_effective_run() {
         continue_on_error: false,
         require_approval: ApprovalMode::Never,
         timeout: None,
+        apply_patch: false,
     };
     assert_eq!(step.effective_run(), Some("npm test"));
 
@@ -154,9 +158,30 @@ fn test_step_definition_effective_run() {
         continue_on_error: false,
         require_approval: ApprovalMode::Never,
         timeout: None,
+        apply_patch: false,
     };
     assert_eq!(step.effective_run(), None);
     assert!(step.is_reusable());
+}
+
+#[test]
+fn test_step_definition_apply_patch_yaml() {
+    // apply-patch: true in YAML
+    let yaml = r#"
+name: lint
+uses: airlock-hq/airlock/defaults/lint@main
+apply-patch: true
+"#;
+    let step: StepDefinition = serde_yaml::from_str(yaml).unwrap();
+    assert!(step.apply_patch);
+
+    // apply-patch omitted defaults to false
+    let yaml2 = r#"
+name: lint
+uses: airlock-hq/airlock/defaults/lint@main
+"#;
+    let step2: StepDefinition = serde_yaml::from_str(yaml2).unwrap();
+    assert!(!step2.apply_patch);
 }
 
 // =========================================================================

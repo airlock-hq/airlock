@@ -33,43 +33,63 @@ on:
     branches: ['**']
 
 jobs:
-  default:
-    name: Lint, Test & Deploy
+  rebase:
+    name: Rebase
     steps:
-      # Rebase onto upstream to handle drift
       - name: rebase
         uses: airlock-hq/airlock/defaults/rebase@main
 
-      # Run linters and formatters, auto-fix issues
-      - name: lint
-        uses: airlock-hq/airlock/defaults/lint@main
-
-      # Commit auto-fix patches and lock the worktree
-      - name: freeze
-        run: airlock exec freeze
-
-      # Generate PR title and description from the diff
-      - name: describe
-        uses: airlock-hq/airlock/defaults/describe@main
-
-      # Update documentation to reflect changes
-      - name: document
-        uses: airlock-hq/airlock/defaults/document@main
-
-      # Run tests
-      - name: test
-        uses: airlock-hq/airlock/defaults/test@main
-
-      # Critique the code change for bugs, risks, and simplification opportunities
+  critique:
+    name: Critique
+    needs: rebase
+    steps:
       - name: critique
         uses: airlock-hq/airlock/defaults/critique@main
 
-      # Push changes to upstream (pauses for user approval first)
+  test:
+    name: Test
+    needs: rebase
+    steps:
+      - name: test
+        uses: airlock-hq/airlock/defaults/test@main
+
+  gate:
+    name: Review Gate
+    needs: [critique, test]
+    steps:
+      - name: review
+        run: |
+          verdict=$(cat "$AIRLOCK_ARTIFACTS/test_result.json" | airlock exec json verdict)
+          severity=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json max_severity)
+          if [ "$verdict" != "pass" ] || [ "$severity" = "error" ]; then
+            echo "Tests failed or critical issues found. Awaiting human review."
+            airlock exec await
+          fi
+
+  describe:
+    name: Describe
+    needs: gate
+    steps:
+      - name: describe
+        uses: airlock-hq/airlock/defaults/describe@main
+
+  document:
+    name: Document
+    needs: gate
+    steps:
+      - name: document
+        uses: airlock-hq/airlock/defaults/document@main
+        apply-patch: true
+
+  deploy:
+    name: Lint & Push
+    needs: [describe, document]
+    steps:
+      - name: lint
+        uses: airlock-hq/airlock/defaults/lint@main
+        apply-patch: true
       - name: push
         uses: airlock-hq/airlock/defaults/push@main
-        require-approval: true
-
-      # Create pull/merge request
       - name: create-pr
         uses: airlock-hq/airlock/defaults/create-pr@main
 "#;

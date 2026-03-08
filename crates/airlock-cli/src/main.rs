@@ -141,6 +141,15 @@ enum ExecAction {
     /// Checks for upstream divergence before pushing.
     Push,
 
+    /// Request human approval before continuing the pipeline
+    ///
+    /// Writes a marker file and exits 0. The executor detects the marker
+    /// and pauses the pipeline for user approval in the UI.
+    Await {
+        /// Optional message explaining why approval is needed
+        message: Option<String>,
+    },
+
     /// JSON helper - extract fields or modify JSON from stdin
     ///
     /// Usage:
@@ -267,6 +276,7 @@ async fn main() -> anyhow::Result<()> {
             } => commands::exec::agent(prompt, output_schema, adapter).await,
             ExecAction::Freeze => commands::exec::freeze().await,
             ExecAction::Push => commands::exec::push().await,
+            ExecAction::Await { message } => commands::exec::await_approval(message).await,
             ExecAction::Json { path, set_fields } => {
                 let args = commands::exec::JsonArgs { path, set_fields };
                 commands::exec::json(args).await
