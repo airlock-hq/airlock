@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.55](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.54...airlock-v0.1.55) (2026-03-08)
+
+
+### Features
+
+* make default pipeline parallelized ([#37](https://github.com/airlock-hq/airlock/issues/37)) ([b279280](https://github.com/airlock-hq/airlock/commit/b27928016e142c7b46972ce20229addd8afc3159))
+
 ## [0.1.54](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.53...airlock-v0.1.54) (2026-03-07)
 
 
