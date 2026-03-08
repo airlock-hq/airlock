@@ -240,11 +240,11 @@ systemctl --user enable --now airlockd.service
 
 ### 5.1 Pipeline Engine
 
-The pipeline executes user-defined stages sequentially, producing a **Push Request**. Each run gets a single worktree where all stages execute.
+The pipeline executes user-defined jobs, producing a **Push Request**. Jobs within a workflow can run in parallel when they have no dependency relationship. Each job declares its dependencies via `needs:`, forming a directed acyclic graph (DAG). Each run gets a single worktree where all jobs execute.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          Stage-Based Pipeline                                │
+│                          Job-Based Pipeline (DAG)                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
@@ -254,29 +254,35 @@ The pipeline executes user-defined stages sequentially, producing a **Push Reque
 │                              │                                              │
 │                              ▼                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  2. PRE-FREEZE STAGES (patches auto-applied)                         │   │
-│  │     ┌────────────┐   ┌────────────┐                                  │   │
-│  │     │   format   │ → │  lint-fix  │ → ...                            │   │
-│  │     └────────────┘   └────────────┘                                  │   │
+│  │  2. REBASE                                                           │   │
+│  │     Rebase onto upstream to handle drift                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                        ┌─────┴─────┐                                        │
+│                        ▼           ▼                                        │
+│  ┌──────────────────────┐  ┌──────────────────────┐                        │
+│  │  3a. CRITIQUE         │  │  3b. TEST             │  (parallel)           │
+│  └──────────────────────┘  └──────────────────────┘                        │
+│                        └─────┬─────┘                                        │
+│                              ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  4. GATE (review gate)                                               │   │
+│  │     Pauses for approval if tests fail or critical issues found       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                        ┌─────┴─────┐                                        │
+│                        ▼           ▼                                        │
+│  ┌──────────────────────┐  ┌──────────────────────┐                        │
+│  │  5a. DESCRIBE         │  │  5b. DOCUMENT         │  (parallel)           │
+│  │                       │  │  (apply-patch: true)  │                       │
+│  └──────────────────────┘  └──────────────────────┘                        │
+│                        └─────┬─────┘                                        │
+│                              ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  6. DEPLOY (lint → push → create-pr)                                 │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  3. FREEZE                                                           │   │
-│  │     Commit applied patches, lock worktree                            │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  4. POST-FREEZE STAGES (patches queued for review)                   │   │
-│  │     ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌──────────┐ │   │
-│  │     │  describe  │ → │    test    │ → │   review   │ → │   push   │ │   │
-│  │     └────────────┘   └────────────┘   └────────────┘   └──────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  5. CLEANUP                                                          │   │
+│  │  7. CLEANUP                                                          │   │
 │  │     Remove worktree (unless keep_worktrees=true)                     │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
@@ -342,29 +348,19 @@ Schema:
 }
 ```
 
-### 5.3 The Freeze Mechanism
+### 5.3 Patch Application
 
-The pipeline has two phases separated by a **freeze point**:
+Steps can produce patches via `airlock artifact patch`. There are two ways patches get applied:
 
-| Phase       | Patch Behavior                   | Worktree State |
-| ----------- | -------------------------------- | -------------- |
-| Pre-freeze  | Patches auto-applied to worktree | Mutable        |
-| Post-freeze | Patches queued for user review   | Locked         |
+**`apply-patch` step property (recommended):** Set `apply-patch: true` on any step. After the step passes, the executor automatically applies all pending patches from `$AIRLOCK_ARTIFACTS/patches/`, commits them, and updates `$AIRLOCK_HEAD_SHA`.
+
+**`airlock exec freeze` (manual):** A step can explicitly run `airlock exec freeze` to collect and commit all pending patches, then lock the worktree. This is an alternative to `apply-patch` for pipelines that need a single explicit freeze point.
 
 **Key design principle:** Stages always produce **explicit patches** via `airlock artifact patch`. Uncommitted worktree changes without a corresponding patch are ignored. This means:
 
-- Stages don't need to know which phase they're in
-- Same stage can work in either phase
+- Stages don't need to know when patches will be applied
+- Same stage can work anywhere in the pipeline
 - Pipeline structure determines behavior
-
-**What `airlock exec freeze` does:**
-
-1. Collect all patches produced by pre-freeze stages
-2. Apply them to the worktree (if not already applied)
-3. Commit with message: "Airlock: auto-fixes from format, lint-fix, ..."
-4. Update `$AIRLOCK_HEAD_SHA` to the new commit
-5. Mark the worktree as frozen
-6. Post-freeze stages that produce patches → patches stored for review
 
 ### 5.4 Stage Definition
 
@@ -523,6 +519,7 @@ run: | # Command to execute (inline script)
 shell: bash # Shell to use: sh, bash, zsh (default: user's login shell via $SHELL -l)
 continue-on-error: false # Continue pipeline if step fails
 require-approval: false # Pause pipeline for user approval (true | false | if_patches)
+apply-patch: false # Auto-apply pending patches after step passes
 
 # Optional metadata
 description: Generate PR description via AI agent
@@ -534,11 +531,12 @@ This means a `uses:` step and an inline `run:` step have the same properties. Th
 
 Some operations require Airlock internals and remain as `airlock exec`:
 
-| Command                  | Description                                |
-| ------------------------ | ------------------------------------------ |
-| `airlock exec freeze`    | Commit patches, lock worktree (see 5.3)    |
-| `airlock exec push`      | Push current branch to upstream            |
-| `airlock exec create-pr` | Create pull request on GitHub via `gh` CLI |
+| Command                  | Description                                          |
+| ------------------------ | ---------------------------------------------------- |
+| `airlock exec freeze`    | Commit patches, lock worktree (see 5.3)              |
+| `airlock exec push`      | Push current branch to upstream                      |
+| `airlock exec create-pr` | Create pull request on GitHub via `gh` CLI           |
+| `airlock exec await`     | Request human approval before continuing pipeline    |
 
 ### 5.9 Agent CLI Helper
 
@@ -566,28 +564,68 @@ on:
     branches: ['**']
 
 jobs:
-  default:
-    name: Lint, Test & Deploy
+  rebase:
+    name: Rebase
+    steps:
+      - name: rebase
+        uses: airlock-hq/airlock/defaults/rebase@main
+
+  critique:
+    name: Critique
+    needs: rebase
+    steps:
+      - name: critique
+        uses: airlock-hq/airlock/defaults/critique@main
+
+  test:
+    name: Test
+    needs: rebase
+    steps:
+      - name: test
+        uses: airlock-hq/airlock/defaults/test@main
+
+  gate:
+    name: Review Gate
+    needs: [critique, test]
+    steps:
+      - name: review
+        run: |
+          verdict=$(cat "$AIRLOCK_ARTIFACTS/test_result.json" | airlock exec json verdict)
+          severity=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json max_severity)
+          if [ "$verdict" != "pass" ] || [ "$severity" = "error" ]; then
+            echo "Tests failed or critical issues found. Awaiting human review."
+            airlock exec await
+          fi
+
+  describe:
+    name: Describe
+    needs: gate
+    steps:
+      - name: describe
+        uses: airlock-hq/airlock/defaults/describe@main
+
+  document:
+    name: Document
+    needs: gate
+    steps:
+      - name: document
+        uses: airlock-hq/airlock/defaults/document@main
+        apply-patch: true
+
+  deploy:
+    name: Lint & Push
+    needs: [describe, document]
     steps:
       - name: lint
         uses: airlock-hq/airlock/defaults/lint@main
-      - name: freeze
-        run: airlock exec freeze
-      - name: describe
-        uses: airlock-hq/airlock/defaults/describe@main
-      - name: test
-        uses: airlock-hq/airlock/defaults/test@main
-        continue-on-error: true
-      - name: critique
-        uses: airlock-hq/airlock/defaults/critique@main
-      - name: review
-        run: 'true'
-        require-approval: true
+        apply-patch: true
       - name: push
         uses: airlock-hq/airlock/defaults/push@main
       - name: create-pr
         uses: airlock-hq/airlock/defaults/create-pr@main
 ```
+
+The default pipeline is parallelized: after rebase, critique and test run concurrently. A review gate checks their results and pauses for human approval if tests fail or critical issues are found (via `airlock exec await`). Steps that produce patches (document, lint) use `apply-patch: true` to auto-commit them.
 
 **Important:** Workflow files in `.airlock/workflows/` are required for pipeline execution. If no workflows exist or cannot be parsed, the pipeline will fail with an error directing the user to run `airlock init`.
 

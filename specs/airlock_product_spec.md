@@ -403,13 +403,16 @@ Steps use `airlock artifact` and `airlock exec agent` CLI helpers to produce art
 
 Some operations require Airlock internals and remain as `airlock exec`:
 
-| Command                  | Description                               |
-| ------------------------ | ----------------------------------------- |
-| `airlock exec freeze`    | Commit pending patches, lock the worktree |
-| `airlock exec push`      | Push changes to upstream                  |
-| `airlock exec create-pr` | Create pull request on GitHub             |
+| Command                  | Description                                       |
+| ------------------------ | ------------------------------------------------- |
+| `airlock exec freeze`    | Commit pending patches, lock the worktree         |
+| `airlock exec push`      | Push changes to upstream                          |
+| `airlock exec create-pr` | Create pull request on GitHub                     |
+| `airlock exec await`     | Request human approval before continuing pipeline |
 
 ### 5.6 Default Workflow
+
+The default workflow uses parallel jobs connected by a DAG. After rebase, critique and test run concurrently. A review gate pauses for human approval if tests fail or critical issues are found. Steps that produce patches use `apply-patch: true` to auto-commit them.
 
 ```yaml
 name: Main Pipeline
@@ -419,23 +422,61 @@ on:
     branches: ['**']
 
 jobs:
-  default:
-    name: Lint, Test & Deploy
+  rebase:
+    name: Rebase
+    steps:
+      - name: rebase
+        uses: airlock-hq/airlock/defaults/rebase@main
+
+  critique:
+    name: Critique
+    needs: rebase
+    steps:
+      - name: critique
+        uses: airlock-hq/airlock/defaults/critique@main
+
+  test:
+    name: Test
+    needs: rebase
+    steps:
+      - name: test
+        uses: airlock-hq/airlock/defaults/test@main
+
+  gate:
+    name: Review Gate
+    needs: [critique, test]
+    steps:
+      - name: review
+        run: |
+          verdict=$(cat "$AIRLOCK_ARTIFACTS/test_result.json" | airlock exec json verdict)
+          severity=$(cat "$AIRLOCK_ARTIFACTS/critique_result.json" | airlock exec json max_severity)
+          if [ "$verdict" != "pass" ] || [ "$severity" = "error" ]; then
+            echo "Tests failed or critical issues found. Awaiting human review."
+            airlock exec await
+          fi
+
+  describe:
+    name: Describe
+    needs: gate
+    steps:
+      - name: describe
+        uses: airlock-hq/airlock/defaults/describe@main
+
+  document:
+    name: Document
+    needs: gate
+    steps:
+      - name: document
+        uses: airlock-hq/airlock/defaults/document@main
+        apply-patch: true
+
+  deploy:
+    name: Lint & Push
+    needs: [describe, document]
     steps:
       - name: lint
         uses: airlock-hq/airlock/defaults/lint@main
-      - name: freeze
-        run: airlock exec freeze
-      - name: describe
-        uses: airlock-hq/airlock/defaults/describe@main
-      - name: test
-        uses: airlock-hq/airlock/defaults/test@main
-        continue-on-error: true
-      - name: critique
-        uses: airlock-hq/airlock/defaults/critique@main
-      - name: review
-        run: 'true'
-        require-approval: true
+        apply-patch: true
       - name: push
         uses: airlock-hq/airlock/defaults/push@main
       - name: create-pr

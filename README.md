@@ -93,32 +93,44 @@ _The critique step found a real bug (milliseconds vs seconds in token expiry) an
 
 ### Pipeline
 
-Defined in `.airlock/workflows/main.yml` using a familiar YAML workflow syntax:
+Defined in `.airlock/workflows/main.yml` using a familiar YAML workflow syntax with parallel jobs:
 
 ```yaml
-steps:
-  - name: rebase
-    uses: airlock-hq/airlock/defaults/rebase@main
-  - name: lint
-    uses: airlock-hq/airlock/defaults/lint@main
-  - name: freeze
-    run: airlock exec freeze
-  - name: describe
-    uses: airlock-hq/airlock/defaults/describe@main
-  - name: document
-    uses: airlock-hq/airlock/defaults/document@main
-  - name: test
-    uses: airlock-hq/airlock/defaults/test@main
-  - name: critique
-    uses: airlock-hq/airlock/defaults/critique@main
-  - name: push
-    uses: airlock-hq/airlock/defaults/push@main
-    require-approval: true
-  - name: create-pr
-    uses: airlock-hq/airlock/defaults/create-pr@main
+jobs:
+  rebase:
+    steps:
+      - name: rebase
+        uses: airlock-hq/airlock/defaults/rebase@main
+  critique:
+    needs: rebase
+    steps:
+      - name: critique
+        uses: airlock-hq/airlock/defaults/critique@main
+  test:
+    needs: rebase
+    steps:
+      - name: test
+        uses: airlock-hq/airlock/defaults/test@main
+  gate:
+    needs: [critique, test]
+    steps:
+      - name: review
+        run: |
+          # Pause for human approval if tests fail or critical issues found
+          airlock exec await
+  deploy:
+    needs: gate
+    steps:
+      - name: lint
+        uses: airlock-hq/airlock/defaults/lint@main
+        apply-patch: true
+      - name: push
+        uses: airlock-hq/airlock/defaults/push@main
+      - name: create-pr
+        uses: airlock-hq/airlock/defaults/create-pr@main
 ```
 
-The **freeze** step splits the pipeline: stages before it auto-apply fixes (formatting, lint), stages after it produce review artifacts without modifying code.
+Jobs declare dependencies via `needs:` and run in parallel when possible. Steps with `apply-patch: true` auto-commit any patches they produce.
 
 Steps can be inline shell commands or reusable definitions loaded from Git repos via `uses:`.
 
