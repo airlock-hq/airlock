@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.56](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.55...airlock-v0.1.56) (2026-03-08)
+
+
+### Bug Fixes
+
+* strip mermaid styling in PR creation ([#39](https://github.com/airlock-hq/airlock/issues/39)) ([43824a9](https://github.com/airlock-hq/airlock/commit/43824a9a3a6f3994355abf9308c12110b3cf78ed))
+
 ## [0.1.55](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.54...airlock-v0.1.55) (2026-03-08)
 
 
