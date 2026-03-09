@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.60](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.59...airlock-v0.1.60) (2026-03-09)
+
+
+### Bug Fixes
+
+* **gate:** remove summary heading from risk ([#46](https://github.com/airlock-hq/airlock/issues/46)) ([42e9824](https://github.com/airlock-hq/airlock/commit/42e982480e2cf6e8d60b669e0db611b7d699e179))
+
 ## [0.1.59](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.58...airlock-v0.1.59) (2026-03-09)
 
 
