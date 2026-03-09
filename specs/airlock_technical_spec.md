@@ -389,7 +389,7 @@ Each stage receives these environment variables:
 | ---------------------- | -------------------------------------------------- |
 | `AIRLOCK_RUN_ID`       | Unique run identifier (UUID)                       |
 | `AIRLOCK_BRANCH`       | Branch being pushed (e.g., `feature/add-auth`)     |
-| `AIRLOCK_BASE_SHA`     | Base commit SHA (before push)                      |
+| `AIRLOCK_BASE_SHA`     | Base commit SHA (merge-base with default branch for feature branches; previous push SHA for default branch) |
 | `AIRLOCK_HEAD_SHA`     | Head commit SHA (updated after freeze)             |
 | `AIRLOCK_WORKTREE`     | Absolute path to run worktree (also CWD)           |
 | `AIRLOCK_ARTIFACTS`    | Directory for run artifacts (shared by all stages) |

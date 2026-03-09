@@ -491,7 +491,7 @@ Each stage runs in a dedicated worktree with these environment variables:
 | ----------------------- | ---------------------------------------------- |
 | `$AIRLOCK_RUN_ID`       | Unique run identifier                          |
 | `$AIRLOCK_BRANCH`       | Branch being pushed                            |
-| `$AIRLOCK_BASE_SHA`     | Base commit SHA                                |
+| `$AIRLOCK_BASE_SHA`     | Base commit SHA (merge-base for feature branches) |
 | `$AIRLOCK_HEAD_SHA`     | Head commit SHA (updated after freeze)         |
 | `$AIRLOCK_WORKTREE`     | Path to run worktree (also CWD)                |
 | `$AIRLOCK_ARTIFACTS`    | Directory for run artifacts (shared by stages) |
