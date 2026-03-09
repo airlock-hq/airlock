@@ -36,8 +36,8 @@ run: |
   ## Output Rules
   - Return a single overall risk level: low, medium, or high
   - Low means the change is well-bounded, mostly cosmetic or otherwise straightforward, with little ambiguity
-  - Medium means the change has meaningful behavioral impact, notable uncertainty, or concerning signals that deserve human review
-  - High means the change is fundamental, risky, ambiguous, or has strong negative signals from tests or critique
+  - Medium means although the change has room to improve, it's safe to merge first and have the concerns addressed as follow ups
+  - High means the change should not be merged without explicit human approval. It is fundamental, risky, ambiguous, or has strong negative signals from tests or critique
   - Be decisive. Do not hedge between two levels.
 
   ## Output Format

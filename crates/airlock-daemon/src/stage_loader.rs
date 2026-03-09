@@ -1080,7 +1080,9 @@ env:
             name: "gate".to_string(),
             run: None,
             uses: Some("owner/repo/defaults/gate@v1".to_string()),
-            env: [("MODE".to_string(), "strict".to_string())].into_iter().collect(),
+            env: [("MODE".to_string(), "strict".to_string())]
+                .into_iter()
+                .collect(),
             shell: None,
             continue_on_error: false,
             require_approval: ApprovalMode::Never,

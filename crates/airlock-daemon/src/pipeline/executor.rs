@@ -1298,10 +1298,9 @@ mod tests {
         let env = create_test_env(&temp_dir);
 
         let mut stage = create_test_stage("test", "echo $AIRLOCK_RISK_THRESHOLD");
-        stage.env.insert(
-            "AIRLOCK_RISK_THRESHOLD".to_string(),
-            "high".to_string(),
-        );
+        stage
+            .env
+            .insert("AIRLOCK_RISK_THRESHOLD".to_string(), "high".to_string());
 
         let result =
             execute_stage_command_with_streaming(&stage, &env, Duration::from_secs(10), None, None)

@@ -186,7 +186,8 @@ fn claude_code_event_stream(
             // Drain pending events first
             if !pending.is_empty() {
                 let event = pending.remove(0);
-                return Some((event, (lines, child, pending, false)));
+                let is_complete = matches!(&event, Ok(AgentEvent::Complete { .. }));
+                return Some((event, (lines, child, pending, is_complete)));
             }
 
             loop {
@@ -219,8 +220,9 @@ fn claude_code_event_stream(
                                     continue;
                                 }
                                 let first = events.remove(0);
+                                let is_complete = matches!(&first, Ok(AgentEvent::Complete { .. }));
                                 pending = events;
-                                return Some((first, (lines, child, pending, false)));
+                                return Some((first, (lines, child, pending, is_complete)));
                             }
                             Err(e) => {
                                 let err_str = e.to_string();
@@ -1151,6 +1153,66 @@ Let me know if you need changes."#;
         assert_eq!(result.session_id, Some("sess-42".into()));
         assert_eq!(result.usage.input_tokens, Some(50));
         assert_eq!(result.usage.output_tokens, Some(25));
+    }
+
+    /// Verify the stream terminates after emitting `Complete`, even if the
+    /// subprocess keeps producing output (e.g. from hooks or other activity).
+    /// This reproduces a bug where the agent got stuck emitting hundreds of
+    /// empty messages after the Result had already been delivered.
+    #[tokio::test]
+    async fn test_stream_terminates_after_complete() {
+        use futures::StreamExt;
+
+        // Build JSONL with a result message followed by more output that
+        // should be ignored — the stream must stop after Complete.
+        let jsonl = [
+            r#"{"type":"system","subtype":"session_start","session_id":"sess-term","model":"sonnet","tools":null,"mcp_servers":null,"cwd":null,"permission_mode":null,"uuid":null,"data":null}"#,
+            r#"{"type":"result","subtype":"query_complete","duration_ms":100,"duration_api_ms":80,"is_error":false,"num_turns":1,"session_id":"sess-term","total_cost_usd":0.001,"usage":{"input_tokens":10,"output_tokens":5},"result":null,"structured_output":null}"#,
+            // These should never be seen — the stream should have stopped
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"ghost message"}],"model":null,"id":null,"stop_reason":null,"usage":null,"error":null},"parent_tool_use_id":null,"session_id":null,"uuid":null}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"another ghost"}],"model":null,"id":null,"stop_reason":null,"usage":null,"error":null},"parent_tool_use_id":null,"session_id":null,"uuid":null}"#,
+        ]
+        .join("\n");
+
+        let mut child = tokio::process::Command::new("printf")
+            .arg(&format!("{}\n", jsonl))
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .unwrap();
+
+        let stdout = child.stdout.take().unwrap();
+        let reader = tokio::io::BufReader::new(stdout);
+        let stream = claude_code_event_stream(reader, child);
+
+        let events: Vec<_> = stream
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(|r| r.unwrap())
+            .collect();
+
+        // Should have SessionStart and Complete — nothing after Complete
+        assert!(
+            matches!(&events[0], AgentEvent::SessionStart { .. }),
+            "Expected SessionStart"
+        );
+        assert!(
+            matches!(events.last().unwrap(), AgentEvent::Complete { .. }),
+            "Last event should be Complete, got {:?}",
+            events.last()
+        );
+        // Must NOT contain the ghost messages
+        let has_ghost = events.iter().any(|e| {
+            matches!(e, AgentEvent::AssistantMessage { content } if content.iter().any(|b| {
+                matches!(b, ContentBlock::Text { text } if text.contains("ghost"))
+            }))
+        });
+        assert!(
+            !has_ghost,
+            "Stream should have terminated before ghost messages"
+        );
     }
 
     // -----------------------------------------------------------------------

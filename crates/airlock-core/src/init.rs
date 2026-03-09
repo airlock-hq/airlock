@@ -729,7 +729,10 @@ mod tests {
     #[test]
     fn test_default_workflow_gate_uses_agent_risk_assessment() {
         let config = crate::parse_workflow_config(DEFAULT_WORKFLOW_YAML).unwrap();
-        let gate = config.jobs.get("gate").expect("default workflow should have gate job");
+        let gate = config
+            .jobs
+            .get("gate")
+            .expect("default workflow should have gate job");
         let review = gate
             .steps
             .iter()
