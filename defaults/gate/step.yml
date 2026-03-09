@@ -108,10 +108,17 @@ run: |
     --set "critique_comment_count=$CRITIQUE_COMMENT_COUNT" \
     > "$AIRLOCK_ARTIFACTS/risk_assessment.json"
 
+  case "$RISK_LEVEL" in
+    low) RISK_EMOJI="🟢" ;;
+    medium) RISK_EMOJI="🟡" ;;
+    high) RISK_EMOJI="🔴" ;;
+  esac
+
   cat << EOF | airlock artifact content --title "Risk Assessment"
-  **Risk Level:** $RISK_LEVEL
-  **Approval Threshold:** $RISK_APPROVAL_THRESHOLD
-  **Decision:** $DECISION
+  ## $RISK_EMOJI Risk: $(echo "$RISK_LEVEL" | tr '[:lower:]' '[:upper:]')
+
+  - **Approval Threshold:** $RISK_APPROVAL_THRESHOLD
+  - **Decision:** $DECISION
 
   ## Summary
   $SUMMARY
