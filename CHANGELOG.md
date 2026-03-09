@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.62](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.61...airlock-v0.1.62) (2026-03-09)
+
+
+### Bug Fixes
+
+* **push:** use merge-base for feature branches ([#50](https://github.com/airlock-hq/airlock/issues/50)) ([5f7a564](https://github.com/airlock-hq/airlock/commit/5f7a5642dac5a551fc012572f3cd331cfefc34ee))
+* tweak gate risk assessment artifact ([#52](https://github.com/airlock-hq/airlock/issues/52)) ([f03ddf4](https://github.com/airlock-hq/airlock/commit/f03ddf4467dcf1c9f01c2f04351e17ef23220f76))
+
 ## [0.1.61](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.60...airlock-v0.1.61) (2026-03-09)
 
 
