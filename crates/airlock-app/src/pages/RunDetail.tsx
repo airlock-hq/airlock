@@ -423,7 +423,7 @@ export function RunDetail() {
         <div className="flex items-center gap-2">
           {prUrl && (
             <Button variant="ghost" size="sm" className="border-border-subtle" asChild>
-              <a href={prUrl}>
+              <a href={prUrl} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                 View Pull Request
               </a>

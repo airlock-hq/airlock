@@ -128,7 +128,6 @@ run: |
   ## Signals
   - Test verdict: $TEST_VERDICT
   - Critique severity: $CRITIQUE_SEVERITY
-  - Critique comments: $CRITIQUE_COMMENT_COUNT
   - System impact: $SYSTEM_IMPACT
   - Ambiguity: $AMBIGUITY
   EOF
