@@ -50,13 +50,7 @@ That's it. Airlock intercepts the push, runs your pipeline, and opens a **Push R
 
 ![Airlock Push Request — Overview with architecture diagram](assets/screenshot1-overview-diagram.png)
 
-During `airlock init`, you'll choose how strict the push gate should be:
-
-- `Always` (`require-approval: true`)
-- `Only when there are patches` (`require-approval: if_patches`)
-- `Never` (`require-approval: false`)
-
-`airlock init` creates or overwrites `.airlock/workflows/main.yml` with the default workflow, then applies your selected approval mode.
+`airlock init` creates or overwrites `.airlock/workflows/main.yml` with the default workflow. You can customize the approval mode (`require-approval: true | false | if_patches`) by editing the workflow file directly.
 
 To bypass Airlock at any time: `git push bypass-airlock main`
 

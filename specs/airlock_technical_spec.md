@@ -125,7 +125,7 @@ When a user runs `airlock init` in their working repository:
 6. Install `pre-receive` and `post-receive` hooks in bare repo
 7. Trigger initial sync from origin
 8. Record repo in SQLite state database
-9. Create or overwrite `.airlock/workflows/main.yml` with the default workflow, then apply the selected approval mode for the push gate (`true`, `if_patches`, or `false`)
+9. Create or overwrite `.airlock/workflows/main.yml` with the default workflow
 
 **Post-init remote layout:**
 

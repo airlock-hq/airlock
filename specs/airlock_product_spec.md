@@ -56,7 +56,7 @@ git push origin feature-branch
 3. Renames `origin` to `bypass-airlock` (preserved as escape hatch)
 4. Sets `origin` to point to the local gate
 5. Registers the repo with the Airlock daemon
-6. Creates or overwrites `.airlock/workflows/main.yml` with the default pipeline, then applies your selected approval mode (`true`, `if_patches`, or `false`) to the push gate
+6. Creates or overwrites `.airlock/workflows/main.yml` with the default pipeline
 
 **Post-init state:**
 
