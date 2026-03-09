@@ -6,6 +6,7 @@ use super::pipeline::execute_pipeline;
 use super::util::now;
 use super::HandlerContext;
 use crate::ipc::AirlockEvent;
+use crate::pipeline::executor::detect_default_branch;
 use crate::push_coalescer;
 use airlock_core::config::{filter_workflows_for_branch, load_workflows_from_tree, WorkflowConfig};
 use airlock_core::{git, JobStatus, RefUpdate, Repo, Run};
@@ -325,6 +326,35 @@ pub async fn process_coalesced_push(
                     update.old_sha = upstream_sha;
                 }
                 _ => {} // No upstream ref or same SHA — keep git's old_sha
+            }
+        }
+    }
+
+    // For feature branches, use the merge-base with the default branch as base_sha.
+    // This ensures the diff always shows the full branch diff (like a PR), rather
+    // than an incremental diff from the previous push.
+    let default_branch = detect_default_branch(&repo.gate_path);
+    for update in pipeline_updates.iter_mut() {
+        // Skip branch creations (null SHA) — handled by find_effective_base_sha
+        if git::is_null_sha(&update.old_sha) {
+            continue;
+        }
+        if let Some(branch) = update.ref_name.strip_prefix("refs/heads/") {
+            if branch == default_branch {
+                continue; // Default branch keeps incremental behavior
+            }
+            let origin_ref = format!("origin/{}", default_branch);
+            if let Some(merge_base) =
+                git::find_merge_base(&repo.gate_path, &update.new_sha, &[&origin_ref])
+            {
+                info!(
+                    "Using merge-base with {} for feature branch {}: {} (was {})",
+                    default_branch,
+                    branch,
+                    &merge_base[..8.min(merge_base.len())],
+                    &update.old_sha[..8.min(update.old_sha.len())],
+                );
+                update.old_sha = merge_base;
             }
         }
     }
@@ -1913,5 +1943,242 @@ mod tests {
             db.list_runs("repo-cleanup", None).unwrap()
         };
         assert_eq!(runs.len(), 1);
+    }
+
+    /// Create a child commit on the given branch ref in a bare repo, returning the new SHA.
+    fn create_child_commit_on_branch(
+        repo: &git2::Repository,
+        branch_ref: &str,
+        parent_ref: &str,
+    ) -> String {
+        let sig = git2::Signature::now("Test", "test@test.com").unwrap();
+        let parent = repo
+            .find_reference(parent_ref)
+            .unwrap()
+            .peel_to_commit()
+            .unwrap();
+        let tree_id = repo.treebuilder(None).unwrap().write().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let oid = repo
+            .commit(
+                Some(branch_ref),
+                &sig,
+                &sig,
+                "child commit",
+                &tree,
+                &[&parent],
+            )
+            .unwrap();
+        oid.to_string()
+    }
+
+    /// Regression test: a feature branch's second push should use merge-base
+    /// with the default branch as base_sha, not the incremental old_sha.
+    ///
+    /// Scenario:
+    /// 1. main has commit0
+    /// 2. Feature branch created from main: commit1
+    /// 3. Push feature → Run1 (base=commit0, head=commit1) — completes OK
+    /// 4. Feature branch gets commit2 on top of commit1
+    /// 5. Push feature again → Run2 should have base=commit0 (merge-base), NOT commit1
+    #[tokio::test]
+    async fn test_feature_branch_second_push_uses_merge_base() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().join("airlock");
+        std::fs::create_dir_all(&root).unwrap();
+
+        let paths = AirlockPaths::with_root(root);
+
+        // Create a real bare gate repo with an initial commit on main
+        let gate_path = temp_dir.path().join("gate.git");
+        let gate_repo = git2::Repository::init_bare(&gate_path).unwrap();
+        gate_repo.remote("origin", "file:///dev/null").unwrap();
+
+        let base_sha = create_bare_repo_commit(&gate_repo);
+
+        // Set origin/main so detect_default_branch and merge-base can find it
+        git::update_ref(&gate_path, "refs/remotes/origin/main", &base_sha).unwrap();
+
+        // Create feature branch from main
+        let feature_commit1 =
+            create_child_commit_on_branch(&gate_repo, "refs/heads/feature", "refs/heads/main");
+
+        // Set up database
+        let db = Database::open_in_memory().unwrap();
+        let repo = Repo {
+            id: "repo-merge-base".to_string(),
+            working_path: temp_dir.path().to_path_buf(),
+            upstream_url: "file:///dev/null".to_string(),
+            gate_path: gate_path.clone(),
+            last_sync: None,
+            created_at: 1704067200,
+        };
+        db.insert_repo(&repo).unwrap();
+
+        let (shutdown_tx, _) = watch::channel(false);
+        let ctx = Arc::new(HandlerContext::new(paths, db, shutdown_tx));
+
+        // --- Push 1: feature branch creation ---
+        let ref_updates1 = vec![RefUpdate {
+            ref_name: "refs/heads/feature".to_string(),
+            old_sha: "0000000000000000000000000000000000000000".to_string(),
+            new_sha: feature_commit1.clone(),
+        }];
+        process_coalesced_push(ctx.clone(), "repo-merge-base", ref_updates1).await;
+
+        let runs1 = {
+            let db = ctx.db.lock().await;
+            db.list_runs("repo-merge-base", None).unwrap()
+        };
+        assert_eq!(runs1.len(), 1);
+        assert_eq!(runs1[0].head_sha, feature_commit1);
+
+        // Simulate Run1 completing successfully — mark job as Passed
+        {
+            let db = ctx.db.lock().await;
+            let job = JobResult {
+                id: "job-pass".to_string(),
+                run_id: runs1[0].id.clone(),
+                job_key: "build".to_string(),
+                name: Some("Build".to_string()),
+                status: JobStatus::Passed,
+                job_order: 0,
+                started_at: Some(1704067200),
+                completed_at: Some(1704067210),
+                error: None,
+                worktree_path: None,
+            };
+            db.insert_job_result(&job).unwrap();
+        }
+
+        // Simulate forwarding: update origin/feature to match gate's feature
+        git::update_ref(&gate_path, "refs/remotes/origin/feature", &feature_commit1).unwrap();
+
+        // --- Push 2: more commits on feature branch ---
+        let feature_commit2 =
+            create_child_commit_on_branch(&gate_repo, "refs/heads/feature", "refs/heads/feature");
+
+        // Git's post-receive reports old_sha=commit1 (previous gate HEAD for feature)
+        let ref_updates2 = vec![RefUpdate {
+            ref_name: "refs/heads/feature".to_string(),
+            old_sha: feature_commit1.clone(),
+            new_sha: feature_commit2.clone(),
+        }];
+        process_coalesced_push(ctx.clone(), "repo-merge-base", ref_updates2).await;
+
+        // Verify Run2 uses merge-base (base_sha) as the base, NOT commit1
+        let runs2 = {
+            let db = ctx.db.lock().await;
+            db.list_runs("repo-merge-base", None).unwrap()
+        };
+        assert_eq!(runs2.len(), 2, "Two runs should exist");
+
+        let run2 = runs2
+            .iter()
+            .find(|r| r.head_sha == feature_commit2)
+            .unwrap();
+        assert_eq!(
+            run2.base_sha, base_sha,
+            "Feature branch second push should use merge-base with main as base_sha, \
+             not the incremental old_sha ({})",
+            feature_commit1
+        );
+    }
+
+    /// Guard test: default branch pushes should keep incremental behavior,
+    /// NOT use merge-base.
+    #[tokio::test]
+    async fn test_default_branch_push_keeps_incremental_behavior() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().join("airlock");
+        std::fs::create_dir_all(&root).unwrap();
+
+        let paths = AirlockPaths::with_root(root);
+
+        // Create a real bare gate repo
+        let gate_path = temp_dir.path().join("gate.git");
+        let gate_repo = git2::Repository::init_bare(&gate_path).unwrap();
+        gate_repo.remote("origin", "file:///dev/null").unwrap();
+
+        let upstream_sha = create_bare_repo_commit(&gate_repo);
+
+        // Set origin/main
+        git::update_ref(&gate_path, "refs/remotes/origin/main", &upstream_sha).unwrap();
+
+        // Create commit1 on main
+        let commit1_sha = create_child_commit(&gate_repo);
+
+        // Set up database
+        let db = Database::open_in_memory().unwrap();
+        let repo = Repo {
+            id: "repo-default-incr".to_string(),
+            working_path: temp_dir.path().to_path_buf(),
+            upstream_url: "file:///dev/null".to_string(),
+            gate_path: gate_path.clone(),
+            last_sync: None,
+            created_at: 1704067200,
+        };
+        db.insert_repo(&repo).unwrap();
+
+        let (shutdown_tx, _) = watch::channel(false);
+        let ctx = Arc::new(HandlerContext::new(paths, db, shutdown_tx));
+
+        // --- Push 1: first push to main ---
+        let ref_updates1 = vec![RefUpdate {
+            ref_name: "refs/heads/main".to_string(),
+            old_sha: upstream_sha.clone(),
+            new_sha: commit1_sha.clone(),
+        }];
+        process_coalesced_push(ctx.clone(), "repo-default-incr", ref_updates1).await;
+
+        // Simulate Run1 completing and forwarding
+        let runs1 = {
+            let db = ctx.db.lock().await;
+            db.list_runs("repo-default-incr", None).unwrap()
+        };
+        assert_eq!(runs1.len(), 1);
+        {
+            let db = ctx.db.lock().await;
+            let job = JobResult {
+                id: "job-p1".to_string(),
+                run_id: runs1[0].id.clone(),
+                job_key: "build".to_string(),
+                name: Some("Build".to_string()),
+                status: JobStatus::Passed,
+                job_order: 0,
+                started_at: Some(1704067200),
+                completed_at: Some(1704067210),
+                error: None,
+                worktree_path: None,
+            };
+            db.insert_job_result(&job).unwrap();
+        }
+
+        // Simulate forwarding: origin/main now points to commit1
+        git::update_ref(&gate_path, "refs/remotes/origin/main", &commit1_sha).unwrap();
+
+        // --- Push 2: second push to main ---
+        let commit2_sha = create_child_commit(&gate_repo);
+
+        let ref_updates2 = vec![RefUpdate {
+            ref_name: "refs/heads/main".to_string(),
+            old_sha: commit1_sha.clone(),
+            new_sha: commit2_sha.clone(),
+        }];
+        process_coalesced_push(ctx.clone(), "repo-default-incr", ref_updates2).await;
+
+        // Verify Run2 uses commit1 as base (incremental), NOT upstream_sha
+        let runs2 = {
+            let db = ctx.db.lock().await;
+            db.list_runs("repo-default-incr", None).unwrap()
+        };
+        assert_eq!(runs2.len(), 2, "Two runs should exist");
+
+        let run2 = runs2.iter().find(|r| r.head_sha == commit2_sha).unwrap();
+        assert_eq!(
+            run2.base_sha, commit1_sha,
+            "Default branch push should use incremental base_sha (commit1), \
+             not merge-base with itself"
+        );
     }
 }
