@@ -1,0 +1,7 @@
+{
+  "content": "{\"success\":true,\"pr_url\":\"https://github.com/example-org/example-repo/pull/42\",\"pr_number\":42,\"platform\":\"github\",\"summary\":\"Created PR #42 for feature/add-user-auth\",\"error\":null}",
+  "is_binary": false,
+  "total_size": 186,
+  "bytes_read": 186,
+  "offset": 0
+}

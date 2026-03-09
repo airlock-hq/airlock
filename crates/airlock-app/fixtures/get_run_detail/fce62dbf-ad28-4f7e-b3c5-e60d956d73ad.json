@@ -181,6 +181,13 @@
       "artifact_type": "file",
       "size_bytes": 445,
       "created_at": 1771950821
+    },
+    {
+      "name": "pr_result.json",
+      "path": "/Users/bakerxiao/.airlock/artifacts/85960af40743/fce62dbf-ad28-4f7e-b3c5-e60d956d73ad/pr_result.json",
+      "artifact_type": "pr",
+      "size_bytes": 186,
+      "created_at": 1771950900
     }
   ]
 }

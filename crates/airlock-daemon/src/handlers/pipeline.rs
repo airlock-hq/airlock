@@ -531,7 +531,9 @@ pub(super) fn should_skip_job(
 ) -> bool {
     for dep in job_config.needs.iter() {
         match job_statuses.get(dep.as_str()) {
-            Some(JobStatus::Failed) | Some(JobStatus::Skipped) => return true,
+            Some(JobStatus::Failed)
+            | Some(JobStatus::Skipped)
+            | Some(JobStatus::AwaitingApproval) => return true,
             _ => {}
         }
     }
@@ -1430,6 +1432,9 @@ pub(super) fn step_status_str(status: StepStatus) -> &'static str {
 ///
 /// If the run already has an error set (e.g. "Stopped by user"), it is
 /// preserved.  Otherwise we default to "Superseded by newer push".
+///
+/// Also transitions any non-terminal jobs and steps to their final state
+/// so the UI never shows stale "Running" indicators after cancellation.
 async fn mark_run_cancelled(ctx: &Arc<HandlerContext>, run: &Run) {
     let db = ctx.db.lock().await;
     // Only set the default cancellation message if no error is already present
@@ -1438,6 +1443,42 @@ async fn mark_run_cancelled(ctx: &Arc<HandlerContext>, run: &Run) {
     if !already_has_error {
         let _ = db.update_run_error(&run.id, Some("Superseded by newer push"));
     }
+
+    // Transition any non-terminal jobs/steps so the UI doesn't show stale
+    // "Running" or "Pending" states after cancellation.
+    if let Ok(jobs) = db.get_job_results_for_run(&run.id) {
+        for job in &jobs {
+            if !job.status.is_final() {
+                let new_status = if job.status == JobStatus::Running {
+                    JobStatus::Failed
+                } else {
+                    JobStatus::Skipped
+                };
+                let _ = db.update_job_status(
+                    &job.id,
+                    new_status,
+                    None,
+                    Some(now_epoch()),
+                    Some("Cancelled"),
+                );
+            }
+            // Also clean up any non-terminal steps within each job
+            if let Ok(steps) = db.get_step_results_for_job(&job.id) {
+                for step in &steps {
+                    if !step.status.is_final() {
+                        let mut updated = step.clone();
+                        updated.status = if step.status == StepStatus::Running {
+                            StepStatus::Failed
+                        } else {
+                            StepStatus::Skipped
+                        };
+                        let _ = db.update_step_result(&updated);
+                    }
+                }
+            }
+        }
+    }
+
     drop(db);
 
     ctx.emit(AirlockEvent::RunCompleted {
@@ -1516,6 +1557,7 @@ pub(super) fn now_epoch() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use airlock_core::config::workflow::OneOrMany;
     use airlock_core::{Database, RefUpdate};
 
     #[test]
@@ -1590,6 +1632,45 @@ mod tests {
         }];
 
         assert_eq!(extract_branch_name(&updates), None);
+    }
+
+    #[test]
+    fn test_should_skip_job_when_dep_failed() {
+        let job_config = JobConfig {
+            name: None,
+            steps: vec![],
+            needs: OneOrMany(vec!["gate".to_string()]),
+        };
+        let mut statuses = HashMap::new();
+        statuses.insert("gate".to_string(), JobStatus::Failed);
+        assert!(should_skip_job("deploy", &job_config, &statuses));
+    }
+
+    #[test]
+    fn test_should_skip_job_when_dep_awaiting_approval() {
+        let job_config = JobConfig {
+            name: None,
+            steps: vec![],
+            needs: OneOrMany(vec!["gate".to_string()]),
+        };
+        let mut statuses = HashMap::new();
+        statuses.insert("gate".to_string(), JobStatus::AwaitingApproval);
+        assert!(
+            should_skip_job("deploy", &job_config, &statuses),
+            "Jobs should be skipped when a dependency is awaiting approval"
+        );
+    }
+
+    #[test]
+    fn test_should_not_skip_job_when_dep_passed() {
+        let job_config = JobConfig {
+            name: None,
+            steps: vec![],
+            needs: OneOrMany(vec!["gate".to_string()]),
+        };
+        let mut statuses = HashMap::new();
+        statuses.insert("gate".to_string(), JobStatus::Passed);
+        assert!(!should_skip_job("deploy", &job_config, &statuses));
     }
 
     #[tokio::test]

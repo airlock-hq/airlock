@@ -625,6 +625,30 @@ fn test_derived_status_from_jobs_pending() {
 }
 
 #[test]
+fn test_derived_status_from_jobs_error_with_running_jobs() {
+    // When a run has an error (e.g. "Stopped by user"), it should show as
+    // "failed" even if some jobs haven't transitioned to terminal states yet.
+    let mut run = create_test_run();
+    run.error = Some("Stopped by user".to_string());
+    let jobs = vec![
+        create_job_result("lint", JobStatus::Passed),
+        create_job_result("test", JobStatus::Running),
+    ];
+    assert_eq!(run.derived_status_from_jobs(&jobs), "failed");
+}
+
+#[test]
+fn test_derived_status_from_jobs_error_with_pending_jobs() {
+    let mut run = create_test_run();
+    run.error = Some("Stopped by user".to_string());
+    let jobs = vec![
+        create_job_result("lint", JobStatus::Passed),
+        create_job_result("test", JobStatus::Pending),
+    ];
+    assert_eq!(run.derived_status_from_jobs(&jobs), "failed");
+}
+
+#[test]
 fn test_derived_status_from_jobs_superseded() {
     let mut run = create_test_run();
     run.superseded = true;

@@ -28,6 +28,7 @@ import {
   Copy,
   Check,
   Square,
+  ExternalLink,
 } from 'lucide-react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -87,6 +88,7 @@ export function RunDetail() {
   const [selectedComments, setSelectedComments] = useState<Set<string>>(new Set());
   const [allPatches, setAllPatches] = useState<PatchArtifact[]>([]);
   const [selectedPatches, setSelectedPatches] = useState<Set<string>>(new Set());
+  const [prUrl, setPrUrl] = useState<string | null>(null);
   const [artifactDataLoading, setArtifactDataLoading] = useState(false);
   const [applyingAndApproving, setApplyingAndApproving] = useState(false);
   const [commentsCopied, setCommentsCopied] = useState(false);
@@ -176,6 +178,40 @@ export function RunDetail() {
       ),
     [detail?.artifacts]
   );
+
+  // Load PR URL from pr_result.json artifact
+  const prArtifact = useMemo(
+    () => (detail?.artifacts ?? []).find((a) => a.artifact_type === 'pr'),
+    [detail?.artifacts]
+  );
+
+  useEffect(() => {
+    if (!prArtifact) {
+      setPrUrl(null);
+      return;
+    }
+    let cancelled = false;
+    readArtifact(prArtifact.path)
+      .then((result) => {
+        if (cancelled) return;
+        try {
+          const parsed = JSON.parse(result.content);
+          if (parsed.success && parsed.pr_url) {
+            setPrUrl(parsed.pr_url);
+          } else {
+            setPrUrl(null);
+          }
+        } catch {
+          setPrUrl(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPrUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [prArtifact]);
 
   // Load comments and patches from artifact files
   useEffect(() => {
@@ -385,6 +421,14 @@ export function RunDetail() {
         </div>
 
         <div className="flex items-center gap-2">
+          {prUrl && (
+            <Button variant="ghost" size="sm" className="border-border-subtle" asChild>
+              <a href={prUrl}>
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                View Pull Request
+              </a>
+            </Button>
+          )}
           {detail?.run.status === 'running' ? (
             <Button
               variant="ghost"

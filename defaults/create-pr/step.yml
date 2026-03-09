@@ -115,6 +115,9 @@ run: |
   # Prepare artifacts directory
   mkdir -p "$AIRLOCK_ARTIFACTS"
 
+  # Persist the full agent response as an artifact for the UI
+  echo "$RESPONSE" > "$AIRLOCK_ARTIFACTS/pr_result.json"
+
   # Determine exit code
   if [[ "$SUCCESS" == "true" ]]; then
       EXIT_CODE=0

@@ -502,7 +502,9 @@ impl Run {
         if self.is_superseded() {
             return "superseded";
         }
-        if self.error.is_some() && jobs.is_empty() {
+        if self.error.is_some() {
+            // Run has an error (e.g. "Stopped by user") — treat as failed
+            // even if some jobs haven't transitioned to terminal states yet.
             return "failed";
         }
         if jobs.is_empty() {
