@@ -765,7 +765,7 @@ fn test_init_creates_default_config() {
     assert!(config_content.contains("name: push"));
     assert!(config_content.contains("name: create-pr"));
     assert!(config_content.contains("name: review"));
-    assert!(config_content.contains("airlock exec await"));
+    assert!(config_content.contains("AIRLOCK_RISK_THRESHOLD"));
 }
 
 #[test]
@@ -797,7 +797,7 @@ fn test_init_overwrites_existing_config() {
     let config_content = fs::read_to_string(&workflow_path).unwrap();
     assert!(!config_content.contains("custom-stage"));
     assert!(config_content.contains("name: describe"));
-    assert!(config_content.contains("airlock exec await"));
+    assert!(config_content.contains("AIRLOCK_RISK_THRESHOLD"));
 }
 
 #[test]
