@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.59](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.58...airlock-v0.1.59) (2026-03-09)
+
+
+### Bug Fixes
+
+* remove init confirmation for human approval ([#44](https://github.com/airlock-hq/airlock/issues/44)) ([42fbeff](https://github.com/airlock-hq/airlock/commit/42fbeff054ed05ed664ac811e6506d5272b7593d))
+
 ## [0.1.58](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.57...airlock-v0.1.58) (2026-03-09)
 
 
