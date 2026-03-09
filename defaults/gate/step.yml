@@ -44,8 +44,8 @@ run: |
   Respond with JSON:
   {
     \"risk_level\": \"low\" | \"medium\" | \"high\",
-    \"summary\": \"Brief summary of the risk assessment\",
-    \"rationale\": \"Short explanation of why this risk level was chosen\",
+    \"summary\": \"One liner brief statement for why you chose the assessment\",
+    \"rationale\": \"More details on the rationale behind the assessment\",
     \"system_impact\": \"cosmetic\" | \"moderate\" | \"fundamental\",
     \"ambiguity\": \"low\" | \"medium\" | \"high\"
   }"
@@ -117,8 +117,7 @@ run: |
   cat << EOF | airlock artifact content --title "Risk Assessment"
   ## $RISK_EMOJI Risk: $(echo "$RISK_LEVEL" | tr '[:lower:]' '[:upper:]')
 
-  - **Approval Threshold:** $RISK_APPROVAL_THRESHOLD
-  - **Decision:** $DECISION
+  - **Decision:** $DECISION (threshold $RISK_APPROVAL_THRESHOLD)
 
   $SUMMARY
 
