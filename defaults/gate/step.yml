@@ -117,7 +117,7 @@ run: |
   cat << EOF | airlock artifact content --title "Risk Assessment"
   ## $RISK_EMOJI Risk: $(echo "$RISK_LEVEL" | tr '[:lower:]' '[:upper:]')
 
-  - **Decision:** $DECISION (threshold $RISK_APPROVAL_THRESHOLD)
+  **Decision:** $DECISION (threshold = $RISK_APPROVAL_THRESHOLD)
 
   $SUMMARY
 
