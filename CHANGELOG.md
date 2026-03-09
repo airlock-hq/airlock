@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.61](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.60...airlock-v0.1.61) (2026-03-09)
+
+
+### Features
+
+* **view:** open PR links in new tab ([#48](https://github.com/airlock-hq/airlock/issues/48)) ([02c28f1](https://github.com/airlock-hq/airlock/commit/02c28f150eaa29c17ed08c4d7a099e76ce24d9e6))
+
 ## [0.1.60](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.59...airlock-v0.1.60) (2026-03-09)
 
 
