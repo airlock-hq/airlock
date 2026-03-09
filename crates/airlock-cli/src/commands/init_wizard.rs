@@ -5,23 +5,21 @@ use console::Style;
 use dialoguer::Select;
 
 use airlock_core::{
-    check_provider_setup, AgentAdapter, ApprovalMode, ClaudeCodeAdapter, CodexAdapter,
-    ProviderCheck, ScmProvider, BANNER, BRAND_COLOR_256,
+    check_provider_setup, AgentAdapter, ClaudeCodeAdapter, CodexAdapter, ProviderCheck,
+    ScmProvider, BANNER, BRAND_COLOR_256,
 };
 
 /// Result of the init wizard.
 pub struct WizardResult {
     /// Agent adapter choice (only Some if first-time setup).
     pub agent_adapter: Option<String>,
-    /// Approval mode for the push step.
-    pub approval_mode: ApprovalMode,
 }
 
 /// Run the init wizard.
 ///
 /// Shows a branded banner and walks the user through setup:
 /// - If `first_time_setup`: asks user-level questions (agent selection)
-/// - Always: asks repo-level questions (approval gate)
+/// - Detects SCM provider and validates CLI setup
 pub fn run_wizard(first_time_setup: bool) -> Result<WizardResult> {
     // Print branded banner
     let brand = Style::new().bold().color256(BRAND_COLOR_256);
@@ -37,35 +35,13 @@ pub fn run_wizard(first_time_setup: bool) -> Result<WizardResult> {
         None
     };
 
-    // Repo-level: approval mode
-    let approval_items = vec![
-        "Always (recommended)",
-        "Only when there are patches to review",
-        "Never",
-    ];
-    let approval_selection = Select::new()
-        .with_prompt("Require human approval before pushing to upstream?")
-        .items(&approval_items)
-        .default(0)
-        .interact()?;
-    let approval_mode = match approval_selection {
-        0 => ApprovalMode::Always,
-        1 => ApprovalMode::IfPatches,
-        _ => ApprovalMode::Never,
-    };
-
-    println!();
-
     // Provider check: detect SCM provider and validate CLI setup
     let provider_check = run_provider_check();
     if let Some(ref check) = provider_check {
         print_provider_check(check);
     }
 
-    Ok(WizardResult {
-        agent_adapter,
-        approval_mode,
-    })
+    Ok(WizardResult { agent_adapter })
 }
 
 /// Ask the user which agent adapter to use.
