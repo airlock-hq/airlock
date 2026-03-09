@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.58](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.57...airlock-v0.1.58) (2026-03-09)
+
+
+### Bug Fixes
+
+* update init tests for risk assessment ([#42](https://github.com/airlock-hq/airlock/issues/42)) ([dc1a9ad](https://github.com/airlock-hq/airlock/commit/dc1a9ad3914cdba970eb693a69c4ebca02447038))
+
 ## [0.1.57](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.56...airlock-v0.1.57) (2026-03-08)
 
 
