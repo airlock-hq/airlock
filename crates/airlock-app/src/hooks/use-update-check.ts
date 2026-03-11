@@ -30,7 +30,7 @@ function compareSemver(a: string, b: string): number {
 
 function getCached(): UpdateCheckResult | null {
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const cached: CachedResult = JSON.parse(raw);
     if (Date.now() - cached.timestamp < CHECK_INTERVAL_MS) {
@@ -45,7 +45,7 @@ function getCached(): UpdateCheckResult | null {
 function setCache(result: UpdateCheckResult) {
   try {
     const cached: CachedResult = { timestamp: Date.now(), result };
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify(cached));
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cached));
   } catch {
     // ignore
   }
@@ -62,7 +62,7 @@ async function fetchUpdateResult(version: string): Promise<UpdateCheckResult | n
     };
   }
 
-  // Check sessionStorage cache first
+  // Check localStorage cache first
   const cached = getCached();
   if (cached) {
     return { ...cached, currentVersion: version };
@@ -74,7 +74,7 @@ async function fetchUpdateResult(version: string): Promise<UpdateCheckResult | n
     const data = await resp.json();
     const tagName: string = data.tag_name ?? '';
     const latestVersion = tagName.replace(/^v/, '');
-    const releaseUrl: string = data.html_url ?? null;
+    const releaseUrl: string | null = data.html_url ?? null;
 
     const updateAvailable = compareSemver(latestVersion, version) > 0;
     return { updateAvailable, latestVersion, currentVersion: version, releaseUrl };
