@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@airlock-hq/design-system/react';
 import { TelemetryBar } from './TelemetryBar';
+import { UpdateBadge } from './UpdateBadge';
 
 interface LayoutProps {
   children: ReactNode;
@@ -43,6 +44,7 @@ export function Layout({ children }: LayoutProps) {
                 <NavTab to="/settings" active={location.pathname === '/settings'}>
                   Settings
                 </NavTab>
+                <UpdateBadge />
               </nav>
             </div>
 
