@@ -100,10 +100,11 @@ export function useUpdateCheck(): UpdateCheckResult {
 
   useEffect(() => {
     if (!currentVersion) return;
+    const version = currentVersion;
     let cancelled = false;
 
     function check() {
-      fetchUpdateResult(currentVersion).then((r) => {
+      fetchUpdateResult(version).then((r) => {
         if (!cancelled && r) {
           setResult(r);
         }
