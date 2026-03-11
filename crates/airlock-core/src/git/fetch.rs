@@ -349,11 +349,16 @@ fn list_remote_branches(repo_path: &Path, remote_name: &str) -> Result<Vec<Strin
 ///    - Same SHA → skip
 ///    - Gate behind (fast-forward) → update
 ///    - Gate ahead → skip (already a superset)
-///    - Diverged → rebase local commits on upstream in a temporary worktree
+///    - Diverged + protected → rebase local commits on upstream in a temporary worktree
+///    - Diverged + unprotected → force-update to match remote
 ///
 /// The `sync_worktree_dir` is a directory where temporary worktrees will be
-/// created for rebase operations. If `None`, diverged branches will be left
-/// as-is with a warning.
+/// created for rebase operations. If `None`, diverged protected branches will
+/// be left as-is with a warning.
+///
+/// `protected_branches` lists branch names with active pipeline runs. Protected
+/// branches are rebased to preserve un-forwarded commits; unprotected branches
+/// are force-updated to match remote (like a normal `git fetch`).
 pub fn smart_sync_from_remote(
     repo_path: &Path,
     remote_name: &str,

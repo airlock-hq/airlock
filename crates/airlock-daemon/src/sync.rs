@@ -321,8 +321,9 @@ pub async fn sync_if_stale_with_threshold(
 
 /// Perform the actual sync operation using smart sync.
 ///
-/// Smart sync preserves un-forwarded local commits by rebasing them on top
-/// of upstream instead of force-overwriting branches.
+/// Smart sync preserves un-forwarded local commits on protected branches
+/// (those with active pipelines) by rebasing them on top of upstream.
+/// Unprotected diverged branches are force-updated to match remote.
 fn do_sync(
     gate_path: &std::path::Path,
     repo_id: &str,
