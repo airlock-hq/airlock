@@ -324,6 +324,14 @@ async fn execute_workflow_dag(
                 continue;
             }
 
+            // Defer if dependencies aren't done yet (e.g. AwaitingApproval).
+            // The job stays Pending and will be picked up by
+            // resume_dag_after_job_completion when the dependency finishes.
+            if should_defer_job(job_config, &job_statuses) {
+                debug!("Deferring job '{}' — dependency not yet complete", job_key);
+                continue;
+            }
+
             let (worktree_path, lease) =
                 match resolve_job_worktree(ctx, job_key, run, repo, job_id_map).await {
                     Ok(result) => result,
@@ -360,6 +368,11 @@ async fn execute_workflow_dag(
 
                 if should_skip_job(job_key, job_config, &job_statuses) {
                     skip_job(ctx, run, job_key, job_id_map, &mut job_statuses).await;
+                    continue;
+                }
+
+                if should_defer_job(job_config, &job_statuses) {
+                    debug!("Deferring job '{}' — dependency not yet complete", job_key);
                     continue;
                 }
 
@@ -531,13 +544,30 @@ pub(super) fn should_skip_job(
 ) -> bool {
     for dep in job_config.needs.iter() {
         match job_statuses.get(dep.as_str()) {
-            Some(JobStatus::Failed)
-            | Some(JobStatus::Skipped)
-            | Some(JobStatus::AwaitingApproval) => return true,
+            Some(JobStatus::Failed) | Some(JobStatus::Skipped) => return true,
             _ => {}
         }
     }
     false
+}
+
+/// Returns true if a job should be deferred (left as Pending) because one or
+/// more of its dependencies have not yet reached a final state.
+///
+/// This is used during initial wave-by-wave execution: when a dependency is
+/// paused (`AwaitingApproval`) or still running, the dependent job must wait
+/// rather than be skipped. It will be picked up later by
+/// `resume_dag_after_job_completion`.
+pub(super) fn should_defer_job(
+    job_config: &JobConfig,
+    job_statuses: &HashMap<String, JobStatus>,
+) -> bool {
+    job_config.needs.iter().any(|dep| {
+        job_statuses
+            .get(dep.as_str())
+            .map(|s| !s.is_final())
+            .unwrap_or(true)
+    })
 }
 
 /// Mark a job and its steps as skipped.
@@ -1647,7 +1677,7 @@ mod tests {
     }
 
     #[test]
-    fn test_should_skip_job_when_dep_awaiting_approval() {
+    fn test_should_not_skip_job_when_dep_awaiting_approval() {
         let job_config = JobConfig {
             name: None,
             steps: vec![],
@@ -1656,8 +1686,38 @@ mod tests {
         let mut statuses = HashMap::new();
         statuses.insert("gate".to_string(), JobStatus::AwaitingApproval);
         assert!(
-            should_skip_job("deploy", &job_config, &statuses),
-            "Jobs should be skipped when a dependency is awaiting approval"
+            !should_skip_job("deploy", &job_config, &statuses),
+            "Jobs should NOT be skipped when a dependency is awaiting approval"
+        );
+    }
+
+    #[test]
+    fn test_should_defer_job_when_dep_awaiting_approval() {
+        let job_config = JobConfig {
+            name: None,
+            steps: vec![],
+            needs: OneOrMany(vec!["gate".to_string()]),
+        };
+        let mut statuses = HashMap::new();
+        statuses.insert("gate".to_string(), JobStatus::AwaitingApproval);
+        assert!(
+            should_defer_job(&job_config, &statuses),
+            "Jobs should be deferred when a dependency is awaiting approval"
+        );
+    }
+
+    #[test]
+    fn test_should_not_defer_job_when_deps_final() {
+        let job_config = JobConfig {
+            name: None,
+            steps: vec![],
+            needs: OneOrMany(vec!["gate".to_string()]),
+        };
+        let mut statuses = HashMap::new();
+        statuses.insert("gate".to_string(), JobStatus::Passed);
+        assert!(
+            !should_defer_job(&job_config, &statuses),
+            "Jobs should not be deferred when all dependencies are final"
         );
     }
 
@@ -1817,6 +1877,317 @@ mod tests {
         assert!(
             !artifacts_dir.join(".head_sha").exists(),
             ".head_sha artifact should be consumed after reading"
+        );
+    }
+
+    /// Helper: create a real git repo with one commit, return (TempDir, gate_path, head_sha).
+    fn setup_test_gate_repo() -> (tempfile::TempDir, std::path::PathBuf, String) {
+        let tmp = tempfile::tempdir().unwrap();
+        let work_path = tmp.path().join("work");
+        std::fs::create_dir_all(&work_path).unwrap();
+
+        for args in [
+            vec!["init"],
+            vec!["config", "user.email", "test@test.com"],
+            vec!["config", "user.name", "Test"],
+        ] {
+            std::process::Command::new("git")
+                .args(&args)
+                .current_dir(&work_path)
+                .output()
+                .unwrap();
+        }
+        std::fs::write(work_path.join("file.txt"), "hello\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "initial"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+        let sha_output = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+        let head_sha = String::from_utf8_lossy(&sha_output.stdout)
+            .trim()
+            .to_string();
+
+        let gate_path = tmp.path().join("gate.git");
+        std::process::Command::new("git")
+            .args([
+                "clone",
+                "--bare",
+                work_path.to_str().unwrap(),
+                gate_path.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+
+        (tmp, gate_path, head_sha)
+    }
+
+    /// Integration test: when `execute_workflow_dag` runs a workflow where the
+    /// "review" job pauses for approval (`require_approval: always`), the
+    /// dependent "deploy" job must stay Pending — NOT be Skipped.
+    ///
+    /// This is the exact bug scenario: the old code treated AwaitingApproval
+    /// as a skip condition, permanently marking dependent jobs as Skipped so
+    /// they could never be resumed after approval.
+    #[tokio::test]
+    async fn test_execute_dag_defers_dependent_jobs_when_approval_paused() {
+        use crate::handlers::HandlerContext;
+        use airlock_core::{AirlockPaths, Database, JobResult, JobStatus as JS, Repo, Run};
+        use tokio::sync::watch;
+        use tokio_util::sync::CancellationToken;
+
+        let (tmp, gate_path, head_sha) = setup_test_gate_repo();
+
+        // Set up context
+        let root = tmp.path().join("airlock");
+        std::fs::create_dir_all(&root).unwrap();
+        let paths = AirlockPaths::with_root(root.clone());
+        let db = Database::open_in_memory().unwrap();
+        let (shutdown_tx, _) = watch::channel(false);
+
+        let repo_id = "test-repo";
+        let run_id = "test-run";
+
+        let repo = Repo {
+            id: repo_id.to_string(),
+            working_path: tmp.path().join("work"),
+            upstream_url: "file:///dev/null".to_string(),
+            gate_path: gate_path.clone(),
+            last_sync: None,
+            created_at: 1704067200,
+        };
+        db.insert_repo(&repo).unwrap();
+
+        let base_sha = "0000000000000000000000000000000000000000";
+        let run = Run {
+            id: run_id.to_string(),
+            repo_id: repo_id.to_string(),
+            ref_updates: vec![RefUpdate {
+                ref_name: "refs/heads/main".to_string(),
+                old_sha: base_sha.to_string(),
+                new_sha: head_sha.clone(),
+            }],
+            branch: "refs/heads/main".to_string(),
+            base_sha: base_sha.to_string(),
+            head_sha: head_sha.clone(),
+            current_step: None,
+            error: None,
+            superseded: false,
+            created_at: 1704067200,
+            updated_at: 1704067200,
+            workflow_file: "main.yml".to_string(),
+            workflow_name: None,
+        };
+        db.insert_run(&run).unwrap();
+
+        // Workflow: review (require_approval: always) -> deploy
+        let workflow: WorkflowConfig = serde_yaml::from_str(
+            r#"
+            name: Test
+            jobs:
+              review:
+                name: Review
+                steps:
+                  - name: check
+                    run: echo ok
+                    require-approval: true
+                    timeout: 10
+              deploy:
+                name: Deploy
+                needs: review
+                steps:
+                  - name: ship
+                    run: echo deployed
+                    timeout: 10
+            "#,
+        )
+        .unwrap();
+
+        let ctx = Arc::new(HandlerContext::new(paths, db, shutdown_tx));
+
+        // Create job + step records (same as pipeline runner does)
+        let waves = airlock_core::config::workflow::validate_job_dag(&workflow.jobs).unwrap();
+        let job_id_map = create_job_and_step_records(&ctx, &run, &workflow, &waves)
+            .await
+            .unwrap();
+
+        // ACT: execute the workflow DAG
+        let cancel = CancellationToken::new();
+        execute_workflow_dag(&ctx, &run, &repo, &workflow, &waves, &job_id_map, &cancel).await;
+
+        // ASSERT
+        let db = ctx.db.lock().await;
+        let jobs = db.get_job_results_for_run(run_id).unwrap();
+
+        let review_job = jobs.iter().find(|j| j.job_key == "review").unwrap();
+        let deploy_job = jobs.iter().find(|j| j.job_key == "deploy").unwrap();
+
+        assert_eq!(
+            review_job.status,
+            JS::AwaitingApproval,
+            "review job should be paused awaiting approval"
+        );
+        assert_eq!(
+            deploy_job.status,
+            JS::Pending,
+            "deploy job should remain Pending (not Skipped) when its dependency is AwaitingApproval"
+        );
+    }
+
+    /// Integration test: after a "review" job completes (Passed), calling
+    /// `resume_dag_after_job_completion` should execute the dependent "deploy"
+    /// job that was left Pending.
+    #[tokio::test]
+    async fn test_resume_dag_runs_pending_dependent_jobs() {
+        use crate::handlers::HandlerContext;
+        use airlock_core::{
+            AirlockPaths, Database, JobResult, JobStatus as JS, Repo, Run, StepResult, StepStatus,
+        };
+        use tokio::sync::watch;
+
+        let (tmp, gate_path, head_sha) = setup_test_gate_repo();
+
+        // Set up context
+        let root = tmp.path().join("airlock");
+        std::fs::create_dir_all(&root).unwrap();
+        let paths = AirlockPaths::with_root(root.clone());
+        let db = Database::open_in_memory().unwrap();
+        let (shutdown_tx, _) = watch::channel(false);
+
+        let repo_id = "test-repo";
+        let run_id = "test-run";
+
+        let repo = Repo {
+            id: repo_id.to_string(),
+            working_path: tmp.path().join("work"),
+            upstream_url: "file:///dev/null".to_string(),
+            gate_path: gate_path.clone(),
+            last_sync: None,
+            created_at: 1704067200,
+        };
+        db.insert_repo(&repo).unwrap();
+
+        let base_sha = "0000000000000000000000000000000000000000";
+        let run = Run {
+            id: run_id.to_string(),
+            repo_id: repo_id.to_string(),
+            ref_updates: vec![RefUpdate {
+                ref_name: "refs/heads/main".to_string(),
+                old_sha: base_sha.to_string(),
+                new_sha: head_sha.clone(),
+            }],
+            branch: "refs/heads/main".to_string(),
+            base_sha: base_sha.to_string(),
+            head_sha: head_sha.clone(),
+            current_step: None,
+            error: None,
+            superseded: false,
+            created_at: 1704067200,
+            updated_at: 1704067200,
+            workflow_file: "main.yml".to_string(),
+            workflow_name: None,
+        };
+        db.insert_run(&run).unwrap();
+
+        // Create job results: "review" already Passed, "deploy" still Pending
+        let review_job_id = "review-job-id";
+        let deploy_job_id = "deploy-job-id";
+
+        db.insert_job_result(&JobResult {
+            id: review_job_id.to_string(),
+            run_id: run_id.to_string(),
+            job_key: "review".to_string(),
+            name: Some("Review".to_string()),
+            status: JS::Passed,
+            job_order: 0,
+            started_at: Some(1704067200),
+            completed_at: Some(1704067200),
+            error: None,
+            worktree_path: None,
+        })
+        .unwrap();
+
+        db.insert_job_result(&JobResult {
+            id: deploy_job_id.to_string(),
+            run_id: run_id.to_string(),
+            job_key: "deploy".to_string(),
+            name: Some("Deploy".to_string()),
+            status: JS::Pending,
+            job_order: 1,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            worktree_path: None,
+        })
+        .unwrap();
+
+        // Create step result for deploy job (a simple echo)
+        db.insert_step_result(&StepResult {
+            id: "deploy-step-id".to_string(),
+            run_id: run_id.to_string(),
+            job_id: deploy_job_id.to_string(),
+            name: "echo-step".to_string(),
+            status: StepStatus::Pending,
+            step_order: 0,
+            exit_code: None,
+            duration_ms: None,
+            error: None,
+            started_at: None,
+            completed_at: None,
+        })
+        .unwrap();
+
+        // Create artifacts dir
+        let artifacts_dir = paths.run_artifacts(repo_id, run_id);
+        std::fs::create_dir_all(&artifacts_dir).unwrap();
+
+        let ctx = Arc::new(HandlerContext::new(paths, db, shutdown_tx));
+
+        // Build the workflow config with 2 jobs: review (no deps) -> deploy
+        let workflow: WorkflowConfig = serde_yaml::from_str(
+            r#"
+            name: Test
+            jobs:
+              review:
+                name: Review
+                steps: []
+              deploy:
+                name: Deploy
+                needs: review
+                steps:
+                  - name: echo-step
+                    run: echo done
+                    timeout: 10
+            "#,
+        )
+        .unwrap();
+
+        // ACT: resume DAG after the "review" job completed
+        resume_dag_after_job_completion(&ctx, &run, &repo, &workflow, "review", JS::Passed).await;
+
+        // ASSERT: "deploy" job should have been executed and passed
+        let db = ctx.db.lock().await;
+        let deploy_result = db
+            .get_job_results_for_run(run_id)
+            .unwrap()
+            .into_iter()
+            .find(|j| j.job_key == "deploy")
+            .unwrap();
+
+        assert_eq!(
+            deploy_result.status,
+            JS::Passed,
+            "deploy job should have been executed and passed after review completed, got: {:?}",
+            deploy_result.status
         );
     }
 }
