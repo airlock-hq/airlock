@@ -2,6 +2,7 @@
 
 use super::cmd::{run_git, run_git_network, run_git_unchecked};
 use crate::error::{AirlockError, Result};
+use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
 
@@ -281,6 +282,8 @@ pub enum BranchSyncStatus {
     RebasedWithConflictResolution,
     /// Rebase failed — branch left as-is.
     RebaseFailed { reason: String },
+    /// Branch was force-updated to match remote (diverged, no active pipeline).
+    ForceUpdated,
 }
 
 /// Report from a smart sync operation.
@@ -356,6 +359,7 @@ pub fn smart_sync_from_remote(
     remote_name: &str,
     sync_worktree_dir: Option<&Path>,
     conflict_resolver: ConflictResolver,
+    protected_branches: &HashSet<String>,
 ) -> Result<SyncReport> {
     tracing::debug!(
         "Smart syncing from '{}' in {}",
@@ -428,27 +432,37 @@ pub fn smart_sync_from_remote(
                         branch
                     );
                 } else {
-                    // Diverged — attempt rebase in temporary worktree
-                    let status = rebase_diverged_branch(
-                        repo_path,
-                        branch,
-                        &remote_ref,
-                        sync_worktree_dir,
-                        conflict_resolver,
-                    );
-                    if let BranchSyncStatus::RebaseFailed { reason } = &status {
-                        let warning = format!(
-                            "Branch '{}' has diverged from upstream and auto-rebase failed: {}.\n\
-                             To resolve manually:\n  \
-                             git fetch upstream\n  \
-                             git rebase upstream/{}\n  \
-                             # resolve conflicts\n  \
-                             git push origin {}",
-                            branch, reason, branch, branch
+                    // Diverged — check if branch has active pipeline
+                    if protected_branches.contains(branch) {
+                        // Active pipeline: rebase to preserve un-forwarded commits
+                        let status = rebase_diverged_branch(
+                            repo_path,
+                            branch,
+                            &remote_ref,
+                            sync_worktree_dir,
+                            conflict_resolver,
                         );
-                        report.warnings.push(warning);
+                        if let BranchSyncStatus::RebaseFailed { reason } = &status {
+                            let warning = format!(
+                                "Branch '{}' has diverged from upstream and auto-rebase failed: {}.\n\
+                                 To resolve manually:\n  \
+                                 git fetch upstream\n  \
+                                 git rebase upstream/{}\n  \
+                                 # resolve conflicts\n  \
+                                 git push origin {}",
+                                branch, reason, branch, branch
+                            );
+                            report.warnings.push(warning);
+                        }
+                        report.branches.push((branch.clone(), status));
+                    } else {
+                        // No active pipeline: force-update like normal git fetch
+                        super::refs::update_ref(repo_path, &local_ref, &remote_sha)?;
+                        report
+                            .branches
+                            .push((branch.clone(), BranchSyncStatus::ForceUpdated));
+                        tracing::debug!("Force-updated diverged branch '{}'", branch);
                     }
-                    report.branches.push((branch.clone(), status));
                 }
             }
         }

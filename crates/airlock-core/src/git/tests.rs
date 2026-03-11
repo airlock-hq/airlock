@@ -1,6 +1,7 @@
 use super::*;
 use crate::types::RefUpdate;
 use git2::Repository;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -1019,8 +1020,14 @@ fn test_smart_sync_creates_new_branch_from_remote() {
         .unwrap();
 
     // Run smart sync
-    let report =
-        smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Both branches should be Created
     assert_eq!(report.branches.len(), 2);
@@ -1068,11 +1075,24 @@ fn test_smart_sync_up_to_date() {
         .unwrap();
 
     // First sync to populate
-    smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Second sync — nothing changed
-    let report =
-        smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
     let status = &report.branches[0].1;
     assert_eq!(
         *status,
@@ -1105,14 +1125,27 @@ fn test_smart_sync_fast_forwards_gate_behind() {
         .unwrap();
 
     // Initial sync — gate gets commit A
-    smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Upstream advances to commit B
     let sha_b = commit_to_bare(&upstream, "main", "file2.txt", "more content");
 
     // Re-sync — gate should fast-forward
-    let report =
-        smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
     let status = &report.branches[0].1;
     assert_eq!(
         *status,
@@ -1143,14 +1176,27 @@ fn test_smart_sync_gate_ahead_preserves_unfollowed_commits() {
         .unwrap();
 
     // Initial sync
-    smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Simulate user push: add a commit directly to the gate (un-forwarded)
     let user_sha = commit_to_bare(&gate, "main", "user_change.txt", "user's work");
 
     // Re-sync — gate is ahead, should skip
-    let report =
-        smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
     let status = &report.branches[0].1;
     assert_eq!(
         *status,
@@ -1187,7 +1233,14 @@ fn test_smart_sync_rebases_diverged_branch_cleanly() {
         .unwrap();
 
     // Initial sync — both at A
-    smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Gate gets user commit B (different file than upstream will change)
     let _sha_b = commit_to_bare(&gate, "main", "user_file.txt", "user work");
@@ -1198,12 +1251,14 @@ fn test_smart_sync_rebases_diverged_branch_cleanly() {
     // Provide a sync worktree dir for the rebase
     let sync_dir = dir.path().join("sync_worktrees");
 
-    // Re-sync — should rebase user's commit on top of upstream
+    // Re-sync — should rebase user's commit on top of upstream (main is protected)
+    let protected = HashSet::from(["main".to_string()]);
     let report = smart_sync_from_remote(
         &gate_path,
         "origin",
         Some(&sync_dir),
         ConflictResolver::Abort,
+        &protected,
     )
     .unwrap();
     let status = &report.branches[0].1;
@@ -1255,7 +1310,14 @@ fn test_smart_sync_diverged_conflict_reports_failure() {
         .unwrap();
 
     // Initial sync
-    smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Gate modifies shared.txt one way
     let gate_sha_before = commit_to_bare(&gate, "main", "shared.txt", "gate's version of the file");
@@ -1270,12 +1332,14 @@ fn test_smart_sync_diverged_conflict_reports_failure() {
 
     let sync_dir = dir.path().join("sync_worktrees");
 
-    // Re-sync — should fail due to conflicts
+    // Re-sync — should fail due to conflicts (main is protected, so rebase is attempted)
+    let protected = HashSet::from(["main".to_string()]);
     let report = smart_sync_from_remote(
         &gate_path,
         "origin",
         Some(&sync_dir),
         ConflictResolver::Abort,
+        &protected,
     )
     .unwrap();
     let (_, status) = &report.branches[0];
@@ -1314,15 +1378,29 @@ fn test_smart_sync_diverged_without_worktree_dir() {
     gate.remote("origin", upstream_path.to_str().unwrap())
         .unwrap();
 
-    smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Create divergence
     commit_to_bare(&gate, "main", "gate.txt", "gate");
     commit_to_bare(&upstream, "main", "upstream.txt", "upstream");
 
-    // Sync without worktree dir — should fail gracefully
-    let report =
-        smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    // Sync without worktree dir — should fail gracefully (main is protected, so rebase is attempted)
+    let protected = HashSet::from(["main".to_string()]);
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &protected,
+    )
+    .unwrap();
     let (_, status) = &report.branches[0];
     assert!(
         matches!(status, BranchSyncStatus::RebaseFailed { .. }),
@@ -1351,7 +1429,14 @@ fn test_smart_sync_multiple_branches_mixed_states() {
         .unwrap();
 
     // Initial sync — gate gets main and dev
-    smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Upstream: advance main, create feature branch
     commit_to_bare(&upstream, "main", "file2.txt", "more");
@@ -1361,8 +1446,14 @@ fn test_smart_sync_multiple_branches_mixed_states() {
     commit_to_bare(&gate, "dev", "user_dev.txt", "user dev work");
 
     // Re-sync
-    let report =
-        smart_sync_from_remote(&gate_path, "origin", None, ConflictResolver::Abort).unwrap();
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
 
     // Collect statuses by branch name
     let statuses: std::collections::HashMap<&str, &BranchSyncStatus> = report
@@ -1582,4 +1673,201 @@ fn test_get_git_config_returns_none_for_unset_key() {
     Repository::init(dir.path()).unwrap();
 
     assert_eq!(get_git_config(dir.path(), "airlock.nonexistent"), None);
+}
+
+// ================================================================
+// Force-update diverged branches tests
+// ================================================================
+
+/// E2E: smart_sync force-updates an unprotected diverged branch.
+///
+/// Scenario:
+///   - Gate and upstream diverge on main
+///   - No active pipelines (empty protected set)
+///   - Result: ForceUpdated, gate main matches upstream
+#[test]
+fn test_smart_sync_force_updates_unprotected_diverged_branch() {
+    let dir = TempDir::new().unwrap();
+
+    let upstream_path = dir.path().join("upstream.git");
+    let upstream = Repository::init_bare(&upstream_path).unwrap();
+    commit_to_bare(&upstream, "main", "README.md", "initial");
+
+    let gate_path = dir.path().join("gate.git");
+    let gate = Repository::init_bare(&gate_path).unwrap();
+    gate.remote("origin", upstream_path.to_str().unwrap())
+        .unwrap();
+
+    // Initial sync
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
+
+    // Create divergence: gate and upstream both advance differently
+    commit_to_bare(&gate, "main", "gate_file.txt", "gate work");
+    let upstream_sha = commit_to_bare(&upstream, "main", "upstream_file.txt", "upstream work");
+
+    // Sync with empty protected set — should force-update
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
+
+    let (branch, status) = &report.branches[0];
+    assert_eq!(branch, "main");
+    assert_eq!(
+        *status,
+        BranchSyncStatus::ForceUpdated,
+        "Unprotected diverged branch should be force-updated"
+    );
+
+    // Gate main should now match upstream
+    let gate_sha = resolve_ref(&gate_path, "refs/heads/main").unwrap().unwrap();
+    assert_eq!(
+        gate_sha, upstream_sha,
+        "Gate main should match upstream after force-update"
+    );
+
+    assert!(report.warnings.is_empty(), "No warnings expected");
+}
+
+/// E2E: smart_sync handles squash-merge scenario.
+///
+/// Scenario:
+///   - Gate main has original commits
+///   - Upstream main has squash-merged versions (different SHAs, same content)
+///   - No active pipelines
+///   - Result: ForceUpdated, gate matches upstream
+#[test]
+fn test_smart_sync_squash_merge_scenario() {
+    let dir = TempDir::new().unwrap();
+
+    let upstream_path = dir.path().join("upstream.git");
+    let upstream = Repository::init_bare(&upstream_path).unwrap();
+    commit_to_bare(&upstream, "main", "README.md", "initial");
+
+    let gate_path = dir.path().join("gate.git");
+    let gate = Repository::init_bare(&gate_path).unwrap();
+    gate.remote("origin", upstream_path.to_str().unwrap())
+        .unwrap();
+
+    // Initial sync
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
+
+    // Simulate squash-merge: gate has feature commits, upstream has squash commit
+    // Both modify the same file differently (different SHAs)
+    commit_to_bare(&gate, "main", "feature.txt", "original feature commit");
+    let upstream_sha = commit_to_bare(&upstream, "main", "feature.txt", "squash-merged feature");
+
+    // Sync with no protected branches
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
+
+    let (_, status) = &report.branches[0];
+    assert_eq!(
+        *status,
+        BranchSyncStatus::ForceUpdated,
+        "Squash-merged branch should be force-updated"
+    );
+
+    let gate_sha = resolve_ref(&gate_path, "refs/heads/main").unwrap().unwrap();
+    assert_eq!(
+        gate_sha, upstream_sha,
+        "Gate should match upstream after squash-merge force-update"
+    );
+}
+
+/// E2E: smart_sync with mixed protected and unprotected diverged branches.
+///
+/// Scenario:
+///   - "main" and "feature" both diverge from upstream
+///   - Only "feature" is protected (has active pipeline)
+///   - Result: main → ForceUpdated, feature → Rebased
+#[test]
+fn test_smart_sync_mixed_protected_and_unprotected() {
+    let dir = TempDir::new().unwrap();
+
+    let upstream_path = dir.path().join("upstream.git");
+    let upstream = Repository::init_bare(&upstream_path).unwrap();
+    commit_to_bare(&upstream, "main", "README.md", "initial");
+    commit_to_bare(&upstream, "feature", "feature.txt", "feature initial");
+
+    let gate_path = dir.path().join("gate.git");
+    let gate = Repository::init_bare(&gate_path).unwrap();
+    gate.remote("origin", upstream_path.to_str().unwrap())
+        .unwrap();
+
+    // Initial sync
+    smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        None,
+        ConflictResolver::Abort,
+        &HashSet::new(),
+    )
+    .unwrap();
+
+    // Diverge both branches (different files to avoid conflicts on rebase)
+    commit_to_bare(&gate, "main", "gate_main.txt", "gate main work");
+    commit_to_bare(&upstream, "main", "upstream_main.txt", "upstream main work");
+
+    commit_to_bare(&gate, "feature", "gate_feature.txt", "gate feature work");
+    commit_to_bare(
+        &upstream,
+        "feature",
+        "upstream_feature.txt",
+        "upstream feature work",
+    );
+
+    // Only protect "feature"
+    let protected = HashSet::from(["feature".to_string()]);
+    let sync_dir = dir.path().join("sync_worktrees");
+
+    let report = smart_sync_from_remote(
+        &gate_path,
+        "origin",
+        Some(&sync_dir),
+        ConflictResolver::Abort,
+        &protected,
+    )
+    .unwrap();
+
+    let statuses: std::collections::HashMap<&str, &BranchSyncStatus> = report
+        .branches
+        .iter()
+        .map(|(b, s)| (b.as_str(), s))
+        .collect();
+
+    assert_eq!(
+        statuses.get("main"),
+        Some(&&BranchSyncStatus::ForceUpdated),
+        "Unprotected main should be force-updated"
+    );
+    assert_eq!(
+        statuses.get("feature"),
+        Some(&&BranchSyncStatus::Rebased),
+        "Protected feature should be rebased"
+    );
 }

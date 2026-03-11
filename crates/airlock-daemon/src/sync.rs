@@ -6,7 +6,8 @@
 //! - File-based locking to prevent concurrent syncs
 //! - Upstream fetch with proper error handling
 
-use airlock_core::{git, AirlockPaths, Repo};
+use airlock_core::{git, AirlockPaths, Database, Repo};
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -212,6 +213,30 @@ impl Drop for SyncLock {
     }
 }
 
+/// Get branch names that have active pipeline runs (un-forwarded commits).
+/// Returns empty set on DB error (force-update is safe default).
+pub fn get_protected_branches(db: &Database, repo_id: &str) -> HashSet<String> {
+    match db.list_active_runs(repo_id) {
+        Ok(runs) => runs
+            .into_iter()
+            .map(|r| {
+                r.branch
+                    .strip_prefix("refs/heads/")
+                    .unwrap_or(&r.branch)
+                    .to_string()
+            })
+            .filter(|b| !b.is_empty())
+            .collect(),
+        Err(e) => {
+            warn!(
+                "Failed to query active runs: {}, defaulting to no protection",
+                e
+            );
+            HashSet::new()
+        }
+    }
+}
+
 /// Perform a sync operation for a repo if it's stale.
 ///
 /// This is the main entry point for sync-on-fetch. It:
@@ -221,8 +246,12 @@ impl Drop for SyncLock {
 ///
 /// Note: This function does NOT update the database - that must be done
 /// by the caller after a successful sync.
-pub async fn sync_if_stale(paths: &AirlockPaths, repo: &Repo) -> SyncResult {
-    sync_if_stale_with_threshold(paths, repo, STALE_THRESHOLD_SECS).await
+pub async fn sync_if_stale(
+    paths: &AirlockPaths,
+    repo: &Repo,
+    protected_branches: &HashSet<String>,
+) -> SyncResult {
+    sync_if_stale_with_threshold(paths, repo, STALE_THRESHOLD_SECS, protected_branches).await
 }
 
 /// Perform a sync operation for a repo if it's stale, with a custom threshold.
@@ -233,6 +262,7 @@ pub async fn sync_if_stale_with_threshold(
     paths: &AirlockPaths,
     repo: &Repo,
     threshold_secs: i64,
+    protected_branches: &HashSet<String>,
 ) -> SyncResult {
     // Check if stale
     if !is_stale_with_threshold(repo, threshold_secs) {
@@ -269,7 +299,7 @@ pub async fn sync_if_stale_with_threshold(
     };
 
     // Perform the sync
-    let result = do_sync(&repo.gate_path, &repo.id, paths);
+    let result = do_sync(&repo.gate_path, &repo.id, paths, protected_branches);
 
     // Lock is automatically released when dropped
     drop(lock);
@@ -281,7 +311,12 @@ pub async fn sync_if_stale_with_threshold(
 ///
 /// Smart sync preserves un-forwarded local commits by rebasing them on top
 /// of upstream instead of force-overwriting branches.
-fn do_sync(gate_path: &std::path::Path, repo_id: &str, paths: &AirlockPaths) -> SyncResult {
+fn do_sync(
+    gate_path: &std::path::Path,
+    repo_id: &str,
+    paths: &AirlockPaths,
+    protected_branches: &HashSet<String>,
+) -> SyncResult {
     let sync_worktree_dir = paths.sync_worktree_dir(repo_id);
     // Use smart sync to preserve un-forwarded commits in the gate
     match git::smart_sync_from_remote(
@@ -289,6 +324,7 @@ fn do_sync(gate_path: &std::path::Path, repo_id: &str, paths: &AirlockPaths) -> 
         "origin",
         Some(&sync_worktree_dir),
         git::ConflictResolver::Agent,
+        protected_branches,
     ) {
         Ok(report) => {
             if report.warnings.is_empty() {
