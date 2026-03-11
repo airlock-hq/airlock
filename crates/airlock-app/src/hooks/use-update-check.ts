@@ -77,7 +77,9 @@ async function fetchUpdateResult(version: string): Promise<UpdateCheckResult | n
     const releaseUrl: string | null = data.html_url ?? null;
 
     const updateAvailable = compareSemver(latestVersion, version) > 0;
-    return { updateAvailable, latestVersion, currentVersion: version, releaseUrl };
+    const result = { updateAvailable, latestVersion, currentVersion: version, releaseUrl };
+    setCache(result);
+    return result;
   } catch {
     return null;
   }
@@ -102,7 +104,6 @@ export function useUpdateCheck(): UpdateCheckResult {
     function check() {
       fetchUpdateResult(currentVersion).then((r) => {
         if (!cancelled && r) {
-          setCache(r);
           setResult(r);
         }
       });

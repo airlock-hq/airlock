@@ -24,10 +24,13 @@ export function UpdateBadge() {
   const command = 'brew update && brew upgrade airlock';
 
   function handleCopy() {
-    navigator.clipboard.writeText(command).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(command).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => {}
+    );
   }
 
   return (
