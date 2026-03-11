@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.63](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.62...airlock-v0.1.63) (2026-03-11)
+
+
+### Features
+
+* update check, smart sync, job resume ([#53](https://github.com/airlock-hq/airlock/issues/53)) ([98dbf18](https://github.com/airlock-hq/airlock/commit/98dbf18da781403b467e41d5b343e9b296f8dfc8))
+
 ## [0.1.62](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.61...airlock-v0.1.62) (2026-03-09)
 
 
