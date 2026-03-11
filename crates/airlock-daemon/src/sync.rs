@@ -214,27 +214,39 @@ impl Drop for SyncLock {
 }
 
 /// Get branch names that have active pipeline runs (un-forwarded commits).
-/// Returns empty set on DB error (force-update is safe default).
-pub fn get_protected_branches(db: &Database, repo_id: &str) -> HashSet<String> {
+/// Returns `None` on DB error — callers should treat all branches as protected
+/// to avoid silently dropping un-forwarded commits.
+pub fn get_protected_branches(db: &Database, repo_id: &str) -> Option<HashSet<String>> {
     match db.list_active_runs(repo_id) {
-        Ok(runs) => runs
-            .into_iter()
-            .map(|r| {
-                r.branch
-                    .strip_prefix("refs/heads/")
-                    .unwrap_or(&r.branch)
-                    .to_string()
-            })
-            .filter(|b| !b.is_empty())
-            .collect(),
+        Ok(runs) => Some(
+            runs.into_iter()
+                .map(|r| {
+                    r.branch
+                        .strip_prefix("refs/heads/")
+                        .unwrap_or(&r.branch)
+                        .to_string()
+                })
+                .filter(|b| !b.is_empty())
+                .collect(),
+        ),
         Err(e) => {
             warn!(
-                "Failed to query active runs: {}, defaulting to no protection",
+                "Failed to query active runs: {}, treating all branches as protected",
                 e
             );
-            HashSet::new()
+            None
         }
     }
+}
+
+/// List all local branches in a gate repo as a `HashSet`.
+/// Used as a fallback when the DB is unreachable — treating every branch as
+/// protected ensures we rebase (preserving commits) instead of force-updating.
+pub fn all_local_branches(gate_path: &std::path::Path) -> HashSet<String> {
+    git::list_local_branches(gate_path)
+        .unwrap_or_default()
+        .into_iter()
+        .collect()
 }
 
 /// Perform a sync operation for a repo if it's stale.
