@@ -65,7 +65,8 @@ async function fetchUpdateResult(version: string): Promise<UpdateCheckResult | n
   // Check localStorage cache first
   const cached = getCached();
   if (cached) {
-    return { ...cached, currentVersion: version };
+    const updateAvailable = cached.latestVersion != null && compareSemver(cached.latestVersion, version) > 0;
+    return { ...cached, currentVersion: version, updateAvailable };
   }
 
   try {
