@@ -1941,7 +1941,7 @@ mod tests {
     #[tokio::test]
     async fn test_execute_dag_defers_dependent_jobs_when_approval_paused() {
         use crate::handlers::HandlerContext;
-        use airlock_core::{AirlockPaths, Database, JobResult, JobStatus as JS, Repo, Run};
+        use airlock_core::{AirlockPaths, Database, JobStatus as JS, Repo, Run};
         use tokio::sync::watch;
         use tokio_util::sync::CancellationToken;
 
