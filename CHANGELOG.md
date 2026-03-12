@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.65](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.64...airlock-v0.1.65) (2026-03-12)
+
+
+### Features
+
+* auto-navigate to new runs ([#58](https://github.com/airlock-hq/airlock/issues/58)) ([5586783](https://github.com/airlock-hq/airlock/commit/55867830fbd5631ba023e95aab97a055d3ae0c2a))
+* risk assessment in PR description ([#60](https://github.com/airlock-hq/airlock/issues/60)) ([8665da4](https://github.com/airlock-hq/airlock/commit/8665da4bed7c389500473d4831b1a6ece3563e94))
+
 ## [0.1.64](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.63...airlock-v0.1.64) (2026-03-12)
 
 
