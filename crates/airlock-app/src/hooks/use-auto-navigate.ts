@@ -14,8 +14,8 @@ export function useAutoNavigateToNewRun() {
   const { detail } = useRunDetail(currentRunId);
 
   useAirlockEvent<RunCreatedEvent>(AIRLOCK_EVENTS.RUN_CREATED, (event) => {
-    // Don't navigate away from an active run
-    if (detail?.run.status && ACTIVE_STATUSES.has(detail.run.status)) {
+    // Don't navigate away from an active run (or one still loading)
+    if (currentRunId && (!detail || ACTIVE_STATUSES.has(detail.run.status))) {
       return;
     }
 
