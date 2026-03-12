@@ -66,7 +66,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
             ));
         }
 
-        let prompt = build_prompt(request);
+        let prompt = request.full_prompt();
         let args = build_cli_args(request);
 
         debug!(
@@ -115,19 +115,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
     }
 }
 
-/// Build the full prompt, combining context if present.
-fn build_prompt(request: &AgentRequest) -> String {
-    match &request.context {
-        Some(ctx) if !ctx.is_empty() => {
-            format!(
-                "Context:\n```\n{}\n```\n\nTask: {}",
-                ctx.trim(),
-                request.prompt
-            )
-        }
-        _ => request.prompt.clone(),
-    }
-}
+// build_prompt is now AgentRequest::full_prompt() in types.rs
 
 /// Build CLI arguments for the `claude` command.
 fn build_cli_args(request: &AgentRequest) -> Vec<String> {
@@ -548,41 +536,7 @@ mod tests {
         assert!(result == true || result == false);
     }
 
-    // -----------------------------------------------------------------------
-    // build_prompt tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_build_prompt_no_context() {
-        let request = AgentRequest {
-            prompt: "Hello".into(),
-            ..Default::default()
-        };
-        assert_eq!(build_prompt(&request), "Hello");
-    }
-
-    #[test]
-    fn test_build_prompt_empty_context() {
-        let request = AgentRequest {
-            prompt: "Hello".into(),
-            context: Some("".into()),
-            ..Default::default()
-        };
-        assert_eq!(build_prompt(&request), "Hello");
-    }
-
-    #[test]
-    fn test_build_prompt_with_context() {
-        let request = AgentRequest {
-            prompt: "Summarize".into(),
-            context: Some("some diff content".into()),
-            ..Default::default()
-        };
-        let prompt = build_prompt(&request);
-        assert!(prompt.contains("Context:"));
-        assert!(prompt.contains("some diff content"));
-        assert!(prompt.contains("Task: Summarize"));
-    }
+    // build_prompt tests moved to types.rs (AgentRequest::full_prompt)
 
     // -----------------------------------------------------------------------
     // build_cli_args tests

@@ -1,6 +1,6 @@
 import { StagesSidebar } from '@/components/StagesSidebar';
 import type { StepSelection } from '@/components/StagesSidebar';
-import { StageLogViewer } from '@/components/StageLogViewer';
+import { StageLogViewer } from '@/components/stage-log-viewer';
 import type { StepResultInfo, JobResultInfo, ArtifactInfo } from '@/hooks/use-daemon';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@airlock-hq/design-system/react';
 import { useCallback, useMemo } from 'react';

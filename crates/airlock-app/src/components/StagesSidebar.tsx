@@ -4,7 +4,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getStatusConfig } from '@/lib/status-utils';
 import { useState } from 'react';
-import { formatStageName, formatDuration } from '@/components/StageLogViewer/utils';
+import { formatStageName, formatDuration } from '@/components/stage-log-viewer/utils';
 
 /** Identifier for a selected step: job key + step name */
 export interface StepSelection {

@@ -82,6 +82,6 @@ pub use worktree::{
     reset_persistent_worktree,
 };
 
-// Legacy intent-centric pipeline (DEPRECATED - will be removed)
-#[allow(deprecated)]
-pub use worktree::{apply_patch, create_intent_branch, create_intent_worktree, hunks_to_patch};
+// Legacy intent-centric functions (create_intent_worktree, create_intent_branch,
+// hunks_to_patch, apply_patch) removed from public API. See worktree.rs for
+// deprecation notes (steps 10.13-10.16).

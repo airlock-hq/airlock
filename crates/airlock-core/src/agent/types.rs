@@ -37,6 +37,25 @@ pub struct AgentRequest {
     pub max_turns: Option<u32>,
 }
 
+impl AgentRequest {
+    /// Build the full prompt, combining context if present.
+    ///
+    /// If `context` is set and non-empty, wraps it in a code block
+    /// and prefixes the prompt with "Task:".
+    pub fn full_prompt(&self) -> String {
+        match &self.context {
+            Some(ctx) if !ctx.is_empty() => {
+                format!(
+                    "Context:\n```\n{}\n```\n\nTask: {}",
+                    ctx.trim(),
+                    self.prompt
+                )
+            }
+            _ => self.prompt.clone(),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Result (assembled from a completed stream)
 // ---------------------------------------------------------------------------
@@ -165,6 +184,44 @@ pub enum ContentBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -----------------------------------------------------------------------
+    // AgentRequest::full_prompt tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_full_prompt_no_context() {
+        let request = AgentRequest {
+            prompt: "Hello".into(),
+            ..Default::default()
+        };
+        assert_eq!(request.full_prompt(), "Hello");
+    }
+
+    #[test]
+    fn test_full_prompt_empty_context() {
+        let request = AgentRequest {
+            prompt: "Hello".into(),
+            context: Some("".into()),
+            ..Default::default()
+        };
+        assert_eq!(request.full_prompt(), "Hello");
+    }
+
+    #[test]
+    fn test_full_prompt_with_context() {
+        let request = AgentRequest {
+            prompt: "Summarize".into(),
+            context: Some("some diff content".into()),
+            ..Default::default()
+        };
+        let prompt = request.full_prompt();
+        assert!(prompt.contains("Context:"));
+        assert!(prompt.contains("some diff content"));
+        assert!(prompt.contains("Task: Summarize"));
+    }
+
+    // -----------------------------------------------------------------------
 
     #[test]
     fn test_agent_event_roundtrip_all_variants() {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FileCode, FileText, MessageSquare, ChevronDown, ChevronUp, Loader2, CheckCircle2, Check } from 'lucide-react';
 import { CritiqueComment, ExpandableCard } from '@airlock-hq/design-system/react';
 import { cn } from '@/lib/utils';
-import { useArtifactLoader } from '@/components/StageLogViewer/hooks';
+import { useArtifactLoader } from '@/components/stage-log-viewer/hooks';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MermaidDiagram } from '@/components/MermaidDiagram';

@@ -2,7 +2,7 @@ import { StatusDot } from '@airlock-hq/design-system/react';
 import type { StepResultInfo, JobResultInfo } from '@/hooks/use-daemon';
 import { cn } from '@/lib/utils';
 import { getStatusConfig } from '@/lib/status-utils';
-import { formatStageName, formatDuration } from '@/components/StageLogViewer/utils';
+import { formatStageName, formatDuration } from '@/components/stage-log-viewer/utils';
 
 interface PipelineChartProps {
   jobs: JobResultInfo[];

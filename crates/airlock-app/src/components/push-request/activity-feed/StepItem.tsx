@@ -1,7 +1,7 @@
 import { StatusDot, Badge } from '@airlock-hq/design-system/react';
 import { Loader2 } from 'lucide-react';
 import { getStatusConfig } from '@/lib/status-utils';
-import { formatStageName, formatDuration } from '@/components/StageLogViewer/utils';
+import { formatStageName, formatDuration } from '@/components/stage-log-viewer/utils';
 import type { FeedEvent } from './types';
 
 type StepEvent = Extract<FeedEvent, { type: 'step-running' | 'step-completed' | 'step-awaiting' }>;

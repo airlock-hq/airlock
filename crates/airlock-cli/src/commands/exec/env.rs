@@ -9,7 +9,6 @@ use std::path::PathBuf;
 /// These are set by the pipeline executor before running stage commands.
 /// See `airlock-daemon/src/pipeline/executor.rs` for the source.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ExecEnvironment {
     /// Unique run identifier (UUID).
     pub run_id: String,

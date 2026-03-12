@@ -98,25 +98,12 @@ fn build_args(request: &AgentRequest) -> Result<Vec<String>> {
     }
 
     // Build the prompt, combining context if present
-    let prompt = build_prompt(request);
-    args.push(prompt);
+    args.push(request.full_prompt());
 
     Ok(args)
 }
 
-/// Build the full prompt, combining context if present.
-fn build_prompt(request: &AgentRequest) -> String {
-    match &request.context {
-        Some(ctx) if !ctx.is_empty() => {
-            format!(
-                "Context:\n```\n{}\n```\n\nTask: {}",
-                ctx.trim(),
-                request.prompt
-            )
-        }
-        _ => request.prompt.clone(),
-    }
-}
+// build_prompt is now AgentRequest::full_prompt() in types.rs
 
 /// Write a JSON schema to a temporary file and return the path.
 ///
@@ -539,41 +526,7 @@ mod tests {
         assert!(result == true || result == false);
     }
 
-    // -----------------------------------------------------------------------
-    // build_prompt tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_build_prompt_no_context() {
-        let request = AgentRequest {
-            prompt: "Hello".into(),
-            ..Default::default()
-        };
-        assert_eq!(build_prompt(&request), "Hello");
-    }
-
-    #[test]
-    fn test_build_prompt_empty_context() {
-        let request = AgentRequest {
-            prompt: "Hello".into(),
-            context: Some("".into()),
-            ..Default::default()
-        };
-        assert_eq!(build_prompt(&request), "Hello");
-    }
-
-    #[test]
-    fn test_build_prompt_with_context() {
-        let request = AgentRequest {
-            prompt: "Summarize".into(),
-            context: Some("some diff content".into()),
-            ..Default::default()
-        };
-        let prompt = build_prompt(&request);
-        assert!(prompt.contains("Context:"));
-        assert!(prompt.contains("some diff content"));
-        assert!(prompt.contains("Task: Summarize"));
-    }
+    // build_prompt tests moved to types.rs (AgentRequest::full_prompt)
 
     // -----------------------------------------------------------------------
     // build_args tests

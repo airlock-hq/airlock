@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { getStatusConfig } from '@/lib/status-utils';
-import { formatStageName } from '@/components/StageLogViewer/utils';
+import { formatStageName } from '@/components/stage-log-viewer/utils';
 import type { StepResultInfo } from '@/hooks/use-daemon';
 
 interface StepProgressBarProps {
