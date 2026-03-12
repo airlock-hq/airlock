@@ -4,8 +4,11 @@ import { Runs } from '@/pages/Runs';
 import { RepoList } from '@/pages/RepoList';
 import { RunDetail } from '@/pages/RunDetail';
 import { Settings } from '@/pages/Settings';
+import { useAutoNavigateToNewRun } from '@/hooks/use-auto-navigate';
 
 function App() {
+  useAutoNavigateToNewRun();
+
   return (
     <Layout>
       <Routes>
