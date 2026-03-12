@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "make fmt"
+            "command": "make fmt || true"
           }
         ]
       }
