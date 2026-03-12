@@ -592,80 +592,86 @@ export function RunDetail() {
       </div>
 
       {/* Bottom action bar */}
-      {detail?.run.status === 'awaiting_approval' && (
-        <div className="border-border-subtle bg-background flex items-center justify-between rounded-lg border px-4 py-3">
-          <button
-            className="text-small text-foreground-muted hover:text-foreground cursor-pointer"
-            onClick={() => {
-              if (selectedComments.size === allComments.length) {
-                setSelectedComments(new Set());
-              } else {
-                setSelectedComments(new Set(allComments.map(getCommentKey)));
-              }
-            }}
+      <div className="border-border-subtle bg-background flex items-center justify-between rounded-lg border px-4 py-3">
+        <button
+          className="text-small text-foreground-muted hover:text-foreground cursor-pointer"
+          onClick={() => {
+            if (selectedComments.size === allComments.length) {
+              setSelectedComments(new Set());
+            } else {
+              setSelectedComments(new Set(allComments.map(getCommentKey)));
+            }
+          }}
+        >
+          {selectedComments.size}/{allComments.length} {allComments.length === 1 ? 'comment' : 'comments'}
+          {detail?.run.status === 'awaiting_approval' && (
+            <>
+              , {selectedPendingPatchCount}/{pendingPatchCount} {pendingPatchCount === 1 ? 'patch' : 'patches'} selected
+            </>
+          )}
+        </button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="signal-outline"
+            size="sm"
+            disabled={selectedComments.size === 0}
+            onClick={handleCopyComments}
           >
-            {selectedComments.size}/{allComments.length} {allComments.length === 1 ? 'comment' : 'comments'},{' '}
-            {selectedPendingPatchCount}/{pendingPatchCount} {pendingPatchCount === 1 ? 'patch' : 'patches'} selected
-          </button>
+            {commentsCopied ? (
+              <>
+                <Check className="text-success mr-1.5 h-3.5 w-3.5" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="mr-1.5 h-3.5 w-3.5" />
+                Copy {selectedComments.size} {selectedComments.size === 1 ? 'comment' : 'comments'}
+              </>
+            )}
+          </Button>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="signal-outline"
-              size="sm"
-              disabled={selectedComments.size === 0}
-              onClick={handleCopyComments}
-            >
-              {commentsCopied ? (
-                <>
-                  <Check className="text-success mr-1.5 h-3.5 w-3.5" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-1.5 h-3.5 w-3.5" />
-                  Copy {selectedComments.size} {selectedComments.size === 1 ? 'comment' : 'comments'}
-                </>
+          {detail?.run.status === 'awaiting_approval' && (
+            <>
+              {selectedPendingPatchCount > 0 && (
+                <Button
+                  variant="signal-outline"
+                  size="sm"
+                  disabled={applyingAndApproving}
+                  onClick={handleApplyAndApprove}
+                >
+                  {applyingAndApproving ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Layers className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Apply {selectedPendingPatchCount} {selectedPendingPatchCount === 1 ? 'patch' : 'patches'} & approve
+                </Button>
               )}
-            </Button>
 
-            {selectedPendingPatchCount > 0 && (
               <Button
-                variant="signal-outline"
+                variant="signal"
                 size="sm"
-                disabled={applyingAndApproving}
-                onClick={handleApplyAndApprove}
+                disabled={approvingStep !== null || applyingAndApproving}
+                onClick={() => {
+                  const awaitingStep = detail?.step_results.find((s) => s.status === 'awaiting_approval');
+                  if (awaitingStep) {
+                    const jobKey = awaitingStep.job_key || 'default';
+                    handleApproveStep(jobKey, awaitingStep.step);
+                  }
+                }}
               >
-                {applyingAndApproving ? (
+                {approvingStep !== null ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Layers className="mr-1.5 h-3.5 w-3.5" />
+                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                 )}
-                Apply {selectedPendingPatchCount} {selectedPendingPatchCount === 1 ? 'patch' : 'patches'} & approve
+                Approve
               </Button>
-            )}
-
-            <Button
-              variant="signal"
-              size="sm"
-              disabled={approvingStep !== null || applyingAndApproving}
-              onClick={() => {
-                const awaitingStep = detail?.step_results.find((s) => s.status === 'awaiting_approval');
-                if (awaitingStep) {
-                  const jobKey = awaitingStep.job_key || 'default';
-                  handleApproveStep(jobKey, awaitingStep.step);
-                }
-              }}
-            >
-              {approvingStep !== null ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Approve
-            </Button>
-          </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
