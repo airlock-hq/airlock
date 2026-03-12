@@ -68,9 +68,14 @@ run: |
     - If a \`mermaid_diagram\` field is present, include it in the PR description as a fenced mermaid code block (\\\`\\\`\\\`mermaid ... \\\`\\\`\\\`). You MUST strip all Mermaid styling before including it: remove all \`classDef\` lines, \`class ... subgraphStyle\` lines, and \`:::className\` suffixes from nodes. GitHub/GitLab render Mermaid with their own dark/light theming, so custom styles break that.
   - If description.json does not exist, generate a title and description from the branch name and commit history
   - Do NOT add a signature for who created the PR/MR
+  - Check if \`\$AIRLOCK_ARTIFACTS/risk_assessment.json\` exists. If it does, include a **Risk Assessment** line in the PR description after the Summary section. Format it as:
+    - 🟢 for low risk, 🟡 for medium risk, 🔴 for high risk
+    - Follow the emoji with the \`risk_level\` value and the \`summary\` field as a one-liner
+    - Example: \"**Risk Assessment:** 🟢 Low — Minor copy change with no logic impact\"
   - The description should have these sections:
     - Summary (of the rationale behind the change)
-    - Diagram (only if a mermaid diagram is available from description.json)
+    - Risk Assessment (only if risk_assessment.json exists — one line with emoji + level + summary)
+    - Architecture (only if a mermaid diagram is available from description.json)
     - Key changes made
     - How was this tested
 
