@@ -31,7 +31,7 @@ pub(crate) fn check_daemon(paths: &AirlockPaths) -> DiagnosticResult {
                 debug!("Failed to connect to daemon socket: {}", e);
                 DiagnosticResult::fail(
                     "Daemon",
-                    format!("Socket exists but daemon not responding: {}", e),
+                    format!("Socket exists but daemon not responding: {e}"),
                     "Try 'airlock daemon restart' to restart the daemon",
                 )
             }
@@ -79,14 +79,14 @@ pub(crate) fn check_database(paths: &AirlockPaths) -> DiagnosticResult {
                 ),
                 Err(e) => DiagnosticResult::fail(
                     "Database",
-                    format!("Database query failed: {}", e),
+                    format!("Database query failed: {e}"),
                     "Try deleting ~/.airlock/state.sqlite and re-initializing your repos",
                 ),
             }
         }
         Err(e) => DiagnosticResult::fail(
             "Database",
-            format!("Failed to open database: {}", e),
+            format!("Failed to open database: {e}"),
             "Try deleting ~/.airlock/state.sqlite and re-initializing your repos",
         ),
     }
@@ -146,13 +146,13 @@ pub(crate) fn check_repo_enrollment(working_dir: &Path, paths: &AirlockPaths) ->
             ),
             Err(e) => DiagnosticResult::fail(
                 "Repository",
-                format!("Failed to check enrollment: {}", e),
+                format!("Failed to check enrollment: {e}"),
                 "Try running 'airlock init' to re-enroll",
             ),
         },
         Err(e) => DiagnosticResult::fail(
             "Repository",
-            format!("Cannot check enrollment: {}", e),
+            format!("Cannot check enrollment: {e}"),
             "Database may be corrupted. Try deleting ~/.airlock/state.sqlite",
         ),
     }
@@ -181,7 +181,7 @@ pub(crate) fn check_remotes(working_dir: &Path, repo: &airlock_core::Repo) -> Di
         Err(e) => {
             return DiagnosticResult::fail(
                 "Remotes",
-                format!("Cannot open repository: {}", e),
+                format!("Cannot open repository: {e}"),
                 "Ensure you're in a valid Git repository",
             );
         }
@@ -348,7 +348,7 @@ pub(crate) fn check_gate_repo(gate_path: &Path) -> DiagnosticResult {
         }
         Err(e) => DiagnosticResult::fail(
             "Gate Repo",
-            format!("Cannot open gate repository: {}", e),
+            format!("Cannot open gate repository: {e}"),
             "Run 'airlock eject' then 'airlock init' to recreate the gate",
         ),
     }

@@ -126,7 +126,7 @@ pub fn configure_gate_ssh(
             .args(["config", "core.sshCommand", &ssh_command])
             .output()
             .map_err(|e| {
-                AirlockError::Git(format!("Failed to set core.sshCommand on gate: {}", e))
+                AirlockError::Git(format!("Failed to set core.sshCommand on gate: {e}"))
             })?;
 
         if !output.status.success() {
@@ -158,7 +158,7 @@ pub fn configure_gate_ssh(
             .args(["config", "core.sshCommand", "ssh -o IdentitiesOnly=yes"])
             .output()
             .map_err(|e| {
-                AirlockError::Git(format!("Failed to set core.sshCommand on gate: {}", e))
+                AirlockError::Git(format!("Failed to set core.sshCommand on gate: {e}"))
             })?;
 
         if !output.status.success() {

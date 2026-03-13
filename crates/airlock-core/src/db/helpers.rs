@@ -25,8 +25,7 @@ pub fn string_to_step_status(s: &str) -> Result<StepStatus> {
         "skipped" => Ok(StepStatus::Skipped),
         "awaiting_approval" => Ok(StepStatus::AwaitingApproval),
         _ => Err(AirlockError::Database(format!(
-            "Unknown step status: {}",
-            s
+            "Unknown step status: {s}"
         ))),
     }
 }

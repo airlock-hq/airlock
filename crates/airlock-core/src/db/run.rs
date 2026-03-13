@@ -66,7 +66,7 @@ impl Database {
                     run.updated_at,
                 ],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to insert run: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to insert run: {e}")))?;
 
         tracing::debug!("Inserted run: {}", run.id);
         Ok(())
@@ -79,7 +79,7 @@ impl Database {
             .conn
             .query_row(&query, [id], row_to_run)
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get run: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get run: {e}")))?;
 
         Ok(result)
     }
@@ -94,13 +94,13 @@ impl Database {
         let mut stmt = self
             .conn
             .prepare(&query)
-            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
 
         let runs = stmt
             .query_map(params![repo_id, limit], row_to_run)
-            .map_err(|e| AirlockError::Database(format!("Failed to query runs: {}", e)))?
+            .map_err(|e| AirlockError::Database(format!("Failed to query runs: {e}")))?
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| AirlockError::Database(format!("Failed to collect runs: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to collect runs: {e}")))?;
 
         Ok(runs)
     }
@@ -119,7 +119,7 @@ impl Database {
                 params![current_step, updated_at, id],
             )
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to update run current_step: {}", e))
+                AirlockError::Database(format!("Failed to update run current_step: {e}"))
             })?;
 
         if rows_affected == 0 {
@@ -142,7 +142,7 @@ impl Database {
                 "UPDATE runs SET error = ?1, updated_at = ?2 WHERE id = ?3",
                 params![error, updated_at, id],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to update run error: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to update run error: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AirlockError::NotFound("Run".into(), id.into()));
@@ -164,7 +164,7 @@ impl Database {
                 "UPDATE runs SET head_sha = ?1, updated_at = ?2 WHERE id = ?3",
                 params![head_sha, updated_at, id],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to update run head_sha: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to update run head_sha: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AirlockError::NotFound("Run".into(), id.into()));
@@ -187,7 +187,7 @@ impl Database {
                 params!["Superseded by newer push", updated_at, id],
             )
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to mark run as superseded: {}", e))
+                AirlockError::Database(format!("Failed to mark run as superseded: {e}"))
             })?;
 
         if rows_affected == 0 {
@@ -235,13 +235,13 @@ impl Database {
         let mut stmt = self
             .conn
             .prepare(&query)
-            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
 
         let runs = stmt
             .query_map([limit], row_to_run)
-            .map_err(|e| AirlockError::Database(format!("Failed to query runs: {}", e)))?
+            .map_err(|e| AirlockError::Database(format!("Failed to query runs: {e}")))?
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| AirlockError::Database(format!("Failed to collect runs: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to collect runs: {e}")))?;
 
         Ok(runs)
     }
@@ -259,7 +259,7 @@ impl Database {
         let rows_affected = self
             .conn
             .execute("DELETE FROM runs WHERE id = ?1", [id])
-            .map_err(|e| AirlockError::Database(format!("Failed to delete run: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to delete run: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AirlockError::NotFound("Run".into(), id.into()));

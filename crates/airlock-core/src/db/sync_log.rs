@@ -21,7 +21,7 @@ impl Database {
                     sync_log.synced_at,
                 ],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to insert sync log: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to insert sync log: {e}")))?;
 
         tracing::debug!("Inserted sync log: {}", sync_log.id);
         Ok(())
@@ -46,7 +46,7 @@ impl Database {
                 },
             )
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get latest sync log: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get latest sync log: {e}")))?;
 
         Ok(result)
     }
@@ -60,7 +60,7 @@ impl Database {
                 "SELECT id, repo_id, success, error, synced_at
                  FROM sync_log WHERE repo_id = ?1 ORDER BY synced_at DESC LIMIT ?2",
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
 
         let logs = stmt
             .query_map(params![repo_id, limit], |row| {
@@ -72,9 +72,9 @@ impl Database {
                     synced_at: row.get(4)?,
                 })
             })
-            .map_err(|e| AirlockError::Database(format!("Failed to query sync logs: {}", e)))?
+            .map_err(|e| AirlockError::Database(format!("Failed to query sync logs: {e}")))?
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| AirlockError::Database(format!("Failed to collect sync logs: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to collect sync logs: {e}")))?;
 
         Ok(logs)
     }
@@ -89,7 +89,7 @@ impl Database {
                 )",
                 params![repo_id, keep_count],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to cleanup sync logs: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to cleanup sync logs: {e}")))?;
 
         Ok(deleted as u32)
     }

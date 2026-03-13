@@ -300,13 +300,13 @@ pub async fn sync_if_stale_with_threshold(
                 Ok(lock) => lock,
                 Err(e) => {
                     warn!("Failed to acquire sync lock for repo {}: {}", repo.id, e);
-                    return SyncResult::failed(format!("Failed to acquire lock: {}", e));
+                    return SyncResult::failed(format!("Failed to acquire lock: {e}"));
                 }
             }
         }
         Err(e) => {
             warn!("Failed to acquire sync lock for repo {}: {}", repo.id, e);
-            return SyncResult::failed(format!("Failed to acquire lock: {}", e));
+            return SyncResult::failed(format!("Failed to acquire lock: {e}"));
         }
     };
 

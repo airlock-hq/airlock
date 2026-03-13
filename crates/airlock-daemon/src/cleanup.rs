@@ -64,7 +64,7 @@ pub fn cleanup_old_artifacts(paths: &AirlockPaths) -> CleanupResult {
         Err(e) => {
             result
                 .errors
-                .push(format!("Failed to read artifacts directory: {}", e));
+                .push(format!("Failed to read artifacts directory: {e}"));
             return result;
         }
     };

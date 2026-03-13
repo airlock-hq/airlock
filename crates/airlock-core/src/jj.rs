@@ -40,7 +40,7 @@ pub fn git_import(working_path: &Path) -> Result<()> {
         .args(["git", "import"])
         .current_dir(working_path)
         .output()
-        .map_err(|e| AirlockError::Git(format!("Failed to execute jj git import: {}", e)))?;
+        .map_err(|e| AirlockError::Git(format!("Failed to execute jj git import: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -65,12 +65,12 @@ pub fn track_bookmarks(working_path: &Path, remote: &str) -> Result<()> {
         working_path.display()
     );
 
-    let glob = format!("glob:*@{}", remote);
+    let glob = format!("glob:*@{remote}");
     let output = Command::new("jj")
         .args(["bookmark", "track", &glob])
         .current_dir(working_path)
         .output()
-        .map_err(|e| AirlockError::Git(format!("Failed to execute jj bookmark track: {}", e)))?;
+        .map_err(|e| AirlockError::Git(format!("Failed to execute jj bookmark track: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -95,12 +95,12 @@ pub fn untrack_bookmarks(working_path: &Path, remote: &str) -> Result<()> {
         working_path.display()
     );
 
-    let glob = format!("glob:*@{}", remote);
+    let glob = format!("glob:*@{remote}");
     let output = Command::new("jj")
         .args(["bookmark", "untrack", &glob])
         .current_dir(working_path)
         .output()
-        .map_err(|e| AirlockError::Git(format!("Failed to execute jj bookmark untrack: {}", e)))?;
+        .map_err(|e| AirlockError::Git(format!("Failed to execute jj bookmark untrack: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

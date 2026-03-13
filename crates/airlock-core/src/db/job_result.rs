@@ -27,7 +27,7 @@ pub fn string_to_job_status(s: &str) -> Result<JobStatus> {
         "failed" => Ok(JobStatus::Failed),
         "skipped" => Ok(JobStatus::Skipped),
         "awaiting_approval" => Ok(JobStatus::AwaitingApproval),
-        _ => Err(AirlockError::Database(format!("Unknown job status: {}", s))),
+        _ => Err(AirlockError::Database(format!("Unknown job status: {s}"))),
     }
 }
 
@@ -85,7 +85,7 @@ impl Database {
                     job_result.worktree_path,
                 ],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to insert job result: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to insert job result: {e}")))?;
 
         tracing::debug!("Inserted job result: {}", job_result.id);
         Ok(())
@@ -115,7 +115,7 @@ impl Database {
                 },
             )
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get job result: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get job result: {e}")))?;
 
         match result {
             Some(row) => Ok(Some(row.into_job_result()?)),
@@ -131,7 +131,7 @@ impl Database {
                 "SELECT id, run_id, job_key, name, status, job_order, started_at, completed_at, error, worktree_path
                  FROM job_results WHERE run_id = ?1 ORDER BY job_order ASC",
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
 
         let rows = stmt
             .query_map([run_id], |row| {
@@ -148,12 +148,12 @@ impl Database {
                     worktree_path: row.get(9)?,
                 })
             })
-            .map_err(|e| AirlockError::Database(format!("Failed to query job results: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to query job results: {e}")))?;
 
         let mut job_results = Vec::new();
         for row in rows {
             let row =
-                row.map_err(|e| AirlockError::Database(format!("Failed to read row: {}", e)))?;
+                row.map_err(|e| AirlockError::Database(format!("Failed to read row: {e}")))?;
             job_results.push(row.into_job_result()?);
         }
 
@@ -179,7 +179,7 @@ impl Database {
                 params![status_str, started_at, completed_at, error, id],
             )
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to update job status: {}", e))
+                AirlockError::Database(format!("Failed to update job status: {e}"))
             })?;
 
         if rows_affected == 0 {
@@ -212,7 +212,7 @@ impl Database {
                 params![new_str, completed_at, error, id, expected_str],
             )
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to conditionally update job status: {}", e))
+                AirlockError::Database(format!("Failed to conditionally update job status: {e}"))
             })?;
 
         if rows_affected > 0 {
@@ -239,7 +239,7 @@ impl Database {
             .conn
             .execute("DELETE FROM job_results WHERE run_id = ?1", [run_id])
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to delete job results for run: {}", e))
+                AirlockError::Database(format!("Failed to delete job results for run: {e}"))
             })?;
 
         tracing::debug!("Deleted {} job results for run: {}", rows_affected, run_id);
@@ -260,7 +260,7 @@ impl Database {
                  JOIN runs r ON j.run_id = r.id
                  WHERE j.status = 'awaiting_approval' AND j.worktree_path IS NOT NULL",
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
 
         let rows = stmt
             .query_map([], |row| {
@@ -271,13 +271,13 @@ impl Database {
                 ))
             })
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to query awaiting approval jobs: {}", e))
+                AirlockError::Database(format!("Failed to query awaiting approval jobs: {e}"))
             })?;
 
         let mut results = Vec::new();
         for row in rows {
             let row =
-                row.map_err(|e| AirlockError::Database(format!("Failed to read row: {}", e)))?;
+                row.map_err(|e| AirlockError::Database(format!("Failed to read row: {e}")))?;
             results.push(row);
         }
 
@@ -293,7 +293,7 @@ impl Database {
                 params![worktree_path, id],
             )
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to update job worktree_path: {}", e))
+                AirlockError::Database(format!("Failed to update job worktree_path: {e}"))
             })?;
 
         if rows_affected == 0 {

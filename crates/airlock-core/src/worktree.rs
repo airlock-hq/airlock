@@ -511,7 +511,7 @@ pub fn create_intent_branch(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(AirlockError::Git(format!("Failed to commit: {}", stderr)));
+        return Err(AirlockError::Git(format!("Failed to commit: {stderr}")));
     }
 
     // Get the commit SHA

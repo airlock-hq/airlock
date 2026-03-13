@@ -42,7 +42,7 @@ pub async fn handle_mark_forwarded(
                 return Response::error(
                     id,
                     error_codes::DATABASE_ERROR,
-                    format!("Failed to query database: {}", e),
+                    format!("Failed to query database: {e}"),
                 )
             }
         }
@@ -64,7 +64,7 @@ pub async fn handle_mark_forwarded(
                 return Response::error(
                     id,
                     error_codes::DATABASE_ERROR,
-                    format!("Failed to query database: {}", e),
+                    format!("Failed to query database: {e}"),
                 )
             }
         }

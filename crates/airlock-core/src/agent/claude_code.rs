@@ -90,7 +90,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
 
         let mut child = cmd
             .spawn()
-            .map_err(|e| AirlockError::Agent(format!("Failed to spawn claude CLI: {}", e)))?;
+            .map_err(|e| AirlockError::Agent(format!("Failed to spawn claude CLI: {e}")))?;
 
         // Write prompt to stdin and close it
         let stdin = child.stdin.take().ok_or_else(|| {
@@ -223,7 +223,7 @@ fn claude_code_event_stream(
                                 // Other parse errors are non-fatal but reported
                                 return Some((
                                     Ok(AgentEvent::Error {
-                                        message: format!("Message parse error: {}", err_str),
+                                        message: format!("Message parse error: {err_str}"),
                                         is_fatal: false,
                                     }),
                                     (lines, child, pending, false),

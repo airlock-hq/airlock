@@ -37,7 +37,7 @@ pub async fn handle_status(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -49,7 +49,7 @@ pub async fn handle_status(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to list runs: {}", e),
+                format!("Failed to list runs: {e}"),
             )
         }
     };
@@ -153,7 +153,7 @@ pub async fn handle_get_repos(ctx: Arc<HandlerContext>, id: serde_json::Value) -
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to list repos: {}", e),
+                format!("Failed to list repos: {e}"),
             )
         }
     };

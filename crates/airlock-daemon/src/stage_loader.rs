@@ -199,7 +199,7 @@ impl StageLoader {
 
         // Parse the reference
         let reference = parse_stage_reference(use_ref)
-            .with_context(|| format!("Failed to parse action reference: {}", use_ref))?;
+            .with_context(|| format!("Failed to parse action reference: {use_ref}"))?;
 
         // Fast path: use bundled YAML for first-party defaults (no cache, no network)
         if let Some(bundled_yaml) = get_bundled_default(&reference) {
@@ -583,16 +583,6 @@ impl StageLoader {
         Ok(stage_yaml)
     }
 
-    /// Clear the cache for a specific action reference.
-    #[allow(dead_code)]
-    pub fn clear_cache(&self, reference: &StageReference) -> Result<()> {
-        let cache_path = self.cache_path(reference);
-        if cache_path.exists() {
-            std::fs::remove_dir_all(&cache_path)
-                .with_context(|| format!("Failed to remove cache: {}", cache_path.display()))?;
-        }
-        Ok(())
-    }
 }
 
 impl Default for StageLoader {

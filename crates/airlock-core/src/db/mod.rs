@@ -42,7 +42,7 @@ impl Database {
     /// Creates the database file and initializes the schema if it doesn't exist.
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)
-            .map_err(|e| AirlockError::Database(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to open database: {e}")))?;
 
         let db = Self { conn };
         db.initialize()?;
@@ -52,7 +52,7 @@ impl Database {
     /// Open an in-memory database (useful for testing).
     pub fn open_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory().map_err(|e| {
-            AirlockError::Database(format!("Failed to open in-memory database: {}", e))
+            AirlockError::Database(format!("Failed to open in-memory database: {e}"))
         })?;
 
         let db = Self { conn };
@@ -91,7 +91,7 @@ impl Database {
 
         // Open temporarily to check version
         let conn = Connection::open(path)
-            .map_err(|e| AirlockError::Database(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to open database: {e}")))?;
 
         // Check if schema_version table exists
         let table_exists: bool = conn
@@ -101,7 +101,7 @@ impl Database {
                 |row| row.get(0),
             )
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to check schema version table: {}", e))
+                AirlockError::Database(format!("Failed to check schema version table: {e}"))
             })?;
 
         if !table_exists {
@@ -118,7 +118,7 @@ impl Database {
                 row.get(0)
             })
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get schema version: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get schema version: {e}")))?;
 
         let current_version = version.unwrap_or(0);
         tracing::debug!("Existing database schema version: {}", current_version);
@@ -142,7 +142,7 @@ impl Database {
     /// Delete a database file.
     fn delete_database(path: &Path) -> Result<()> {
         std::fs::remove_file(path)
-            .map_err(|e| AirlockError::Database(format!("Failed to delete old database: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to delete old database: {e}")))?;
 
         // Also try to delete WAL and SHM files if they exist
         let wal_path = path.with_extension("sqlite-wal");
@@ -159,7 +159,7 @@ impl Database {
         // Enable foreign keys
         self.conn
             .execute("PRAGMA foreign_keys = ON", [])
-            .map_err(|e| AirlockError::Database(format!("Failed to enable foreign keys: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to enable foreign keys: {e}")))?;
 
         // Check current schema version
         let current_version = self.get_schema_version()?;
@@ -187,7 +187,7 @@ impl Database {
                 [],
                 |row| row.get(0),
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to check schema version table: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to check schema version table: {e}")))?;
 
         if !table_exists {
             return Ok(0);
@@ -200,7 +200,7 @@ impl Database {
                 row.get(0)
             })
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get schema version: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get schema version: {e}")))?;
 
         Ok(version.unwrap_or(0))
     }
@@ -210,7 +210,7 @@ impl Database {
         self.conn
             .execute("DELETE FROM schema_version", [])
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to clear schema version: {}", e))
+                AirlockError::Database(format!("Failed to clear schema version: {e}"))
             })?;
 
         self.conn
@@ -218,7 +218,7 @@ impl Database {
                 "INSERT INTO schema_version (version) VALUES (?1)",
                 [version],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to set schema version: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to set schema version: {e}")))?;
 
         Ok(())
     }
@@ -241,7 +241,7 @@ impl Database {
 
         for stmt in statements {
             self.conn.execute(stmt, []).map_err(|e| {
-                AirlockError::Database(format!("Failed to execute schema statement: {}", e))
+                AirlockError::Database(format!("Failed to execute schema statement: {e}"))
             })?;
         }
 
@@ -280,7 +280,7 @@ impl Database {
             self.conn
                 .execute(schema::ADD_STAGE_ORDER_COLUMN, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to add stage_order column: {}", e))
+                    AirlockError::Database(format!("Failed to add stage_order column: {e}"))
                 })?;
         }
 
@@ -299,23 +299,23 @@ impl Database {
             self.conn
                 .execute(schema::MIGRATE_STAGE_RESULTS_V6_COPY, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to copy stage_results data: {}", e))
+                    AirlockError::Database(format!("Failed to copy stage_results data: {e}"))
                 })?;
             self.conn
                 .execute(schema::MIGRATE_STAGE_RESULTS_V6_DROP, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to drop old stage_results table: {}", e))
+                    AirlockError::Database(format!("Failed to drop old stage_results table: {e}"))
                 })?;
             self.conn
                 .execute(schema::MIGRATE_STAGE_RESULTS_V6_RENAME, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to rename stage_results table: {}", e))
+                    AirlockError::Database(format!("Failed to rename stage_results table: {e}"))
                 })?;
             // Recreate the index
             self.conn
                 .execute(schema::CREATE_STAGE_RESULTS_RUN_INDEX, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to recreate stage_results index: {}", e))
+                    AirlockError::Database(format!("Failed to recreate stage_results index: {e}"))
                 })?;
         }
 
@@ -325,7 +325,7 @@ impl Database {
             self.conn
                 .execute(schema::ADD_SUPERSEDED_COLUMN, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to add superseded column: {}", e))
+                    AirlockError::Database(format!("Failed to add superseded column: {e}"))
                 })?;
         }
 
@@ -357,26 +357,26 @@ impl Database {
             self.conn
                 .execute(schema::MIGRATE_V8_CREATE_JOB_RESULTS, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to create job_results table: {}", e))
+                    AirlockError::Database(format!("Failed to create job_results table: {e}"))
                 })?;
 
             // Drop old stage_results and create new step_results
             self.conn
                 .execute(schema::MIGRATE_V8_DROP_STAGE_RESULTS, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to drop stage_results table: {}", e))
+                    AirlockError::Database(format!("Failed to drop stage_results table: {e}"))
                 })?;
             self.conn
                 .execute(schema::MIGRATE_V8_CREATE_STEP_RESULTS, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to create step_results table: {}", e))
+                    AirlockError::Database(format!("Failed to create step_results table: {e}"))
                 })?;
 
             // Create indexes
             self.conn
                 .execute(schema::CREATE_JOB_RESULTS_RUN_INDEX, [])
                 .map_err(|e| {
-                    AirlockError::Database(format!("Failed to create job_results index: {}", e))
+                    AirlockError::Database(format!("Failed to create job_results index: {e}"))
                 })?;
             self.conn
                 .execute(schema::CREATE_STEP_RESULTS_RUN_INDEX, [])

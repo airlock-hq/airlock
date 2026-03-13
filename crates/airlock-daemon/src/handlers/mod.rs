@@ -132,7 +132,7 @@ async fn handle_shutdown(ctx: Arc<HandlerContext>, id: serde_json::Value) -> Res
         return Response::error(
             id,
             error_codes::INTERNAL_ERROR,
-            format!("Failed to initiate shutdown: {}", e),
+            format!("Failed to initiate shutdown: {e}"),
         );
     }
 

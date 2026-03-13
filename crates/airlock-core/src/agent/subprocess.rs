@@ -47,7 +47,7 @@ impl SubprocessReader {
             .map_err(|e| AirlockError::Agent(format!("Failed to spawn {}: {}", program, e)))?;
 
         let stdout = child.stdout.take().ok_or_else(|| {
-            AirlockError::Agent(format!("Failed to capture stdout from {}", program))
+            AirlockError::Agent(format!("Failed to capture stdout from {program}"))
         })?;
 
         let reader = BufReader::new(stdout);
@@ -74,7 +74,7 @@ impl SubprocessReader {
         self.child
             .wait()
             .await
-            .map_err(|e| AirlockError::Agent(format!("Error waiting for subprocess: {}", e)))
+            .map_err(|e| AirlockError::Agent(format!("Error waiting for subprocess: {e}")))
     }
 }
 

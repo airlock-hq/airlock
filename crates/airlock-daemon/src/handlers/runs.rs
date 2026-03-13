@@ -41,7 +41,7 @@ pub async fn handle_get_runs(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     }
@@ -53,7 +53,7 @@ pub async fn handle_get_runs(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to list runs: {}", e),
+                format!("Failed to list runs: {e}"),
             )
         }
     };
@@ -121,7 +121,7 @@ pub async fn handle_get_run_detail(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -261,7 +261,7 @@ pub async fn handle_reprocess_run(
                 return Response::error(
                     id,
                     error_codes::DATABASE_ERROR,
-                    format!("Failed to query database: {}", e),
+                    format!("Failed to query database: {e}"),
                 )
             }
         }
@@ -297,7 +297,7 @@ pub async fn handle_reprocess_run(
                 return Response::error(
                     id,
                     error_codes::DATABASE_ERROR,
-                    format!("Failed to query database: {}", e),
+                    format!("Failed to query database: {e}"),
                 )
             }
         }
@@ -324,7 +324,7 @@ pub async fn handle_reprocess_run(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to clear run error: {}", e),
+                format!("Failed to clear run error: {e}"),
             );
         }
     }
@@ -380,7 +380,7 @@ pub async fn handle_cancel_run(
                 return Response::error(
                     id,
                     error_codes::DATABASE_ERROR,
-                    format!("Failed to query database: {}", e),
+                    format!("Failed to query database: {e}"),
                 )
             }
         }

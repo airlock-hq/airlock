@@ -50,7 +50,7 @@ pub async fn handle_approve_step(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -69,7 +69,7 @@ pub async fn handle_approve_step(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -90,7 +90,7 @@ pub async fn handle_approve_step(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to get job results: {}", e),
+                format!("Failed to get job results: {e}"),
             )
         }
     };
@@ -102,7 +102,7 @@ pub async fn handle_approve_step(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to get step results: {}", e),
+                format!("Failed to get step results: {e}"),
             )
         }
     };
@@ -137,7 +137,7 @@ pub async fn handle_approve_step(
         return Response::error(
             id,
             error_codes::DATABASE_ERROR,
-            format!("Failed to update step result: {}", e),
+            format!("Failed to update step result: {e}"),
         );
     }
 
@@ -167,7 +167,7 @@ pub async fn handle_approve_step(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -599,7 +599,7 @@ pub async fn handle_apply_patches(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -618,7 +618,7 @@ pub async fn handle_apply_patches(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -634,7 +634,7 @@ pub async fn handle_apply_patches(
             return Response::error(
                 id,
                 error_codes::INVALID_PARAMS,
-                format!("Patch path must be within artifacts directory: {}", path),
+                format!("Patch path must be within artifacts directory: {path}"),
             );
         }
     }
@@ -673,7 +673,7 @@ pub async fn handle_apply_patches(
                     return Response::error(
                         id,
                         error_codes::DATABASE_ERROR,
-                        format!("Failed to query jobs: {}", e),
+                        format!("Failed to query jobs: {e}"),
                     );
                 }
             }
@@ -711,7 +711,7 @@ pub async fn handle_apply_patches(
                     return Response::error(
                         id,
                         error_codes::DATABASE_ERROR,
-                        format!("Failed to query jobs: {}", e),
+                        format!("Failed to query jobs: {e}"),
                     );
                 }
             }
@@ -791,7 +791,7 @@ pub async fn handle_apply_patches(
             Err(e) => {
                 patch_errors.push(PatchError {
                     path: patch_path.clone(),
-                    error: format!("Failed to read patch file: {}", e),
+                    error: format!("Failed to read patch file: {e}"),
                 });
                 continue;
             }
@@ -802,7 +802,7 @@ pub async fn handle_apply_patches(
             Err(e) => {
                 patch_errors.push(PatchError {
                     path: patch_path.clone(),
-                    error: format!("Failed to parse patch JSON: {}", e),
+                    error: format!("Failed to parse patch JSON: {e}"),
                 });
                 continue;
             }
@@ -830,7 +830,7 @@ pub async fn handle_apply_patches(
         if let Err(e) = std::fs::write(&temp_patch, diff) {
             patch_errors.push(PatchError {
                 path: patch_path.clone(),
-                error: format!("Failed to write temp patch file: {}", e),
+                error: format!("Failed to write temp patch file: {e}"),
             });
             continue;
         }
@@ -862,10 +862,10 @@ pub async fn handle_apply_patches(
                         let stderr2 = String::from_utf8_lossy(&o2.stderr);
                         Err(format!("git apply failed: {}", stderr2))
                     }
-                    Err(e) => Err(format!("Failed to execute git apply: {}", e)),
+                    Err(e) => Err(format!("Failed to execute git apply: {e}")),
                 }
             }
-            Err(e) => Err(format!("Failed to execute git apply: {}", e)),
+            Err(e) => Err(format!("Failed to execute git apply: {e}")),
         };
 
         let _ = std::fs::remove_file(&temp_patch);
@@ -926,7 +926,7 @@ pub async fn handle_apply_patches(
         return Response::error(
             id,
             error_codes::GIT_ERROR,
-            format!("Failed to stage changes: {}", e),
+            format!("Failed to stage changes: {e}"),
         );
     }
 
@@ -955,7 +955,7 @@ pub async fn handle_apply_patches(
 
     // Create commit
     let titles_summary = applied_titles.join(", ");
-    let commit_msg = format!("Airlock: applied patches: {}", titles_summary);
+    let commit_msg = format!("Airlock: applied patches: {titles_summary}");
 
     let commit_output = std::process::Command::new("git")
         .args(["commit", "-m", &commit_msg])
@@ -968,14 +968,14 @@ pub async fn handle_apply_patches(
             return Response::error(
                 id,
                 error_codes::GIT_ERROR,
-                format!("Failed to commit patches: {}", stderr),
+                format!("Failed to commit patches: {stderr}"),
             );
         }
     } else if let Err(e) = commit_output {
         return Response::error(
             id,
             error_codes::GIT_ERROR,
-            format!("Failed to execute git commit: {}", e),
+            format!("Failed to execute git commit: {e}"),
         );
     }
 
@@ -1057,7 +1057,7 @@ pub async fn handle_get_run_diff(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };
@@ -1076,7 +1076,7 @@ pub async fn handle_get_run_diff(
             return Response::error(
                 id,
                 error_codes::DATABASE_ERROR,
-                format!("Failed to query database: {}", e),
+                format!("Failed to query database: {e}"),
             )
         }
     };

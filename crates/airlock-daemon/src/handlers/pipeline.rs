@@ -159,7 +159,7 @@ pub async fn execute_pipeline(
         Err(e) => {
             error!("Invalid job DAG in workflow '{}': {}", workflow_file, e);
             let db = ctx.db.lock().await;
-            let _ = db.update_run_error(&run.id, Some(&format!("Invalid job DAG: {}", e)));
+            let _ = db.update_run_error(&run.id, Some(&format!("Invalid job DAG: {e}")));
             ctx.emit(AirlockEvent::RunCompleted {
                 repo_id: run.repo_id.clone(),
                 run_id: run.id.clone(),
@@ -813,7 +813,7 @@ pub(super) async fn execute_step_sequence(
                     resolved_step.name, e
                 );
                 job_success = false;
-                job_error = Some(format!("Failed to build environment: {}", e));
+                job_error = Some(format!("Failed to build environment: {e}"));
                 break;
             }
         };
@@ -910,7 +910,7 @@ pub(super) async fn execute_step_sequence(
                         Err(e) => {
                             warn!("apply-patch '{}' failed: {}", step.name, e);
                             step_result.status = StepStatus::Failed;
-                            step_result.error = Some(format!("apply-patch failed: {}", e));
+                            step_result.error = Some(format!("apply-patch failed: {e}"));
                             let db = params.ctx.db.lock().await;
                             let _ = db.update_step_result(step_result);
                         }
@@ -1064,7 +1064,7 @@ pub(super) async fn execute_single_job(
                 JobStatus::Failed,
                 None,
                 Some(now_epoch()),
-                Some(&format!("Failed to create worktree: {}", e)),
+                Some(&format!("Failed to create worktree: {e}")),
             );
             ctx.emit(AirlockEvent::JobCompleted {
                 repo_id: run.repo_id.clone(),
@@ -1100,7 +1100,7 @@ pub(super) async fn execute_single_job(
                     JobStatus::Failed,
                     None,
                     Some(now_epoch()),
-                    Some(&format!("Failed to get step results: {}", e)),
+                    Some(&format!("Failed to get step results: {e}")),
                 );
                 return JobStatus::Failed;
             }

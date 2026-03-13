@@ -369,7 +369,7 @@ async fn handle_connection(ctx: Arc<HandlerContext>, stream: Stream) -> Result<(
                         let response = Response::error(
                             serde_json::Value::Null,
                             error_codes::PARSE_ERROR,
-                            format!("Parse error: {}", e),
+                            format!("Parse error: {e}"),
                         );
                         let response_json = serde_json::to_string(&response)?;
                         writer.write_all(response_json.as_bytes()).await?;

@@ -16,14 +16,14 @@ use super::GlobalConfig;
 pub fn load_global_config(path: &Path) -> Result<GlobalConfig> {
     let content = std::fs::read_to_string(path)?;
     let config: GlobalConfig = serde_yaml::from_str(&content)
-        .map_err(|e| AirlockError::Config(format!("Failed to parse global config: {}", e)))?;
+        .map_err(|e| AirlockError::Config(format!("Failed to parse global config: {e}")))?;
     Ok(config)
 }
 
 /// Parse a single workflow config from a YAML string.
 pub fn parse_workflow_config(content: &str) -> Result<WorkflowConfig> {
     let config: WorkflowConfig = serde_yaml::from_str(content)
-        .map_err(|e| AirlockError::Config(format!("Failed to parse workflow config: {}", e)))?;
+        .map_err(|e| AirlockError::Config(format!("Failed to parse workflow config: {e}")))?;
     Ok(config)
 }
 
@@ -50,7 +50,7 @@ pub fn load_workflows_from_tree(
             &format!("{}/", workflows_dir),
         ])
         .output()
-        .map_err(|e| AirlockError::Git(format!("Failed to run git ls-tree: {}", e)))?;
+        .map_err(|e| AirlockError::Git(format!("Failed to run git ls-tree: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -64,7 +64,7 @@ pub fn load_workflows_from_tree(
     }
 
     let listing = String::from_utf8(output.stdout)
-        .map_err(|e| AirlockError::Git(format!("git ls-tree output is not valid UTF-8: {}", e)))?;
+        .map_err(|e| AirlockError::Git(format!("git ls-tree output is not valid UTF-8: {e}")))?;
 
     let mut workflows = Vec::new();
 
@@ -125,7 +125,7 @@ pub fn load_workflows_from_disk(repo_root: &Path) -> Result<Vec<(String, Workflo
 
     for entry in entries {
         let entry = entry
-            .map_err(|e| AirlockError::Config(format!("Failed to read directory entry: {}", e)))?;
+            .map_err(|e| AirlockError::Config(format!("Failed to read directory entry: {e}")))?;
 
         let path = entry.path();
         let filename = match path.file_name().and_then(|n| n.to_str()) {

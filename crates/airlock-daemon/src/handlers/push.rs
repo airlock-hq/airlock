@@ -769,7 +769,7 @@ async fn detect_missed_pushes_for_repo(
 ) -> Result<usize, String> {
     // List push marker refs — only branches the user actually pushed
     let markers = git::list_push_markers(&repo.gate_path)
-        .map_err(|e| format!("Failed to list push markers: {}", e))?;
+        .map_err(|e| format!("Failed to list push markers: {e}"))?;
 
     if markers.is_empty() {
         return Ok(0);

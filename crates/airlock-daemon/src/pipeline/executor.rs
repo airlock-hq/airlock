@@ -800,7 +800,7 @@ pub async fn execute_stage_command_with_streaming(
             Ok(StageExecutionResult {
                 exit_code: -1,
                 stdout: String::new(),
-                stderr: format!("Process error: {}", e),
+                stderr: format!("Process error: {e}"),
                 duration_ms,
                 passed: false,
             })

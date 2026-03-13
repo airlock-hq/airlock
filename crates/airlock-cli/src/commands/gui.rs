@@ -14,7 +14,8 @@ use anyhow::Result;
 /// the GUI binary could not be found or failed to start.
 pub fn launch() -> Result<()> {
     let gui_path = airlock_core::gui::find_gui_binary()?;
-    airlock_core::gui::spawn_detached(&gui_path)
+    airlock_core::gui::spawn_detached(&gui_path)?;
+    Ok(())
 }
 
 #[cfg(test)]

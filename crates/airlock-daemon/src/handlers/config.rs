@@ -170,7 +170,7 @@ pub async fn handle_update_config(
                 return Response::error(
                     id,
                     error_codes::INTERNAL_ERROR,
-                    format!("Failed to create config directory: {}", e),
+                    format!("Failed to create config directory: {e}"),
                 );
             }
         }
@@ -182,7 +182,7 @@ pub async fn handle_update_config(
                 return Response::error(
                     id,
                     error_codes::INTERNAL_ERROR,
-                    format!("Failed to serialize config: {}", e),
+                    format!("Failed to serialize config: {e}"),
                 )
             }
         };
@@ -191,7 +191,7 @@ pub async fn handle_update_config(
             return Response::error(
                 id,
                 error_codes::INTERNAL_ERROR,
-                format!("Failed to write config file: {}", e),
+                format!("Failed to write config file: {e}"),
             );
         }
 

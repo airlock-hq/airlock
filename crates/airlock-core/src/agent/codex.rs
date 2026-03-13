@@ -250,7 +250,7 @@ fn codex_event_stream(reader: SubprocessReader) -> AgentEventStream {
                         Err(e) => {
                             return Some((
                                 Ok(AgentEvent::Error {
-                                    message: format!("JSONL parse error: {}", e),
+                                    message: format!("JSONL parse error: {e}"),
                                     is_fatal: false,
                                 }),
                                 (reader, acc, pending, false),
@@ -476,7 +476,7 @@ fn map_codex_event(
                         .to_string();
                     vec![Ok(AgentEvent::ToolResult {
                         tool_name: "file_change".to_string(),
-                        output: format!("File changed: {}", path),
+                        output: format!("File changed: {path}"),
                         is_error: false,
                     })]
                 }

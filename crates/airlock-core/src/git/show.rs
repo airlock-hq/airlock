@@ -24,7 +24,7 @@ pub fn show_file(repo_path: &Path, commit: &str, file_path: &str) -> Result<Stri
     let output = Command::new("git")
         .args(["-C", &repo_path.to_string_lossy(), "show", &rev_spec])
         .output()
-        .map_err(|e| AirlockError::Git(format!("Failed to run git show: {}", e)))?;
+        .map_err(|e| AirlockError::Git(format!("Failed to run git show: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -36,7 +36,7 @@ pub fn show_file(repo_path: &Path, commit: &str, file_path: &str) -> Result<Stri
     }
 
     String::from_utf8(output.stdout)
-        .map_err(|e| AirlockError::Git(format!("git show output is not valid UTF-8: {}", e)))
+        .map_err(|e| AirlockError::Git(format!("git show output is not valid UTF-8: {e}")))
 }
 
 #[cfg(test)]

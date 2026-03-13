@@ -26,6 +26,7 @@ use interprocess::local_socket::{tokio::Stream, GenericNamespaced};
 /// JSON-RPC notification from the daemon.
 #[derive(Debug, Deserialize)]
 struct Notification {
+    /// Required by JSON-RPC 2.0 schema; consumed during deserialization.
     #[allow(dead_code)]
     jsonrpc: String,
     method: String,
@@ -44,6 +45,7 @@ struct SubscribeRequest {
 /// JSON-RPC response.
 #[derive(Debug, Deserialize)]
 struct Response {
+    /// Present in successful responses; currently unused but part of the JSON-RPC schema.
     #[allow(dead_code)]
     result: Option<serde_json::Value>,
     error: Option<RpcError>,
@@ -51,6 +53,7 @@ struct Response {
 
 #[derive(Debug, Deserialize)]
 struct RpcError {
+    /// JSON-RPC error code; deserialized for completeness but only `message` is displayed.
     #[allow(dead_code)]
     code: i32,
     message: String,
@@ -70,12 +73,6 @@ impl EventBridgeState {
             running: AtomicBool::new(true),
             request_id: AtomicU32::new(1),
         }
-    }
-
-    /// Stop the event bridge.
-    #[allow(dead_code)]
-    pub fn stop(&self) {
-        self.running.store(false, Ordering::SeqCst);
     }
 
     fn next_id(&self) -> u32 {

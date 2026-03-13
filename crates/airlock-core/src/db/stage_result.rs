@@ -30,7 +30,7 @@ impl Database {
                     step_result.completed_at,
                 ],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to insert step result: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to insert step result: {e}")))?;
 
         tracing::debug!("Inserted step result: {}", step_result.id);
         Ok(())
@@ -61,7 +61,7 @@ impl Database {
                 },
             )
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get step result: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get step result: {e}")))?;
 
         match result {
             Some(mut step_result) => {
@@ -74,7 +74,7 @@ impl Database {
                         |row| row.get(0),
                     )
                     .map_err(|e| {
-                        AirlockError::Database(format!("Failed to get step result status: {}", e))
+                        AirlockError::Database(format!("Failed to get step result status: {e}"))
                     })?;
                 step_result.status = string_to_step_status(&status_str)?;
                 Ok(Some(step_result))
@@ -108,7 +108,7 @@ impl Database {
         let mut stmt = self
             .conn
             .prepare(&sql)
-            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
 
         let rows = stmt
             .query_map([filter_value], |row| {
@@ -127,7 +127,7 @@ impl Database {
                     row.get::<_, Option<i64>>(10)?,
                 ))
             })
-            .map_err(|e| AirlockError::Database(format!("Failed to query step results: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to query step results: {e}")))?;
 
         let mut step_results = Vec::new();
         for row in rows {
@@ -143,7 +143,7 @@ impl Database {
                 error,
                 started_at,
                 completed_at,
-            ) = row.map_err(|e| AirlockError::Database(format!("Failed to read row: {}", e)))?;
+            ) = row.map_err(|e| AirlockError::Database(format!("Failed to read row: {e}")))?;
 
             let status = string_to_step_status(&status_str)?;
 
@@ -184,7 +184,7 @@ impl Database {
                     step_result.id,
                 ],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to update step result: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to update step result: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AirlockError::NotFound(
@@ -203,7 +203,7 @@ impl Database {
             .conn
             .execute("DELETE FROM step_results WHERE run_id = ?1", [run_id])
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to delete step results for run: {}", e))
+                AirlockError::Database(format!("Failed to delete step results for run: {e}"))
             })?;
 
         tracing::debug!("Deleted {} step results for run: {}", rows_affected, run_id);

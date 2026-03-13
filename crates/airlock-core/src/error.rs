@@ -24,10 +24,6 @@ pub enum AirlockError {
     #[error("Configuration error: {0}")]
     Config(String),
 
-    /// Deprecated — use [`Agent`](Self::Agent) for all provider errors.
-    #[error("LLM error: {0}")]
-    Llm(String),
-
     /// Failures from agent adapters (Claude Code, Codex) including
     /// subprocess spawning, stream parsing, and provider API errors.
     #[error("Agent error: {0}")]

@@ -23,7 +23,7 @@ impl Database {
                     repo.created_at,
                 ],
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to insert repo: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to insert repo: {e}")))?;
 
         tracing::debug!("Inserted repo: {}", repo.id);
         Ok(())
@@ -51,7 +51,7 @@ impl Database {
                 },
             )
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get repo: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get repo: {e}")))?;
 
         Ok(result)
     }
@@ -79,7 +79,7 @@ impl Database {
                 },
             )
             .optional()
-            .map_err(|e| AirlockError::Database(format!("Failed to get repo by path: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to get repo by path: {e}")))?;
 
         Ok(result)
     }
@@ -92,7 +92,7 @@ impl Database {
                 "SELECT id, working_path, upstream_url, gate_path, last_sync, created_at
                  FROM repos ORDER BY created_at DESC",
             )
-            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
 
         let repos = stmt
             .query_map([], |row| {
@@ -105,9 +105,9 @@ impl Database {
                     created_at: row.get(5)?,
                 })
             })
-            .map_err(|e| AirlockError::Database(format!("Failed to query repos: {}", e)))?
+            .map_err(|e| AirlockError::Database(format!("Failed to query repos: {e}")))?
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| AirlockError::Database(format!("Failed to collect repos: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to collect repos: {e}")))?;
 
         Ok(repos)
     }
@@ -121,7 +121,7 @@ impl Database {
                 params![last_sync, id],
             )
             .map_err(|e| {
-                AirlockError::Database(format!("Failed to update repo last_sync: {}", e))
+                AirlockError::Database(format!("Failed to update repo last_sync: {e}"))
             })?;
 
         if rows_affected == 0 {
@@ -136,7 +136,7 @@ impl Database {
         let rows_affected = self
             .conn
             .execute("DELETE FROM repos WHERE id = ?1", [id])
-            .map_err(|e| AirlockError::Database(format!("Failed to delete repo: {}", e)))?;
+            .map_err(|e| AirlockError::Database(format!("Failed to delete repo: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AirlockError::NotFound("Repo".into(), id.into()));

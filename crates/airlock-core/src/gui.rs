@@ -4,7 +4,7 @@
 //! Used by the CLI (when invoked without arguments) and the daemon
 //! (to auto-launch the app on git push).
 
-use anyhow::{Context, Result};
+use crate::error::{AirlockError, Result};
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
@@ -45,9 +45,10 @@ pub fn find_gui_binary() -> Result<PathBuf> {
         }
     }
 
-    Err(anyhow::anyhow!(
+    Err(AirlockError::Other(
         "Desktop app not found. Install it from https://airlock.dev/download\n\
          or run 'airlock --help' for CLI commands."
+            .into(),
     ))
 }
 
@@ -107,8 +108,12 @@ pub fn spawn_detached(gui_path: &PathBuf) -> Result<()> {
             });
         }
 
-        cmd.spawn()
-            .with_context(|| format!("Failed to spawn GUI process: {}", gui_path.display()))?;
+        cmd.spawn().map_err(|e| {
+            AirlockError::Other(format!(
+                "Failed to spawn GUI process: {}: {e}",
+                gui_path.display()
+            ))
+        })?;
     }
 
     #[cfg(windows)]
@@ -120,7 +125,12 @@ pub fn spawn_detached(gui_path: &PathBuf) -> Result<()> {
         Command::new(gui_path)
             .creation_flags(DETACHED_PROCESS)
             .spawn()
-            .with_context(|| format!("Failed to spawn GUI process: {}", gui_path.display()))?;
+            .map_err(|e| {
+                AirlockError::Other(format!(
+                    "Failed to spawn GUI process: {}: {e}",
+                    gui_path.display()
+                ))
+            })?;
     }
 
     Ok(())

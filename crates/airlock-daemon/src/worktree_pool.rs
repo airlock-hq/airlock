@@ -137,7 +137,7 @@ impl WorktreePool {
             airlock_core::reset_persistent_worktree(&gate, &wt, &sha)
         })
         .await
-        .map_err(|e| format!("Worktree reset task panicked: {}", e))?;
+        .map_err(|e| format!("Worktree reset task panicked: {e}"))?;
 
         if let Err(e) = result {
             // Release the slot back since we failed
@@ -145,7 +145,7 @@ impl WorktreePool {
             if let Some(pool) = pools.get_mut(repo_id) {
                 pool.release(slot_index);
             }
-            return Err(format!("Failed to reset pool worktree: {}", e));
+            return Err(format!("Failed to reset pool worktree: {e}"));
         }
 
         debug!(
@@ -186,7 +186,7 @@ impl WorktreePool {
         }
 
         let entries = std::fs::read_dir(&worktrees_dir)
-            .map_err(|e| format!("Failed to read worktrees dir: {}", e))?;
+            .map_err(|e| format!("Failed to read worktrees dir: {e}"))?;
 
         let mut pools = self.inner.lock().await;
 

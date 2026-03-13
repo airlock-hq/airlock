@@ -532,7 +532,7 @@ fn rebase_diverged_branch(
     // Ensure parent directory exists
     if let Err(e) = std::fs::create_dir_all(sync_dir) {
         return BranchSyncStatus::RebaseFailed {
-            reason: format!("Failed to create sync worktree directory: {}", e),
+            reason: format!("Failed to create sync worktree directory: {e}"),
         };
     }
 
@@ -554,7 +554,7 @@ fn rebase_diverged_branch(
         Ok(o) => o,
         Err(e) => {
             return BranchSyncStatus::RebaseFailed {
-                reason: format!("Failed to create worktree: {}", e),
+                reason: format!("Failed to create worktree: {e}"),
             };
         }
     };
@@ -626,7 +626,7 @@ fn rebase_diverged_branch(
             }
         }
         Err(e) => BranchSyncStatus::RebaseFailed {
-            reason: format!("Failed to execute git rebase: {}", e),
+            reason: format!("Failed to execute git rebase: {e}"),
         },
     };
 
@@ -648,7 +648,7 @@ fn invoke_agent_for_rebase_conflicts(worktree_path: &Path) -> std::result::Resul
         .arg(worktree_path)
         .args(["diff", "--name-only", "--diff-filter=U"])
         .output()
-        .map_err(|e| format!("Failed to list conflicted files: {}", e))?;
+        .map_err(|e| format!("Failed to list conflicted files: {e}"))?;
 
     let conflicted_files = String::from_utf8_lossy(&conflict_output.stdout)
         .trim()
@@ -700,7 +700,7 @@ fn invoke_agent_for_rebase_conflicts(worktree_path: &Path) -> std::result::Resul
         .args(["exec", "agent", &prompt, "--output-schema", schema])
         .current_dir(worktree_path)
         .output()
-        .map_err(|e| format!("Failed to invoke agent: {}", e))?;
+        .map_err(|e| format!("Failed to invoke agent: {e}"))?;
 
     if !agent_output.status.success() {
         let stderr = String::from_utf8_lossy(&agent_output.stderr);
@@ -709,7 +709,7 @@ fn invoke_agent_for_rebase_conflicts(worktree_path: &Path) -> std::result::Resul
 
     let stdout = String::from_utf8_lossy(&agent_output.stdout);
     let response: serde_json::Value = serde_json::from_str(stdout.trim())
-        .map_err(|e| format!("Failed to parse agent response: {}", e))?;
+        .map_err(|e| format!("Failed to parse agent response: {e}"))?;
 
     match response.get("verdict").and_then(|v| v.as_str()) {
         Some("pass") => {
@@ -727,7 +727,7 @@ fn invoke_agent_for_rebase_conflicts(worktree_path: &Path) -> std::result::Resul
                 .get("summary")
                 .and_then(|s| s.as_str())
                 .unwrap_or("Agent reported failure");
-            Err(format!("Agent could not resolve conflicts: {}", summary))
+            Err(format!("Agent could not resolve conflicts: {summary}"))
         }
         _ => Err("Agent response missing or invalid 'verdict' field".to_string()),
     }
@@ -741,7 +741,7 @@ fn remove_worktree(repo_path: &Path, worktree_path: &Path) -> Result<()> {
         .args(["worktree", "remove", "--force"])
         .arg(worktree_path)
         .output()
-        .map_err(|e| AirlockError::Git(format!("Failed to remove worktree: {}", e)))?;
+        .map_err(|e| AirlockError::Git(format!("Failed to remove worktree: {e}")))?;
 
     if !output.status.success() {
         // Try to clean up the directory manually if git worktree remove fails

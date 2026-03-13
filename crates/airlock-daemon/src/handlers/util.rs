@@ -17,7 +17,7 @@ pub fn parse_params<T: DeserializeOwned>(
         Response::error(
             id.clone(),
             error_codes::INVALID_PARAMS,
-            format!("Invalid parameters: {}", e),
+            format!("Invalid parameters: {e}"),
         )
     })
 }
