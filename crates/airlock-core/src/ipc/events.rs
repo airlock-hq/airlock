@@ -54,6 +54,8 @@ pub enum AirlockEvent {
         success: bool,
         branch: String,
     },
+    /// A run was superseded by a newer push.
+    RunSuperseded { repo_id: String, run_id: String },
     /// A chunk of log output from a running step.
     LogChunk {
         repo_id: String,

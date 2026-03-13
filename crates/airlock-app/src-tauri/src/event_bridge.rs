@@ -327,6 +327,9 @@ fn emit_event_to_frontend<R: tauri::Runtime>(
                 warn!("Failed to send pipeline notification: {}", e);
             }
         }
+        AirlockEvent::RunSuperseded { .. } => {
+            // No notification for superseded runs — they're silently replaced
+        }
         _ => {}
     }
 
@@ -393,6 +396,10 @@ fn emit_event_to_frontend<R: tauri::Runtime>(
         } => (
             "airlock://run-completed",
             serde_json::json!({ "repo_id": repo_id, "run_id": run_id, "success": success, "branch": branch }),
+        ),
+        AirlockEvent::RunSuperseded { repo_id, run_id } => (
+            "airlock://run-superseded",
+            serde_json::json!({ "repo_id": repo_id, "run_id": run_id }),
         ),
         AirlockEvent::LogChunk {
             repo_id,

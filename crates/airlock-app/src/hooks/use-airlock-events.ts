@@ -87,6 +87,7 @@ export const AIRLOCK_EVENTS = {
   STEP_STARTED: 'airlock://step-started',
   STEP_COMPLETED: 'airlock://step-completed',
   RUN_COMPLETED: 'airlock://run-completed',
+  RUN_SUPERSEDED: 'airlock://run-superseded',
   LOG_CHUNK: 'airlock://log-chunk',
 } as const;
 
