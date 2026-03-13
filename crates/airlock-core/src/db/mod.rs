@@ -209,9 +209,7 @@ impl Database {
     fn set_schema_version(&self, version: i32) -> Result<()> {
         self.conn
             .execute("DELETE FROM schema_version", [])
-            .map_err(|e| {
-                AirlockError::Database(format!("Failed to clear schema version: {e}"))
-            })?;
+            .map_err(|e| AirlockError::Database(format!("Failed to clear schema version: {e}")))?;
 
         self.conn
             .execute(

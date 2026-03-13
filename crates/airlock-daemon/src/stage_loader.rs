@@ -582,7 +582,6 @@ impl StageLoader {
 
         Ok(stage_yaml)
     }
-
 }
 
 impl Default for StageLoader {

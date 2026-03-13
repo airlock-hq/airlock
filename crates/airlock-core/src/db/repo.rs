@@ -120,9 +120,7 @@ impl Database {
                 "UPDATE repos SET last_sync = ?1 WHERE id = ?2",
                 params![last_sync, id],
             )
-            .map_err(|e| {
-                AirlockError::Database(format!("Failed to update repo last_sync: {e}"))
-            })?;
+            .map_err(|e| AirlockError::Database(format!("Failed to update repo last_sync: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AirlockError::NotFound("Repo".into(), id.into()));
