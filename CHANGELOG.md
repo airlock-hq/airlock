@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.66](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.65...airlock-v0.1.66) (2026-03-13)
+
+
+### Bug Fixes
+
+* **push:** emit run superseded events ([#62](https://github.com/airlock-hq/airlock/issues/62)) ([46e9932](https://github.com/airlock-hq/airlock/commit/46e9932de540bd6448195c3deab12e3ff045517e))
+* **use-auto-navigate:** emit superseded flag for navigation ([#64](https://github.com/airlock-hq/airlock/issues/64)) ([e9bbb96](https://github.com/airlock-hq/airlock/commit/e9bbb96a9b7433b492170347ae40d618fe4cf2ab))
+
 ## [0.1.65](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.64...airlock-v0.1.65) (2026-03-12)
 
 
