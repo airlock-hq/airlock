@@ -60,7 +60,7 @@ pub use config::{
     TriggerConfig,
     WorkflowConfig,
 };
-pub use db::{job_status_to_string, string_to_job_status, Database};
+pub use db::{job_status_to_string, step_status_to_string, string_to_job_status, Database};
 pub use error::{AirlockError, Result};
 pub use git::{
     compute_diff, find_effective_base_sha, hooks, show_file, DiffResult, RefUpdateType,

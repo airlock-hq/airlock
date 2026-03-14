@@ -10,7 +10,7 @@ use crate::ipc::{
     GetRunsParams, GetRunsResult, JobResultInfo, RefUpdateParam, ReprocessRunParams,
     ReprocessRunResult, Response, RunDetailInfo, RunInfo, StepResultInfo,
 };
-use airlock_core::StepStatus;
+use airlock_core::step_status_to_string;
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -425,16 +425,4 @@ pub async fn handle_cancel_run(
     };
 
     Response::success(id, serde_json::to_value(result).unwrap())
-}
-
-/// Convert StepStatus to string for IPC responses.
-fn step_status_to_string(status: StepStatus) -> &'static str {
-    match status {
-        StepStatus::Pending => "pending",
-        StepStatus::Running => "running",
-        StepStatus::Passed => "passed",
-        StepStatus::Failed => "failed",
-        StepStatus::Skipped => "skipped",
-        StepStatus::AwaitingApproval => "awaiting_approval",
-    }
 }

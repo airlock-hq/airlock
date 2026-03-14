@@ -101,6 +101,10 @@ pub fn spawn_detached(gui_path: &PathBuf) -> Result<()> {
 
         let mut cmd = Command::new(gui_path);
 
+        // SAFETY: `setsid()` is called in the child process after `fork()` and
+        // before `exec()`.  It only affects the child's session/process-group and
+        // cannot fail in a way that corrupts the parent.  The closure captures no
+        // shared state, so there are no data-race concerns.
         unsafe {
             cmd.pre_exec(|| {
                 libc::setsid();

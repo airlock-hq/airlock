@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use std::path::Path;
 
 // Import database and types from airlock-core
-use airlock_core::{AirlockPaths, Database, Run, StepStatus};
+use airlock_core::{step_status_to_string, AirlockPaths, Database, Run};
 
 // Import IPC types from airlock-daemon for exact serialization matching
 use airlock_daemon::ipc::{
@@ -483,18 +483,6 @@ fn write_index(output_dir: &Path, repos: &[ExportedRepo]) -> Result<()> {
     println!("  index.json -> {}", path.display());
 
     Ok(())
-}
-
-/// Convert StepStatus to string for IPC responses.
-fn step_status_to_string(status: StepStatus) -> &'static str {
-    match status {
-        StepStatus::Pending => "pending",
-        StepStatus::Running => "running",
-        StepStatus::Passed => "passed",
-        StepStatus::Failed => "failed",
-        StepStatus::Skipped => "skipped",
-        StepStatus::AwaitingApproval => "awaiting_approval",
-    }
 }
 
 /// Load artifacts from a run's artifact directory.

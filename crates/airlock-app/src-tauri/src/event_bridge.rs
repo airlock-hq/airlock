@@ -26,7 +26,7 @@ use interprocess::local_socket::{tokio::Stream, GenericNamespaced};
 /// JSON-RPC notification from the daemon.
 #[derive(Debug, Deserialize)]
 struct Notification {
-    /// Required by JSON-RPC 2.0 schema; consumed during deserialization.
+    /// Required by JSON-RPC 2.0; deserialized for schema compliance.
     #[allow(dead_code)]
     jsonrpc: String,
     method: String,
@@ -45,7 +45,7 @@ struct SubscribeRequest {
 /// JSON-RPC response.
 #[derive(Debug, Deserialize)]
 struct Response {
-    /// Present in successful responses; currently unused but part of the JSON-RPC schema.
+    /// Deserialized for schema compliance; only `error` is inspected.
     #[allow(dead_code)]
     result: Option<serde_json::Value>,
     error: Option<RpcError>,
@@ -53,7 +53,7 @@ struct Response {
 
 #[derive(Debug, Deserialize)]
 struct RpcError {
-    /// JSON-RPC error code; deserialized for completeness but only `message` is displayed.
+    /// Deserialized for schema compliance; only `message` is displayed.
     #[allow(dead_code)]
     code: i32,
     message: String,
@@ -118,9 +118,6 @@ async fn connect_to_daemon(paths: &AirlockPaths) -> Result<Stream, String> {
 pub async fn run_event_bridge<R: tauri::Runtime>(app_handle: tauri::AppHandle<R>) {
     let paths = AirlockPaths::default();
     let state = Arc::new(EventBridgeState::new());
-
-    // Store state in app for potential cleanup
-    // Note: In a real implementation, you might want to store this in Tauri's state management
 
     info!("Event bridge starting...");
 
@@ -258,6 +255,8 @@ fn emit_event_to_frontend<R: tauri::Runtime>(
     app_handle: &tauri::AppHandle<R>,
     event: &AirlockEvent,
 ) {
+    use tauri_plugin_notification::NotificationExt;
+
     // Emit a general event with the full payload
     if let Err(e) = app_handle.emit("airlock://event", event) {
         warn!("Failed to emit event to frontend: {}", e);
@@ -266,7 +265,6 @@ fn emit_event_to_frontend<R: tauri::Runtime>(
     // Send OS notifications
     match event {
         AirlockEvent::RunCreated { branch, .. } => {
-            use tauri_plugin_notification::NotificationExt;
             if let Err(e) = app_handle
                 .notification()
                 .builder()
@@ -283,7 +281,6 @@ fn emit_event_to_frontend<R: tauri::Runtime>(
             branch,
             ..
         } if status == "awaiting_approval" => {
-            use tauri_plugin_notification::NotificationExt;
             let display_branch = branch.strip_prefix("refs/heads/").unwrap_or(branch);
             if let Err(e) = app_handle
                 .notification()
@@ -301,7 +298,6 @@ fn emit_event_to_frontend<R: tauri::Runtime>(
         AirlockEvent::RunCompleted {
             success, branch, ..
         } => {
-            use tauri_plugin_notification::NotificationExt;
             let display_branch = branch.strip_prefix("refs/heads/").unwrap_or(branch);
             let (title, body) = if *success {
                 (
