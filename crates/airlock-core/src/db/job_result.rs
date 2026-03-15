@@ -4,32 +4,8 @@ use crate::error::{AirlockError, Result};
 use crate::types::{JobResult, JobStatus};
 use rusqlite::{params, OptionalExtension};
 
+use super::helpers::{job_status_to_string, string_to_job_status};
 use super::Database;
-
-/// Convert JobStatus to string for database storage.
-pub fn job_status_to_string(status: JobStatus) -> &'static str {
-    match status {
-        JobStatus::Pending => "pending",
-        JobStatus::Running => "running",
-        JobStatus::Passed => "passed",
-        JobStatus::Failed => "failed",
-        JobStatus::Skipped => "skipped",
-        JobStatus::AwaitingApproval => "awaiting_approval",
-    }
-}
-
-/// Convert string from database to JobStatus.
-pub fn string_to_job_status(s: &str) -> Result<JobStatus> {
-    match s {
-        "pending" => Ok(JobStatus::Pending),
-        "running" => Ok(JobStatus::Running),
-        "passed" => Ok(JobStatus::Passed),
-        "failed" => Ok(JobStatus::Failed),
-        "skipped" => Ok(JobStatus::Skipped),
-        "awaiting_approval" => Ok(JobStatus::AwaitingApproval),
-        _ => Err(AirlockError::Database(format!("Unknown job status: {s}"))),
-    }
-}
 
 /// Internal row type for reading job results from the database.
 struct JobResultRow {

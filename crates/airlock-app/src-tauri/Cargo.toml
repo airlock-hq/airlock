@@ -30,6 +30,7 @@ serde_json = "1.0"
 
 # Logging
 log = "0.4"
+tracing = { workspace = true }
 
 # Async runtime (for IPC)
 tokio = { version = "1", features = ["full"] }

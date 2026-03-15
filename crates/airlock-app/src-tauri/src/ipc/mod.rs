@@ -53,11 +53,11 @@ impl IpcClient {
         let socket_name = self.paths.socket_name();
         let name = socket_name
             .to_fs_name::<GenericFilePath>()
-            .map_err(|e| IpcError::ConnectionError(e.to_string()))?;
+            .map_err(|e| IpcError::Connection(e.to_string()))?;
 
         Stream::connect(name)
             .await
-            .map_err(|e| IpcError::ConnectionError(e.to_string()))
+            .map_err(|e| IpcError::Connection(e.to_string()))
     }
 
     /// Connect to the daemon (Windows)
@@ -66,11 +66,11 @@ impl IpcClient {
         let socket_name = self.paths.socket_name();
         let name = socket_name
             .to_ns_name::<GenericNamespaced>()
-            .map_err(|e| IpcError::ConnectionError(e.to_string()))?;
+            .map_err(|e| IpcError::Connection(e.to_string()))?;
 
         Stream::connect(name)
             .await
-            .map_err(|e| IpcError::ConnectionError(e.to_string()))
+            .map_err(|e| IpcError::Connection(e.to_string()))
     }
 
     /// Send a request and get a response
@@ -95,33 +95,33 @@ impl IpcClient {
         writer
             .write_all(request_json.as_bytes())
             .await
-            .map_err(|e| IpcError::SendError(e.to_string()))?;
+            .map_err(|e| IpcError::Send(e.to_string()))?;
         writer
             .write_all(b"\n")
             .await
-            .map_err(|e| IpcError::SendError(e.to_string()))?;
+            .map_err(|e| IpcError::Send(e.to_string()))?;
         writer
             .flush()
             .await
-            .map_err(|e| IpcError::SendError(e.to_string()))?;
+            .map_err(|e| IpcError::Send(e.to_string()))?;
 
         // Read response
         let mut line = String::new();
         reader
             .read_line(&mut line)
             .await
-            .map_err(|e| IpcError::ReceiveError(e.to_string()))?;
+            .map_err(|e| IpcError::Receive(e.to_string()))?;
 
         let response: Response = serde_json::from_str(&line)?;
 
         if let Some(error) = response.error {
-            return Err(IpcError::RpcError {
+            return Err(IpcError::Rpc {
                 code: error.code,
                 message: error.message,
             });
         }
 
-        response.result.ok_or_else(|| IpcError::RpcError {
+        response.result.ok_or_else(|| IpcError::Rpc {
             code: -32603,
             message: "No result in response".to_string(),
         })

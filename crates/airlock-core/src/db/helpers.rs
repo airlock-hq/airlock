@@ -1,7 +1,35 @@
-//! Helper functions for enum serialization in the database.
+//! Helper functions for status enum serialization in the database.
+//!
+//! All status-to-string and string-to-status conversion functions live here
+//! to keep the pattern co-located and consistent.
 
 use crate::error::{AirlockError, Result};
-use crate::types::StepStatus;
+use crate::types::{JobStatus, StepStatus};
+
+/// Convert JobStatus to string for database storage.
+pub fn job_status_to_string(status: JobStatus) -> &'static str {
+    match status {
+        JobStatus::Pending => "pending",
+        JobStatus::Running => "running",
+        JobStatus::Passed => "passed",
+        JobStatus::Failed => "failed",
+        JobStatus::Skipped => "skipped",
+        JobStatus::AwaitingApproval => "awaiting_approval",
+    }
+}
+
+/// Convert string from database to JobStatus.
+pub fn string_to_job_status(s: &str) -> Result<JobStatus> {
+    match s {
+        "pending" => Ok(JobStatus::Pending),
+        "running" => Ok(JobStatus::Running),
+        "passed" => Ok(JobStatus::Passed),
+        "failed" => Ok(JobStatus::Failed),
+        "skipped" => Ok(JobStatus::Skipped),
+        "awaiting_approval" => Ok(JobStatus::AwaitingApproval),
+        _ => Err(AirlockError::Database(format!("Unknown job status: {s}"))),
+    }
+}
 
 /// Convert StepStatus to string for database storage.
 pub fn step_status_to_string(status: StepStatus) -> &'static str {

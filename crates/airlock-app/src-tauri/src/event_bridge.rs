@@ -5,7 +5,7 @@
 
 use airlock_core::ipc::AirlockEvent;
 use airlock_core::AirlockPaths;
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -26,9 +26,9 @@ use interprocess::local_socket::{tokio::Stream, GenericNamespaced};
 /// JSON-RPC notification from the daemon.
 #[derive(Debug, Deserialize)]
 struct Notification {
-    /// Required by JSON-RPC 2.0; deserialized for schema compliance.
-    #[allow(dead_code)]
-    jsonrpc: String,
+    /// Required by JSON-RPC 2.0; deserialized for schema compliance but not inspected.
+    #[serde(rename = "jsonrpc")]
+    _jsonrpc: String,
     method: String,
     params: serde_json::Value,
 }
@@ -46,16 +46,16 @@ struct SubscribeRequest {
 #[derive(Debug, Deserialize)]
 struct Response {
     /// Deserialized for schema compliance; only `error` is inspected.
-    #[allow(dead_code)]
-    result: Option<serde_json::Value>,
+    #[serde(rename = "result")]
+    _result: Option<serde_json::Value>,
     error: Option<RpcError>,
 }
 
 #[derive(Debug, Deserialize)]
 struct RpcError {
     /// Deserialized for schema compliance; only `message` is displayed.
-    #[allow(dead_code)]
-    code: i32,
+    #[serde(rename = "code")]
+    _code: i32,
     message: String,
 }
 

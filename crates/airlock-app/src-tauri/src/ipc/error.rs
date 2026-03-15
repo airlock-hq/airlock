@@ -2,37 +2,36 @@
 
 use thiserror::Error;
 
-/// Errors that can occur during IPC communication
+/// Errors that can occur during IPC communication.
 #[derive(Error, Debug)]
-#[allow(clippy::enum_variant_names)]
 pub enum IpcError {
     #[error("Failed to connect to daemon: {0}")]
-    ConnectionError(String),
+    Connection(String),
 
     #[error("Failed to send request: {0}")]
-    SendError(String),
+    Send(String),
 
     #[error("Failed to receive response: {0}")]
-    ReceiveError(String),
+    Receive(String),
 
     #[error("JSON serialization error: {0}")]
-    JsonError(String),
+    Json(String),
 
     #[error("RPC error ({code}): {message}")]
-    RpcError { code: i32, message: String },
+    Rpc { code: i32, message: String },
 
     #[error("IO error: {0}")]
-    IoError(String),
+    Io(String),
 }
 
 impl From<serde_json::Error> for IpcError {
     fn from(e: serde_json::Error) -> Self {
-        IpcError::JsonError(e.to_string())
+        IpcError::Json(e.to_string())
     }
 }
 
 impl From<std::io::Error> for IpcError {
     fn from(e: std::io::Error) -> Self {
-        IpcError::IoError(e.to_string())
+        IpcError::Io(e.to_string())
     }
 }
