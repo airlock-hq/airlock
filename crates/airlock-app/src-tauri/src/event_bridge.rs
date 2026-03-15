@@ -5,13 +5,13 @@
 
 use airlock_core::ipc::AirlockEvent;
 use airlock_core::AirlockPaths;
-use tracing::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tracing::{debug, info, warn};
 
 #[cfg(unix)]
 use interprocess::local_socket::tokio::prelude::*;
