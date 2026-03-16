@@ -240,19 +240,19 @@ fn export_run_detail(
         .context("Failed to get run")?
         .ok_or_else(|| anyhow::anyhow!("Run not found: {}", run_id))?;
 
-    // Get stage results
-    let db_stage_results = db.get_step_results_for_run(run_id).unwrap_or_default();
+    // Get step results
+    let db_step_results = db.get_step_results_for_run(run_id).unwrap_or_default();
 
     // Compute derived status
-    let status = run.derived_status(&db_stage_results).to_string();
+    let status = run.derived_status(&db_step_results).to_string();
     let completed_at = if status == "completed" || status == "failed" {
-        db_stage_results.iter().filter_map(|s| s.completed_at).max()
+        db_step_results.iter().filter_map(|s| s.completed_at).max()
     } else {
         None
     };
 
-    // Convert stage results to IPC format
-    let step_results: Vec<StepResultInfo> = db_stage_results
+    // Convert step results to IPC format
+    let step_results: Vec<StepResultInfo> = db_step_results
         .iter()
         .map(|sr| StepResultInfo {
             id: sr.id.clone(),

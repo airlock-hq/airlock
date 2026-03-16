@@ -8,16 +8,16 @@ mod job_result;
 mod repo;
 mod run;
 mod schema;
-mod stage_result;
+mod step_result;
 mod sync_log;
 
 #[cfg(test)]
 mod tests;
 
-// Re-export step status helpers
-pub use helpers::{step_status_to_string, string_to_step_status};
-// Re-export job status helpers
-pub use job_result::{job_status_to_string, string_to_job_status};
+// Re-export status conversion helpers (both step and job converters live in helpers.rs)
+pub use helpers::{
+    job_status_to_string, step_status_to_string, string_to_job_status, string_to_step_status,
+};
 
 use crate::error::{AirlockError, Result};
 use crate::paths::AirlockPaths;

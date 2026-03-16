@@ -178,7 +178,7 @@ pub mod methods {
     /// Get details of a specific run.
     pub const GET_RUN_DETAIL: &str = "get_run_detail";
 
-    /// Signal that a push stage has successfully forwarded changes to upstream.
+    /// Signal that a push step has successfully forwarded changes to upstream.
     pub const MARK_FORWARDED: &str = "mark_forwarded";
 
     /// Notification that a push was received (from post-receive hook).

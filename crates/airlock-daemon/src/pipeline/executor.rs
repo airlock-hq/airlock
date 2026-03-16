@@ -1,7 +1,7 @@
-//! Stage executor for the stage-based pipeline.
+//! Step executor for the pipeline.
 //!
-//! This module implements the core stage execution logic for the new architecture:
-//! - Environment variable setup for each stage
+//! This module implements the core step execution logic:
+//! - Environment variable setup for each step
 //! - Shell command execution with configurable shell
 //! - Capturing stdout, stderr, exit code, and duration
 //! - Artifact directory management
@@ -214,7 +214,7 @@ fn resolve_user_path() -> &'static str {
     })
 }
 
-/// Environment variables provided to each stage.
+/// Environment variables provided to each step.
 pub struct StageEnvironment {
     /// Unique run identifier (UUID).
     pub run_id: String,
@@ -226,9 +226,9 @@ pub struct StageEnvironment {
     pub head_sha: String,
     /// Absolute path to run worktree (also CWD).
     pub worktree: PathBuf,
-    /// Directory for run-level artifacts (shared by all stages).
+    /// Directory for run-level artifacts (shared by all steps).
     pub artifacts: PathBuf,
-    /// Directory for this stage's log files (stdout.log, stderr.log).
+    /// Directory for this step's log files (stdout.log, stderr.log).
     pub logs_dir: PathBuf,
     /// Path to write JSON result (optional).
     pub stage_result_path: PathBuf,
@@ -251,7 +251,7 @@ pub struct StageEnvironment {
 }
 
 impl StageEnvironment {
-    /// Create environment variable map for the stage execution.
+    /// Create environment variable map for the step execution.
     pub fn to_env_vars(&self) -> HashMap<String, String> {
         let mut env = HashMap::new();
         env.insert("AIRLOCK_RUN_ID".to_string(), self.run_id.clone());
@@ -293,7 +293,7 @@ impl StageEnvironment {
             env.insert("AIRLOCK_JOB_NAME".to_string(), job_name.clone());
         }
 
-        // Set git identity env vars so commits created by stages
+        // Set git identity env vars so commits created by steps
         // are attributed to the user (author) with Airlock provenance (committer).
         if let Some(ref name) = self.git_author_name {
             env.insert("GIT_AUTHOR_NAME".to_string(), name.clone());
@@ -324,7 +324,7 @@ impl StageEnvironment {
     }
 }
 
-/// Result of executing a single stage.
+/// Result of executing a single step.
 #[derive(Debug, Clone)]
 pub struct StageExecutionResult {
     /// Exit code of the command.
@@ -335,15 +335,15 @@ pub struct StageExecutionResult {
     pub stderr: String,
     /// Duration of the execution in milliseconds.
     pub duration_ms: i64,
-    /// Whether the stage passed (exit_code == 0).
+    /// Whether the step passed (exit_code == 0).
     pub passed: bool,
 }
 
-/// Create the stage logs directory.
+/// Create the step logs directory.
 ///
 /// Directory structure:
-/// - With job_key: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<job_key>/<stage-name>/`
-/// - Without job_key: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<stage-name>/`
+/// - With job_key: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<job_key>/<step-name>/`
+/// - Without job_key: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<step-name>/`
 pub fn create_stage_logs_dir(
     paths: &AirlockPaths,
     repo_id: &str,
@@ -369,9 +369,9 @@ pub fn create_stage_logs_dir(
 /// Directory structure:
 /// ```text
 /// ~/.airlock/artifacts/<repo-id>/<run-id>/
-/// ├── logs/              # Stage log files (stdout.log, stderr.log per stage)
-/// ├── description.json   # From describe stage
-/// ├── pr_result.json     # From create-pr stage
+/// ├── logs/              # Step log files (stdout.log, stderr.log per step)
+/// ├── description.json   # From describe step
+/// ├── pr_result.json     # From create-pr step
 /// └── ...
 /// ```
 pub fn create_run_artifacts_dir(
@@ -395,7 +395,7 @@ pub fn create_run_artifacts_dir(
     Ok(run_artifacts_dir)
 }
 
-/// Parameters for building a stage environment.
+/// Parameters for building a step environment.
 pub struct StageEnvironmentParams<'a> {
     /// Airlock paths.
     pub paths: &'a AirlockPaths,
@@ -478,7 +478,7 @@ pub fn detect_default_branch(gate_path: &Path) -> String {
 
 /// Build the StageEnvironment for a stage execution.
 pub fn build_stage_environment(params: &StageEnvironmentParams<'_>) -> Result<StageEnvironment> {
-    // Create stage logs directory
+    // Create step logs directory
     let logs_dir = create_stage_logs_dir(
         params.paths,
         params.repo_id,
@@ -515,7 +515,7 @@ pub fn build_stage_environment(params: &StageEnvironmentParams<'_>) -> Result<St
     })
 }
 
-/// Execute a stage command with optional log streaming and cancellation support.
+/// Execute a step command with optional log streaming and cancellation support.
 ///
 /// Similar to `execute_stage_command` but accepts an optional callback for
 /// streaming output in real-time. The callback receives (stream_type, content)
@@ -533,7 +533,7 @@ pub async fn execute_stage_command_with_streaming(
     // Get the run command - must be present (either directly or resolved from uses)
     let run_command = stage.run.as_ref().ok_or_else(|| {
         anyhow::anyhow!(
-            "Stage '{}' has no run command. If using 'use:', ensure the stage has been resolved.",
+            "Step '{}' has no run command. If using 'use:', ensure the stage has been resolved.",
             stage.name
         )
     })?;
@@ -745,7 +745,7 @@ pub async fn execute_stage_command_with_streaming(
             biased;
             _ = token.cancelled() => {
                 // Cancellation requested — kill the child process
-                warn!("Stage '{}' cancelled (superseded by newer push)", stage.name);
+                warn!("Step '{}' cancelled (superseded by newer push)", stage.name);
                 child.kill().await.ok();
                 let duration_ms = start_time.elapsed().as_millis() as i64;
                 return Ok(StageExecutionResult {
@@ -772,19 +772,19 @@ pub async fn execute_stage_command_with_streaming(
 
             if passed {
                 info!(
-                    "Stage '{}' passed (exit code: {}, duration: {:?})",
+                    "Step '{}' passed (exit code: {}, duration: {:?})",
                     stage.name, exit_code, duration
                 );
             } else {
                 warn!(
-                    "Stage '{}' failed (exit code: {}, duration: {:?})",
+                    "Step '{}' failed (exit code: {}, duration: {:?})",
                     stage.name, exit_code, duration
                 );
             }
 
-            debug!("Stage '{}' stdout:\n{}", stage.name, stdout);
+            debug!("Step '{}' stdout:\n{}", stage.name, stdout);
             if !stderr.is_empty() {
-                debug!("Stage '{}' stderr:\n{}", stage.name, stderr);
+                debug!("Step '{}' stderr:\n{}", stage.name, stderr);
             }
 
             Ok(StageExecutionResult {
@@ -796,7 +796,7 @@ pub async fn execute_stage_command_with_streaming(
             })
         }
         Ok(Err(e)) => {
-            warn!("Stage '{}' process error: {}", stage.name, e);
+            warn!("Step '{}' process error: {}", stage.name, e);
             Ok(StageExecutionResult {
                 exit_code: -1,
                 stdout: String::new(),
@@ -806,14 +806,14 @@ pub async fn execute_stage_command_with_streaming(
             })
         }
         Err(_) => {
-            warn!("Stage '{}' timed out after {:?}", stage.name, timeout);
+            warn!("Step '{}' timed out after {:?}", stage.name, timeout);
             // Kill the process
             child.kill().await.ok();
 
             Ok(StageExecutionResult {
                 exit_code: -1,
                 stdout: String::new(),
-                stderr: format!("Stage timed out after {:?}", timeout),
+                stderr: format!("Step timed out after {:?}", timeout),
                 duration_ms,
                 passed: false,
             })
@@ -821,13 +821,13 @@ pub async fn execute_stage_command_with_streaming(
     }
 }
 
-/// Execute a stage with optional log streaming callback.
+/// Execute a step with optional log streaming callback.
 ///
 /// Like `execute_stage` but accepts a callback for streaming output in real-time.
-/// The optional `cancel` token allows the stage to be cancelled mid-execution.
+/// The optional `cancel` token allows the step to be cancelled mid-execution.
 pub async fn execute_stage_with_log_callback(
     stage: &StepDefinition,
-    stage_result_id: &str,
+    step_result_id: &str,
     run_id: &str,
     env: &StageEnvironment,
     timeout: Duration,
@@ -839,10 +839,10 @@ pub async fn execute_stage_with_log_callback(
         .unwrap()
         .as_secs() as i64;
 
-    // Create initial step result (Running status)
-    // Note: step_order is preserved from the original insert, this is just for the update
-    let mut stage_result = StepResult {
-        id: stage_result_id.to_string(),
+    // Create initial step result (Running status).
+    // step_order is preserved from the original insert; this is just for the update.
+    let mut step_result = StepResult {
+        id: step_result_id.to_string(),
         run_id: run_id.to_string(),
         job_id: String::new(), // Preserved from original insert
         name: stage.name.clone(),
@@ -859,27 +859,27 @@ pub async fn execute_stage_with_log_callback(
     // Pause BEFORE running the command so that patches can be applied before
     // side-effecting steps (like push) execute.
     if stage.require_approval == ApprovalMode::IfPatches && has_pending_patches(&env.artifacts) {
-        stage_result.status = StepStatus::AwaitingApproval;
+        step_result.status = StepStatus::AwaitingApproval;
         info!(
-            "Stage '{}' paused before execution (pending patches)",
+            "Step '{}' paused before execution (pending patches)",
             stage.name
         );
-        return Ok(stage_result);
+        return Ok(step_result);
     }
 
     // Execute the command with streaming if callback is provided
     let exec_result =
         execute_stage_command_with_streaming(stage, env, timeout, log_callback, cancel).await?;
 
-    // Update stage result based on execution
+    // Update step result based on execution
     let completed_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
 
-    stage_result.exit_code = Some(exec_result.exit_code);
-    stage_result.duration_ms = Some(exec_result.duration_ms);
-    stage_result.completed_at = Some(completed_at);
+    step_result.exit_code = Some(exec_result.exit_code);
+    step_result.duration_ms = Some(exec_result.duration_ms);
+    step_result.completed_at = Some(completed_at);
 
     // Determine final status
     if exec_result.passed {
@@ -887,9 +887,9 @@ pub async fn execute_stage_with_log_callback(
         let await_marker = env.logs_dir.join(".awaiting");
         if await_marker.exists() {
             let _ = std::fs::remove_file(&await_marker);
-            stage_result.status = StepStatus::AwaitingApproval;
+            step_result.status = StepStatus::AwaitingApproval;
             info!(
-                "Stage '{}' requested approval via `airlock exec await`",
+                "Step '{}' requested approval via `airlock exec await`",
                 stage.name
             );
         } else {
@@ -899,17 +899,17 @@ pub async fn execute_stage_with_log_callback(
                 ApprovalMode::Never => false,
             };
             if should_pause {
-                // Stage passed but requires approval before proceeding
-                stage_result.status = StepStatus::AwaitingApproval;
-                info!("Stage '{}' completed and awaiting approval", stage.name);
+                // Step passed but requires approval before proceeding
+                step_result.status = StepStatus::AwaitingApproval;
+                info!("Step '{}' completed and awaiting approval", stage.name);
             } else {
-                stage_result.status = StepStatus::Passed;
+                step_result.status = StepStatus::Passed;
             }
         }
     } else {
-        // Stage failed
-        stage_result.status = StepStatus::Failed;
-        stage_result.error = Some(format!(
+        // Step failed
+        step_result.status = StepStatus::Failed;
+        step_result.error = Some(format!(
             "Exit code: {}. {}",
             exec_result.exit_code,
             if !exec_result.stderr.is_empty() {
@@ -928,7 +928,7 @@ pub async fn execute_stage_with_log_callback(
     // Write stdout/stderr to log files
     write_stage_logs(&env.logs_dir, &exec_result)?;
 
-    Ok(stage_result)
+    Ok(step_result)
 }
 
 /// Null SHA used by Git for new branches (no previous ref).
@@ -1054,7 +1054,7 @@ fn compute_merge_base_fallback(worktree_path: &Path, reason: &str) -> Result<Str
 /// Check if the artifacts directory contains pending (unapplied) patches.
 ///
 /// A patch is "pending" if it is a `.json` file at the top level of `patches/`.
-/// Applied patches are moved to `patches/applied/` by the freeze stage.
+/// Applied patches are moved to `patches/applied/` by the freeze step.
 pub fn has_pending_patches(artifacts_dir: &Path) -> bool {
     let patches_dir = artifacts_dir.join("patches");
     if !patches_dir.exists() {
@@ -1071,7 +1071,7 @@ pub fn has_pending_patches(artifacts_dir: &Path) -> bool {
     })
 }
 
-/// Write stage stdout/stderr to log files in the logs directory.
+/// Write step stdout/stderr to log files in the logs directory.
 ///
 /// If log files already exist (written incrementally by the log streaming callback),
 /// this is a no-op for those files to avoid overwriting.
@@ -1093,14 +1093,14 @@ fn write_stage_logs(logs_dir: &Path, result: &StageExecutionResult) -> Result<()
     Ok(())
 }
 
-/// Determine if the pipeline should continue after a stage result.
+/// Determine if the pipeline should continue after a step result.
 ///
 /// Returns `true` if the pipeline should continue, `false` if it should stop.
 ///
 /// Rules:
-/// - If stage passed or is awaiting approval: continue (unless awaiting, which pauses)
-/// - If stage failed and `continue_on_error` is true: continue
-/// - If stage failed and `continue_on_error` is false: stop
+/// - If step passed or is awaiting approval: continue (unless awaiting, which pauses)
+/// - If step failed and `continue_on_error` is true: continue
+/// - If step failed and `continue_on_error` is false: stop
 pub fn should_continue_pipeline(stage: &StepDefinition, result: &StepResult) -> bool {
     match result.status {
         StepStatus::Passed => true,

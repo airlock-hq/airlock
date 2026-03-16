@@ -102,22 +102,22 @@ impl Server {
         //
         // Runs can be in these states:
         // 1. Awaiting approval - should NOT be marked as failed, just left paused
-        // 2. Actively running a stage - were interrupted and should be marked as failed
-        // 3. Have pending stages (not started yet) - were interrupted, mark as failed
-        // 4. Already completed (all stages final) - skip, nothing to do
+        // 2. Actively running a step - were interrupted and should be marked as failed
+        // 3. Have pending steps (not started yet) - were interrupted, mark as failed
+        // 4. Already completed (all steps final) - skip, nothing to do
         match db.list_all_runs(None) {
             Ok(all_runs) => {
                 let mut orphaned_count = 0;
                 for run in &all_runs {
-                    // Check stage results to determine the run's actual state
+                    // Check step results to determine the run's actual state
                     match db.get_step_results_for_run(&run.id) {
                         Ok(stages) => {
-                            // Skip runs that are already completed (all stages have final status)
+                            // Skip runs that are already completed (all steps have final status)
                             if run.is_completed(&stages) {
                                 continue;
                             }
 
-                            // If any stage is awaiting approval, the run was paused - leave it alone
+                            // If any step is awaiting approval, the run was paused - leave it alone
                             if run.is_awaiting_approval(&stages) {
                                 info!(
                                     "Run {} was awaiting approval - leaving it paused for user to resume",
@@ -135,7 +135,7 @@ impl Server {
                                     let mut failed_stage = stage.clone();
                                     failed_stage.status = StepStatus::Failed;
                                     failed_stage.error = Some(
-                                        "Stage interrupted: daemon was restarted while stage was running".to_string()
+                                        "Step interrupted: daemon was restarted while step was running".to_string()
                                     );
                                     if let Err(e) = db.update_step_result(&failed_stage) {
                                         warn!(

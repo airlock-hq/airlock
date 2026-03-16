@@ -3,10 +3,12 @@
 use anyhow::{Context, Result};
 use std::env;
 use std::path::Path;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use tracing::{debug, info};
 
 use airlock_core::{git, AirlockPaths, Database};
+
+use super::format::format_timestamp;
 
 use super::format::format_time_ago;
 
@@ -192,29 +194,6 @@ fn run_with_paths(working_dir: &Path, paths: &AirlockPaths) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Format a Unix timestamp as a human-readable date/time.
-fn format_timestamp(timestamp: i64) -> String {
-    // Convert to chrono if available, otherwise use simple format
-    let duration = Duration::from_secs(timestamp as u64);
-    let datetime = UNIX_EPOCH + duration;
-
-    if let Ok(elapsed) = SystemTime::now().duration_since(datetime) {
-        // If we can compute elapsed time, datetime is valid
-        let _ = elapsed; // Just to verify the datetime is valid
-    }
-
-    // Format as ISO-like string (simple version without chrono dependency)
-    // In production, we'd use chrono for proper timezone support
-    let secs = timestamp;
-    let days = secs / 86400;
-    let years_since_1970 = days / 365;
-    let year = 1970 + years_since_1970;
-
-    // Simplified: just show the timestamp in a readable way
-    // A proper implementation would use chrono
-    format!("{}-{:02}-{:02}", year, 1, 1)
 }
 
 #[cfg(test)]

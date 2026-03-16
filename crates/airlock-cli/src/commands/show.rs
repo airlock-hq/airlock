@@ -5,7 +5,7 @@ use tracing::{debug, info};
 
 use airlock_core::{AirlockPaths, Database, StepStatus};
 
-use super::format::format_time_ago;
+use super::format::{format_time_ago, format_timestamp};
 use super::lookup::find_run_by_prefix;
 
 /// Arguments for the show command.
@@ -141,7 +141,7 @@ fn run_with_paths(paths: &AirlockPaths, args: &ShowArgs) -> Result<()> {
         println!("  {}", "─".repeat(50));
 
         for stage in &stages {
-            let status_str = format_stage_status(stage.status);
+            let status_str = format_step_status(stage.status);
             let duration_str = stage
                 .duration_ms
                 .map(|ms| format!("{}ms", ms))
@@ -191,7 +191,7 @@ fn format_derived_status(status: &str) -> String {
 }
 
 /// Format stage status with indicator.
-fn format_stage_status(status: StepStatus) -> String {
+fn format_step_status(status: StepStatus) -> String {
     match status {
         StepStatus::Pending => "○ pending".to_string(),
         StepStatus::Running => "● running".to_string(),
@@ -200,35 +200,6 @@ fn format_stage_status(status: StepStatus) -> String {
         StepStatus::Skipped => "- skipped".to_string(),
         StepStatus::AwaitingApproval => "◐ awaiting approval".to_string(),
     }
-}
-
-/// Format a Unix timestamp as a human-readable date/time.
-fn format_timestamp(timestamp: i64) -> String {
-    // Simple ISO-like format
-    // In production, we'd use chrono for proper formatting
-    let secs = timestamp;
-    let days_since_epoch = secs / 86400;
-
-    // Approximate year calculation
-    let years = days_since_epoch / 365;
-    let year = 1970 + years;
-
-    // Remaining days in year
-    let day_of_year = days_since_epoch % 365;
-
-    // Approximate month and day
-    let month = (day_of_year / 30) + 1;
-    let day = (day_of_year % 30) + 1;
-
-    // Time of day
-    let secs_of_day = secs % 86400;
-    let hours = secs_of_day / 3600;
-    let minutes = (secs_of_day % 3600) / 60;
-
-    format!(
-        "{}-{:02}-{:02} {:02}:{:02}",
-        year, month, day, hours, minutes
-    )
 }
 
 /// Format a duration in seconds as a human-readable string.
@@ -284,14 +255,14 @@ mod tests {
     }
 
     #[test]
-    fn test_format_stage_status() {
-        assert_eq!(format_stage_status(StepStatus::Pending), "○ pending");
-        assert_eq!(format_stage_status(StepStatus::Running), "● running");
-        assert_eq!(format_stage_status(StepStatus::Passed), "✓ passed");
-        assert_eq!(format_stage_status(StepStatus::Failed), "✗ failed");
-        assert_eq!(format_stage_status(StepStatus::Skipped), "- skipped");
+    fn test_format_step_status() {
+        assert_eq!(format_step_status(StepStatus::Pending), "○ pending");
+        assert_eq!(format_step_status(StepStatus::Running), "● running");
+        assert_eq!(format_step_status(StepStatus::Passed), "✓ passed");
+        assert_eq!(format_step_status(StepStatus::Failed), "✗ failed");
+        assert_eq!(format_step_status(StepStatus::Skipped), "- skipped");
         assert_eq!(
-            format_stage_status(StepStatus::AwaitingApproval),
+            format_step_status(StepStatus::AwaitingApproval),
             "◐ awaiting approval"
         );
     }

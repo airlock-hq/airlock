@@ -15,7 +15,7 @@ pub mod pipeline;
 // Per-repo run serialization queue
 pub mod run_queue;
 
-// Stage loader for reusable stages
+// Step loader for reusable steps (actions)
 pub mod stage_loader;
 
 // Per-repo pool of reusable worktrees

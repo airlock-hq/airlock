@@ -45,6 +45,37 @@ pub fn format_time_ago(timestamp: i64) -> String {
     format!("{}y ago", years)
 }
 
+/// Format a Unix timestamp as an approximate `YYYY-MM-DD HH:MM` string.
+///
+/// Uses a simple calendar approximation (no leap-year handling) since
+/// the output is only for human-readable CLI display. For exact
+/// formatting, switch to `chrono`.
+pub fn format_timestamp(timestamp: i64) -> String {
+    let secs = timestamp;
+    let days_since_epoch = secs / 86400;
+
+    // Approximate year calculation
+    let years = days_since_epoch / 365;
+    let year = 1970 + years;
+
+    // Remaining days in year
+    let day_of_year = days_since_epoch % 365;
+
+    // Approximate month and day
+    let month = (day_of_year / 30) + 1;
+    let day = (day_of_year % 30) + 1;
+
+    // Time of day
+    let secs_of_day = secs % 86400;
+    let hours = secs_of_day / 3600;
+    let minutes = (secs_of_day % 3600) / 60;
+
+    format!(
+        "{}-{:02}-{:02} {:02}:{:02}",
+        year, month, day, hours, minutes
+    )
+}
+
 /// Format run status with indicator symbol.
 pub fn format_status(status: &str) -> String {
     match status {
