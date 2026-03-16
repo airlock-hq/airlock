@@ -64,7 +64,7 @@ Airlock is a local-first Git proxy that transforms messy AI-generated code into 
 ```
 ~/.airlock/
 ├── config.yml               # Global configuration
-├── state.sqlite             # State database (repos, runs, stage_results)
+├── state.sqlite             # State database (repos, runs, job_results, step_results)
 ├── repos/                   # Local bare repos (gates)
 │   └── <repo-id>.git/
 │       └── hooks/           # pre-receive, post-receive
@@ -793,14 +793,28 @@ CREATE TABLE runs (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
--- Note: Run status is derived from stage_results, not stored
+-- Note: Run status is derived from job_results/step_results, not stored
 
-CREATE TABLE stage_results (
+CREATE TABLE job_results (
     id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL REFERENCES runs(id),
+    run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    job_key TEXT NOT NULL,
+    name TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    job_order INTEGER NOT NULL DEFAULT 0,
+    started_at INTEGER,
+    completed_at INTEGER,
+    error TEXT,
+    worktree_path TEXT
+);
+
+CREATE TABLE step_results (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    job_id TEXT NOT NULL REFERENCES job_results(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    status TEXT NOT NULL,  -- pending, running, passed, failed, skipped, awaiting_approval
-    stage_order INTEGER,   -- order in pipeline (0-indexed)
+    status TEXT NOT NULL DEFAULT 'pending',
+    step_order INTEGER NOT NULL DEFAULT 0,
     exit_code INTEGER,
     duration_ms INTEGER,
     error TEXT,
@@ -812,7 +826,7 @@ CREATE TABLE stage_results (
 
 **Storage split:**
 
-- SQLite for relational data (repos, runs, stage_results, sync log)
+- SQLite for relational data (repos, runs, job_results, step_results, sync log)
 - Filesystem for large artifacts (descriptions, tours, logs) to avoid bloating the database
 
 ### 7.2 Artifact Structure

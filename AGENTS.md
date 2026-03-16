@@ -170,7 +170,7 @@ Airlock stores its data in `~/.airlock/`:
 
 ```
 ~/.airlock/
-├── state.sqlite    # Main database (repos, runs, stage_results, sync_log)
+├── state.sqlite    # Main database (repos, runs, job_results, step_results, sync_log)
 ├── repos/          # Gate bare repos for each enrolled repository
 ├── worktrees/      # Pool worktrees for pipeline execution (worktrees/{repo_id}/pool-{N})
 ├── artifacts/      # Stage output artifacts (logs, etc.)
