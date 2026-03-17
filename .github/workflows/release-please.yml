@@ -256,34 +256,37 @@ jobs:
             -f since="${prev_date}" \
             --jq '.[].sha')
 
-          # Collect unique issue numbers from closing references in PRs
-          declare -A seen_issues
+          # Collect unique PR numbers across all commits first (avoids duplicate timeline queries)
+          declare -A seen_prs
           for sha in $commits; do
-            # Find PRs associated with this commit
             prs=$(gh api repos/${{ github.repository }}/commits/${sha}/pulls \
               --jq '.[].number' 2>/dev/null || true)
             for pr in $prs; do
-              # Get issues linked via cross-references in timeline events
-              cross_ref_issues=$(gh api repos/${{ github.repository }}/issues/${pr}/timeline \
-                --paginate --jq '.[] | select(.event == "cross-referenced") | .source.issue.number // empty' 2>/dev/null || true)
+              seen_prs[$pr]=1
+            done
+          done
 
-              # Get issues linked via the "connected" event (GitHub sidebar linking)
-              connected_issues=$(gh api repos/${{ github.repository }}/issues/${pr}/timeline \
-                --paginate --jq '[.[] | select(.event == "connected")] | .[].url // empty' 2>/dev/null \
-                | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+' || true)
+          # For each unique PR, find linked issues and comment
+          declare -A seen_issues
+          for pr in "${!seen_prs[@]}"; do
+            # Get issues linked via sidebar (connected events use .url, not .source)
+            connected_issues=$(gh api repos/${{ github.repository }}/issues/${pr}/timeline \
+              --paginate --jq '.[] | select(.event == "connected") | .url' 2>/dev/null \
+              | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+' || true)
 
-              # Also check the PR body for "Fixes #N" / "Closes #N" patterns
-              body_issues=$(gh api repos/${{ github.repository }}/pulls/${pr} \
-                --jq '.body' 2>/dev/null | grep -oiE '(fix(es|ed)?|close[sd]?|resolve[sd]?)\s+#[0-9]+' | grep -oE '[0-9]+' || true)
+            # Check the PR body for "Fixes #N" / "Closes #N" patterns (same-repo only, excludes org/repo#N)
+            body_issues=$(gh api repos/${{ github.repository }}/pulls/${pr} \
+              --jq '.body' 2>/dev/null \
+              | grep -oiE '(fix(es|ed)?|close[sd]?|resolve[sd]?)\s+#[0-9]+' \
+              | grep -oE '[0-9]+' || true)
 
-              for issue in $cross_ref_issues $connected_issues $body_issues; do
-                if [ -z "${seen_issues[$issue]+x}" ]; then
-                  seen_issues[$issue]=1
-                  echo "Commenting on issue #${issue}"
-                  gh issue comment "$issue" \
-                    --repo ${{ github.repository }} \
-                    --body "This issue has been addressed in [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/${TAG_NAME}). :tada:"
-                fi
-              done
+            for issue in $connected_issues $body_issues; do
+              if [ -z "${seen_issues[$issue]+x}" ]; then
+                seen_issues[$issue]=1
+                echo "Commenting on issue #${issue}"
+                gh issue comment "$issue" \
+                  --repo ${{ github.repository }} \
+                  --body "This issue has been addressed in [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/${TAG_NAME}). :tada:"
+              fi
             done
           done
