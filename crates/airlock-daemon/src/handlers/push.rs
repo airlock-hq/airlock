@@ -131,7 +131,7 @@ pub async fn handle_push_received(
         .await;
 
     // Also check for any other ready pushes (from other repos)
-    let mut all_ready = ctx.coalescer.get_ready_pushes().await;
+    let mut all_ready = ctx.coalescer.ready_pushes().await;
     if let Some(refs) = ready_refs {
         // This repo's push is ready immediately (debounce passed)
         all_ready.push((repo.id.clone(), refs));
@@ -910,7 +910,7 @@ async fn detect_missed_pushes_for_repo(
 /// This should be called periodically to ensure pushes are processed
 /// even if no new pushes arrive.
 pub async fn process_ready_pushes(ctx: Arc<HandlerContext>) {
-    let ready = ctx.coalescer.get_ready_pushes().await;
+    let ready = ctx.coalescer.ready_pushes().await;
     for (repo_id, ref_updates) in ready {
         process_coalesced_push(ctx.clone(), &repo_id, ref_updates).await;
     }

@@ -95,7 +95,7 @@ impl PushCoalescer {
     ///
     /// Returns a list of (repo_id, ref_updates) for pushes that have passed
     /// the debounce period.
-    pub async fn get_ready_pushes(&self) -> Vec<(String, Vec<RefUpdate>)> {
+    pub async fn ready_pushes(&self) -> Vec<(String, Vec<RefUpdate>)> {
         let mut pending = self.pending.lock().await;
         let now = Instant::now();
 

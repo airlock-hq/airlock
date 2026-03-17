@@ -622,6 +622,80 @@ pub fn list_worktrees(gate_path: &Path) -> Result<Vec<String>> {
 mod tests {
     use super::*;
 
+    /// Shared helper to create a bare repo with an initial commit containing a file.
+    ///
+    /// Used by both `integration_legacy` and `integration_stage_based` test modules.
+    #[cfg(unix)]
+    fn create_bare_repo_with_file(
+        temp_dir: &tempfile::TempDir,
+        file_name: &str,
+        file_content: &str,
+    ) -> (std::path::PathBuf, String) {
+        use std::process::Command;
+
+        // Create a working repo first
+        let work_path = temp_dir.path().join("work");
+        std::fs::create_dir_all(&work_path).unwrap();
+
+        // Init the repo
+        Command::new("git")
+            .args(["init"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+
+        // Configure git user
+        Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+
+        Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+
+        // Create the file
+        std::fs::write(work_path.join(file_name), file_content).unwrap();
+
+        // Add and commit
+        Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+
+        Command::new("git")
+            .args(["commit", "-m", "Initial commit"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+
+        // Get the commit SHA
+        let output = Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(&work_path)
+            .output()
+            .unwrap();
+        let commit_sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        // Clone to bare repo
+        let bare_path = temp_dir.path().join("bare.git");
+        Command::new("git")
+            .args([
+                "clone",
+                "--bare",
+                work_path.to_str().unwrap(),
+                bare_path.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+
+        (bare_path, commit_sha)
+    }
+
     // =========================================================================
     // Legacy Unit Tests (for deprecated functions)
     // These tests use deprecated functions and will be removed in 10.13-10.16
@@ -779,75 +853,6 @@ mod tests {
         use std::fs;
         use std::process::Command;
         use tempfile::TempDir;
-
-        /// Helper to create a bare repo with an initial commit containing a file
-        fn create_bare_repo_with_file(
-            temp_dir: &TempDir,
-            file_name: &str,
-            file_content: &str,
-        ) -> (std::path::PathBuf, String) {
-            // Create a working repo first
-            let work_path = temp_dir.path().join("work");
-            fs::create_dir_all(&work_path).unwrap();
-
-            // Init the repo
-            Command::new("git")
-                .args(["init"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            // Configure git user
-            Command::new("git")
-                .args(["config", "user.email", "test@example.com"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["config", "user.name", "Test User"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            // Create the file
-            fs::write(work_path.join(file_name), file_content).unwrap();
-
-            // Add and commit
-            Command::new("git")
-                .args(["add", "-A"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Initial commit"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            // Get the commit SHA
-            let output = Command::new("git")
-                .args(["rev-parse", "HEAD"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-            let commit_sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-            // Clone to bare repo
-            let bare_path = temp_dir.path().join("bare.git");
-            Command::new("git")
-                .args([
-                    "clone",
-                    "--bare",
-                    work_path.to_str().unwrap(),
-                    bare_path.to_str().unwrap(),
-                ])
-                .output()
-                .unwrap();
-
-            (bare_path, commit_sha)
-        }
 
         #[test]
         fn test_create_and_remove_worktree() {
@@ -1084,75 +1089,6 @@ mod tests {
         use std::fs;
         use std::process::Command;
         use tempfile::TempDir;
-
-        /// Helper to create a bare repo with an initial commit containing a file
-        fn create_bare_repo_with_file(
-            temp_dir: &TempDir,
-            file_name: &str,
-            file_content: &str,
-        ) -> (std::path::PathBuf, String) {
-            // Create a working repo first
-            let work_path = temp_dir.path().join("work");
-            fs::create_dir_all(&work_path).unwrap();
-
-            // Init the repo
-            Command::new("git")
-                .args(["init"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            // Configure git user
-            Command::new("git")
-                .args(["config", "user.email", "test@example.com"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["config", "user.name", "Test User"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            // Create the file
-            fs::write(work_path.join(file_name), file_content).unwrap();
-
-            // Add and commit
-            Command::new("git")
-                .args(["add", "-A"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Initial commit"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-
-            // Get the commit SHA
-            let output = Command::new("git")
-                .args(["rev-parse", "HEAD"])
-                .current_dir(&work_path)
-                .output()
-                .unwrap();
-            let commit_sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-            // Clone to bare repo
-            let bare_path = temp_dir.path().join("bare.git");
-            Command::new("git")
-                .args([
-                    "clone",
-                    "--bare",
-                    work_path.to_str().unwrap(),
-                    bare_path.to_str().unwrap(),
-                ])
-                .output()
-                .unwrap();
-
-            (bare_path, commit_sha)
-        }
 
         #[test]
         fn test_create_run_worktree() {

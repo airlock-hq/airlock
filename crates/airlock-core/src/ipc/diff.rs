@@ -5,49 +5,32 @@ use serde::{Deserialize, Serialize};
 /// Information about a single commit with its diff.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitDiffInfo {
-    /// Full commit SHA.
     pub sha: String,
-    /// Commit message (subject line).
+    /// Subject line.
     pub message: String,
-    /// Author name.
     pub author: String,
-    /// Author timestamp (Unix epoch seconds).
+    /// Unix epoch seconds.
     pub timestamp: i64,
     /// Unified diff patch for this commit.
     pub patch: String,
-    /// Files changed in this commit.
     pub files_changed: Vec<String>,
-    /// Number of lines added.
     pub additions: u32,
-    /// Number of lines deleted.
     pub deletions: u32,
 }
 
 /// Result for the `get_run_diff` method.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetRunDiffResult {
-    /// Run ID.
     pub run_id: String,
-
-    /// Branch name.
     pub branch: String,
-
-    /// Base commit SHA.
     pub base_sha: String,
-
-    /// Head commit SHA.
     pub head_sha: String,
 
     /// Full unified diff patch string.
     pub patch: String,
 
-    /// Files changed in this run.
     pub files_changed: Vec<String>,
-
-    /// Number of lines added.
     pub additions: u32,
-
-    /// Number of lines deleted.
     pub deletions: u32,
 
     /// Per-commit diff information (empty for single-commit pushes).

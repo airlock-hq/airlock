@@ -272,7 +272,7 @@ impl WorktreePool {
         }
 
         // Mark worktrees for AwaitingApproval jobs as in-use
-        if let Ok(paused_jobs) = db.get_awaiting_approval_jobs_with_worktrees() {
+        if let Ok(paused_jobs) = db.awaiting_approval_jobs_with_worktrees() {
             for (repo_id, job_key, wt_path) in &paused_jobs {
                 if let Some(pool) = pools.get_mut(repo_id) {
                     let wt = PathBuf::from(wt_path);
