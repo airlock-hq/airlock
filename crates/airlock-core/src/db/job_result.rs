@@ -225,9 +225,7 @@ impl Database {
     /// Get all AwaitingApproval jobs that have a worktree_path, joined with their repo_id.
     ///
     /// Used by worktree pool initialization to mark in-use slots after a restart.
-    pub fn awaiting_approval_jobs_with_worktrees(
-        &self,
-    ) -> Result<Vec<(String, String, String)>> {
+    pub fn awaiting_approval_jobs_with_worktrees(&self) -> Result<Vec<(String, String, String)>> {
         let mut stmt = self
             .conn
             .prepare(
