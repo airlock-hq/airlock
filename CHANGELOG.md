@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.67](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.66...airlock-v0.1.67) (2026-03-17)
+
+
+### Bug Fixes
+
+* **core:** set commit author and committer identities ([#70](https://github.com/airlock-hq/airlock/issues/70)) ([6f369d9](https://github.com/airlock-hq/airlock/commit/6f369d97abe3d48fd136b46c9db337cd66fb0955))
+
 ## [0.1.66](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.65...airlock-v0.1.66) (2026-03-13)
 
 
