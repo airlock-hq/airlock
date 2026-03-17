@@ -604,9 +604,9 @@ pub async fn handle_apply_patches(
         }
     };
 
-    // Validate repo exists
-    match db.get_repo(&run.repo_id) {
-        Ok(Some(_)) => {}
+    // Validate repo exists and read author identity from the working repo
+    let repo = match db.get_repo(&run.repo_id) {
+        Ok(Some(r)) => r,
         Ok(None) => {
             return Response::error(
                 id,
@@ -622,6 +622,8 @@ pub async fn handle_apply_patches(
             )
         }
     };
+    let git_author_name = airlock_core::git::get_git_config(&repo.working_path, "user.name");
+    let git_author_email = airlock_core::git::get_git_config(&repo.working_path, "user.email");
 
     // Release DB lock before doing I/O
     drop(db);
@@ -769,15 +771,8 @@ pub async fn handle_apply_patches(
         }
     }
 
-    // Configure git user in worktree
-    let _ = std::process::Command::new("git")
-        .args(["config", "user.name", "Airlock"])
-        .current_dir(&worktree_path)
-        .output();
-    let _ = std::process::Command::new("git")
-        .args(["config", "user.email", "airlock@localhost"])
-        .current_dir(&worktree_path)
-        .output();
+    // Git identity is set via env vars on the commit command below,
+    // not via worktree-level git config.
 
     // Apply each patch
     let mut applied_count: u32 = 0;
@@ -957,10 +952,19 @@ pub async fn handle_apply_patches(
     let titles_summary = applied_titles.join(", ");
     let commit_msg = format!("Airlock: applied patches: {titles_summary}");
 
-    let commit_output = std::process::Command::new("git")
+    let mut commit_cmd = std::process::Command::new("git");
+    commit_cmd
         .args(["commit", "-m", &commit_msg])
         .current_dir(&worktree_path)
-        .output();
+        .env("GIT_COMMITTER_NAME", "Airlock")
+        .env("GIT_COMMITTER_EMAIL", "airlock@airlockhq.com");
+    if let Some(ref name) = git_author_name {
+        commit_cmd.env("GIT_AUTHOR_NAME", name);
+    }
+    if let Some(ref email) = git_author_email {
+        commit_cmd.env("GIT_AUTHOR_EMAIL", email);
+    }
+    let commit_output = commit_cmd.output();
 
     if let Ok(ref o) = commit_output {
         if !o.status.success() {

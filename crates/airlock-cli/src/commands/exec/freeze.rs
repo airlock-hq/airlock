@@ -32,7 +32,10 @@ pub async fn freeze() -> Result<()> {
     )?;
     let worktree_path = PathBuf::from(&worktree);
 
-    match airlock_core::patches::apply_pending_patches(&worktree_path, &artifacts_path)? {
+    // Author/committer env vars are inherited from the stage environment
+    // (set by StageEnvironment::to_env_vars in the daemon).
+    match airlock_core::patches::apply_pending_patches(&worktree_path, &artifacts_path, None, None)?
+    {
         Some(new_sha) => {
             // Write new SHA to artifacts
             let head_sha_path = artifacts_path.join(".head_sha");

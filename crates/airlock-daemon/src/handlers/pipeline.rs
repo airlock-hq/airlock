@@ -895,6 +895,8 @@ pub(super) async fn execute_step_sequence(
                     match airlock_core::patches::apply_pending_patches(
                         params.worktree_path,
                         &env.artifacts,
+                        env.git_author_name.as_deref(),
+                        env.git_author_email.as_deref(),
                     ) {
                         Ok(Some(new_sha)) => {
                             info!(
