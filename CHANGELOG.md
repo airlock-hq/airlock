@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.68](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.67...airlock-v0.1.68) (2026-03-18)
+
+
+### Features
+
+* add bitbucket support ([#79](https://github.com/airlock-hq/airlock/issues/79)) ([093ab5f](https://github.com/airlock-hq/airlock/commit/093ab5ff86f5ae64c25cbcd955278ad1dff4dde4))
+
 ## [0.1.67](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.66...airlock-v0.1.67) (2026-03-17)
 
 
