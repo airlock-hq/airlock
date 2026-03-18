@@ -1,7 +1,4 @@
 //! Unified types for the agent adapter system.
-//!
-//! These types provide a provider-agnostic interface for agent interactions.
-//! All adapters (Claude Code, Codex, etc.) map their native types to these.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

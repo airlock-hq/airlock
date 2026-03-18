@@ -30,10 +30,7 @@ pub use types::{
 ///
 /// Each adapter wraps a specific agent CLI (e.g., Claude Code, Codex) and
 /// translates its native output into a unified stream of [`AgentEvent`] values.
-///
-/// Streaming is the only execution mode — there is no separate non-streaming
-/// `run()` method. Callers that need a collected result drain the stream with
-/// [`StreamCollector`].
+/// Callers that need a collected result drain the stream with [`StreamCollector`].
 #[async_trait]
 pub trait AgentAdapter: Send + Sync {
     /// Human-readable name (e.g., "Claude Code", "Codex").
@@ -43,11 +40,6 @@ pub trait AgentAdapter: Send + Sync {
     fn is_available(&self) -> bool;
 
     /// Run a prompt and return a stream of events for real-time output.
-    ///
-    /// Streaming is the only execution mode — there is no non-streaming `run()`.
-    /// Each adapter does best effort to produce a consistent stream of
-    /// [`AgentEvent`] variants regardless of how the underlying CLI delivers
-    /// output.
     async fn run(&self, request: &AgentRequest) -> Result<AgentEventStream>;
 }
 

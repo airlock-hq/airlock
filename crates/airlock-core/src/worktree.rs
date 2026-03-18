@@ -1,25 +1,13 @@
 //! Git worktree management for pipeline execution.
 //!
-//! This module provides utilities for creating and managing git worktrees
-//! used during pipeline processing.
+//! Provides utilities for creating and managing git worktrees used during
+//! stage-based pipeline processing.
 //!
-//! ## Stage-Based Pipeline (Recommended)
-//!
-//! The stage-based pipeline uses a single worktree per run:
 //! - [`create_run_worktree`] - Create worktree at head commit
 //! - [`remove_run_worktree`] - Remove a run's worktree
 //! - [`list_worktrees`] - List all worktrees for a repo
 //!
 //! Worktree path format: `~/.airlock/worktrees/<repo_id>/<run_id>`
-//!
-//! ## Legacy Intent-Centric Pipeline (DEPRECATED)
-//!
-//! The following functions are for the legacy intent-centric pipeline and
-//! will be removed in steps 10.13-10.16:
-//! - [`create_intent_worktree`] - Create worktree with patch application
-//! - [`create_intent_branch`] - Create branch and commit in worktree
-//! - [`hunks_to_patch`] - Convert hunks to unified diff patch
-//! - [`apply_patch`] - Apply patch to worktree
 
 use crate::error::{AirlockError, Result};
 use crate::types::SplitHunk;

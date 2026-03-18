@@ -34,42 +34,42 @@ pub mod service;
 pub mod types;
 pub mod worktree;
 
+// --- Agent types ---
 pub use agent::{
     create_adapter, try_extract_json, AgentAdapter, AgentEvent, AgentEventStream, AgentMessage,
     AgentRequest, AgentResult, AgentUsage, ClaudeCodeAdapter, CodexAdapter, ContentBlock,
     StreamCollector,
 };
+
+// --- Config types ---
 pub use config::{
-    // Workflow config
-    branch_matches_trigger,
-    filter_workflows_for_branch,
-    // Config loading utilities
-    load_global_config,
-    load_workflows_from_disk,
-    load_workflows_from_tree,
-    parse_workflow_config,
-    validate_job_dag,
-    // Common config types
-    AgentGlobalConfig,
-    AgentOptions,
-    DagValidationError,
-    GlobalConfig,
-    JobConfig,
-    OneOrMany,
-    PushTrigger,
-    TriggerConfig,
-    WorkflowConfig,
+    branch_matches_trigger, filter_workflows_for_branch, load_global_config,
+    load_workflows_from_disk, load_workflows_from_tree, parse_workflow_config, validate_job_dag,
+    AgentGlobalConfig, AgentOptions, DagValidationError, GlobalConfig, JobConfig, OneOrMany,
+    PushTrigger, TriggerConfig, WorkflowConfig,
 };
+
+// --- Database ---
 pub use db::{job_status_to_string, step_status_to_string, string_to_job_status, Database};
+
+// --- Error handling ---
 pub use error::{AirlockError, Result};
+
+// --- Git operations ---
 pub use git::{
     compute_diff, find_effective_base_sha, hooks, show_file, DiffResult, RefUpdateType,
     DEFAULT_BRANCHES, EMPTY_TREE_SHA,
 };
+
+// --- Initialization ---
 pub use init::{BYPASS_REMOTE, REPO_CONFIG_PATH};
+
+// --- Paths & providers ---
 pub use paths::AirlockPaths;
 pub use provider::{check_provider_setup, detect_provider, ProviderCheck, ScmProvider};
 pub use service::ServiceManager;
+
+// --- Domain types ---
 pub use types::{
     ApprovalMode, CleanResult, DependencyGraph, DiffAnalysis, DiffHunk, FileChange, FileStatus,
     FormatResult, GuidedTour, HunkDependencies, Intent, IntentCategory, IntentStatus, JobResult,
@@ -77,11 +77,9 @@ pub use types::{
     SecretFinding, SecretsResult, SplitAnalysis, SplitHunk, SplitIntent, StepDefinition,
     StepResult, StepStatus, SyncLog, TourResult, TourStep,
 };
+
+// --- Worktree management ---
 pub use worktree::{
     create_run_worktree, is_valid_worktree, list_worktrees, remove_run_worktree, remove_worktree,
     reset_persistent_worktree,
 };
-
-// Legacy intent-centric functions (create_intent_worktree, create_intent_branch,
-// hunks_to_patch, apply_patch) removed from public API. See worktree.rs for
-// deprecation notes (steps 10.13-10.16).

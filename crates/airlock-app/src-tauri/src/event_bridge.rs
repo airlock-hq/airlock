@@ -26,7 +26,6 @@ use interprocess::local_socket::{tokio::Stream, GenericNamespaced};
 /// JSON-RPC notification from the daemon.
 #[derive(Debug, Deserialize)]
 struct Notification {
-    /// Required by JSON-RPC 2.0; deserialized for schema compliance but not inspected.
     #[serde(rename = "jsonrpc")]
     _jsonrpc: String,
     method: String,
@@ -45,7 +44,6 @@ struct SubscribeRequest {
 /// JSON-RPC response.
 #[derive(Debug, Deserialize)]
 struct Response {
-    /// Deserialized for schema compliance; only `error` is inspected.
     #[serde(rename = "result")]
     _result: Option<serde_json::Value>,
     error: Option<RpcError>,
@@ -53,7 +51,6 @@ struct Response {
 
 #[derive(Debug, Deserialize)]
 struct RpcError {
-    /// Deserialized for schema compliance; only `message` is displayed.
     #[serde(rename = "code")]
     _code: i32,
     message: String,
