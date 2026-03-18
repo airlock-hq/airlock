@@ -385,6 +385,10 @@ export async function reprocessRun(runId: string): Promise<boolean> {
   return invoke<boolean>('reprocess_run', { runId });
 }
 
+export async function retryJob(runId: string, jobKey: string): Promise<boolean> {
+  return invoke<boolean>('retry_job', { runId, jobKey });
+}
+
 export async function cancelRun(runId: string): Promise<boolean> {
   return invoke<boolean>('cancel_run', { runId });
 }

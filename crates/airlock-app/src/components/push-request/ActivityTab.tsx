@@ -14,13 +14,25 @@ interface ActivityTabProps {
   artifacts: ArtifactInfo[];
   onApproveStep?: (jobKey: string, stepName: string) => Promise<void>;
   approvingStep?: StepSelection | null;
+  onRetryJob?: (jobKey: string) => Promise<void>;
+  retryingJob?: string | null;
 }
 
 /**
  * ActivityTab displays the pipeline jobs/steps sidebar and log viewer.
  * URL params: ?job=<key>&step=<name>
  */
-export function ActivityTab({ repoId, runId, jobs, steps, artifacts, onApproveStep, approvingStep }: ActivityTabProps) {
+export function ActivityTab({
+  repoId,
+  runId,
+  jobs,
+  steps,
+  artifacts,
+  onApproveStep,
+  approvingStep,
+  onRetryJob,
+  retryingJob,
+}: ActivityTabProps) {
   // Store selected step in URL search params
   const [searchParams, setSearchParams] = useSearchParams();
   const jobParam = searchParams.get('job');
@@ -79,6 +91,8 @@ export function ActivityTab({ repoId, runId, jobs, steps, artifacts, onApproveSt
           onSelectStep={handleSelectStep}
           onApprove={onApproveStep}
           approvingStep={approvingStep}
+          onRetryJob={onRetryJob}
+          retryingJob={retryingJob}
         />
       </ResizablePanel>
 

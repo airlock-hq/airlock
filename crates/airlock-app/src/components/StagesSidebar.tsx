@@ -1,6 +1,6 @@
 import { Button, StatusDot } from '@airlock-hq/design-system/react';
 import type { StepResultInfo, JobResultInfo } from '@/hooks/use-daemon';
-import { CheckCircle2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getStatusConfig } from '@/lib/status-utils';
 import { useState } from 'react';
@@ -19,6 +19,8 @@ interface StagesSidebarProps {
   onSelectStep: (selection: StepSelection) => void;
   onApprove?: (jobKey: string, stepName: string) => Promise<void>;
   approvingStep?: StepSelection | null;
+  onRetryJob?: (jobKey: string) => Promise<void>;
+  retryingJob?: string | null;
 }
 
 /**
@@ -33,6 +35,8 @@ export function StagesSidebar({
   onSelectStep,
   onApprove,
   approvingStep,
+  onRetryJob,
+  retryingJob,
 }: StagesSidebarProps) {
   const isSingleJob = jobs.length <= 1;
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
@@ -61,12 +65,28 @@ export function StagesSidebar({
   // Sort jobs by job_order
   const sortedJobs = [...jobs].sort((a, b) => a.job_order - b.job_order);
 
+  const singleJob = isSingleJob ? jobs[0] : undefined;
+
   return (
     <div className="flex h-full flex-col">
-      <div className="border-border-subtle border-b px-4 py-3">
+      <div className="border-border-subtle flex items-center justify-between border-b px-4 py-3">
         <span className="text-micro text-foreground-muted font-mono tracking-widest uppercase">
           {isSingleJob ? 'Steps' : 'Jobs'}
         </span>
+        {singleJob && onRetryJob && (singleJob.status === 'failed' || singleJob.status === 'skipped') && (
+          <button
+            className="text-foreground-muted hover:text-foreground shrink-0 cursor-pointer p-0.5"
+            title="Retry this job"
+            onClick={() => onRetryJob(singleJob.job_key)}
+            disabled={retryingJob === singleJob.job_key}
+          >
+            {retryingJob === singleJob.job_key ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {isSingleJob
@@ -104,6 +124,23 @@ export function StagesSidebar({
                     <span className="text-small min-w-0 flex-1 truncate font-medium">
                       {job.name || formatStageName(job.job_key)}
                     </span>
+                    {onRetryJob && (job.status === 'failed' || job.status === 'skipped') && (
+                      <button
+                        className="text-foreground-muted hover:text-foreground shrink-0 cursor-pointer p-0.5"
+                        title="Retry this job"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRetryJob(job.job_key);
+                        }}
+                        disabled={retryingJob === job.job_key}
+                      >
+                        {retryingJob === job.job_key ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* Steps within this job */}

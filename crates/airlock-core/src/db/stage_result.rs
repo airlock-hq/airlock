@@ -197,6 +197,25 @@ impl Database {
         Ok(())
     }
 
+    /// Reset all step results for a job to Pending, clearing exit_code, duration_ms, error, started_at, completed_at.
+    pub fn reset_step_results_for_job(&self, job_id: &str) -> Result<u32> {
+        let rows_affected = self
+            .conn
+            .execute(
+                "UPDATE step_results SET status = 'pending', exit_code = NULL, duration_ms = NULL, error = NULL, started_at = NULL, completed_at = NULL
+                 WHERE job_id = ?1",
+                [job_id],
+            )
+            .map_err(|e| {
+                AirlockError::Database(format!(
+                    "Failed to reset step results for job: {e}"
+                ))
+            })?;
+
+        tracing::debug!("Reset {} step results for job: {}", rows_affected, job_id);
+        Ok(rows_affected as u32)
+    }
+
     /// Delete all step results for a run.
     pub fn delete_step_results_for_run(&self, run_id: &str) -> Result<u32> {
         let rows_affected = self

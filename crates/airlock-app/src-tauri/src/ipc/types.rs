@@ -138,3 +138,8 @@ pub(crate) struct DaemonReprocessRunResult {
 pub(crate) struct DaemonCancelRunResult {
     pub success: bool,
 }
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DaemonRetryJobResult {
+    pub success: bool,
+}

@@ -2,17 +2,22 @@
 //!
 //! Handles run listing, detail retrieval, and reprocessing.
 
-use super::pipeline::execute_pipeline;
+use super::pipeline::{
+    emit_run_final_status, execute_pipeline, execute_single_job, extract_branch_name,
+    load_workflows_for_run, resolve_job_worktree, resume_dag_after_job_completion,
+};
 use super::util::{load_artifacts, parse_params};
 use super::HandlerContext;
 use crate::ipc::{
     error_codes, CancelRunParams, CancelRunResult, GetRunDetailParams, GetRunDetailResult,
     GetRunsParams, GetRunsResult, JobResultInfo, RefUpdateParam, ReprocessRunParams,
-    ReprocessRunResult, Response, RunDetailInfo, RunInfo, StepResultInfo,
+    ReprocessRunResult, Response, RetryJobParams, RetryJobResult, RunDetailInfo, RunInfo,
+    StepResultInfo,
 };
-use airlock_core::step_status_to_string;
+use airlock_core::{step_status_to_string, JobStatus, WorkflowConfig};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 /// Handle the `get_runs` method.
 pub async fn handle_get_runs(
@@ -425,4 +430,438 @@ pub async fn handle_cancel_run(
     };
 
     Response::success(id, serde_json::to_value(result).unwrap())
+}
+
+/// Collect transitive downstream dependents of a job in a workflow DAG.
+///
+/// BFS from the target job: for each job in the workflow, if any of its `needs`
+/// entries is in the frontier, it is a downstream dependent.
+pub fn collect_downstream(target: &str, workflow: &WorkflowConfig) -> Vec<String> {
+    let mut downstream = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(target.to_string());
+
+    while let Some(current) = queue.pop_front() {
+        for (job_key, job_config) in workflow.jobs.iter() {
+            if downstream.contains(job_key.as_str()) {
+                continue;
+            }
+            if job_key == target {
+                continue;
+            }
+            if job_config.needs.iter().any(|dep| dep == &current) {
+                downstream.insert(job_key.clone());
+                queue.push_back(job_key.clone());
+            }
+        }
+    }
+
+    downstream.into_iter().collect()
+}
+
+/// Handle the `retry_job` method.
+///
+/// Retries a specific failed/skipped job by resetting it and its transitive
+/// downstream dependents to Pending, then re-executing from that job.
+pub async fn handle_retry_job(
+    ctx: Arc<HandlerContext>,
+    params: serde_json::Value,
+    id: serde_json::Value,
+) -> Response {
+    let params: RetryJobParams = match parse_params(params, &id) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+
+    // Phase 1: DB reads + validation (hold lock briefly)
+    let (run, repo) = {
+        let db = ctx.db.lock().await;
+
+        let run = match db.get_run(&params.run_id) {
+            Ok(Some(r)) => r,
+            Ok(None) => {
+                return Response::error(
+                    id,
+                    error_codes::RUN_NOT_FOUND,
+                    format!("Run not found: {}", params.run_id),
+                )
+            }
+            Err(e) => {
+                return Response::error(
+                    id,
+                    error_codes::DATABASE_ERROR,
+                    format!("Failed to query database: {e}"),
+                )
+            }
+        };
+
+        let jobs = match db.get_job_results_for_run(&run.id) {
+            Ok(j) => j,
+            Err(e) => {
+                return Response::error(
+                    id,
+                    error_codes::DATABASE_ERROR,
+                    format!("Failed to get job results: {e}"),
+                )
+            }
+        };
+        if run.is_running_from_jobs(&jobs) {
+            return Response::error(
+                id,
+                error_codes::INVALID_REPO_STATE,
+                "Cannot retry a job while the run is still running".to_string(),
+            );
+        }
+
+        let target_job = match jobs.iter().find(|j| j.job_key == params.job_key) {
+            Some(j) => j,
+            None => {
+                return Response::error(
+                    id,
+                    error_codes::STEP_NOT_FOUND,
+                    format!(
+                        "Job '{}' not found in run {}",
+                        params.job_key, params.run_id
+                    ),
+                )
+            }
+        };
+
+        if target_job.status != JobStatus::Failed && target_job.status != JobStatus::Skipped {
+            return Response::error(
+                id,
+                error_codes::JOB_NOT_RETRYABLE,
+                format!(
+                    "Job '{}' has status '{}' — only failed or skipped jobs can be retried",
+                    params.job_key,
+                    airlock_core::job_status_to_string(target_job.status)
+                ),
+            );
+        }
+
+        let repo = match db.get_repo(&run.repo_id) {
+            Ok(Some(r)) => r,
+            Ok(None) => {
+                return Response::error(
+                    id,
+                    error_codes::REPO_NOT_FOUND,
+                    format!("Repository not found: {}", run.repo_id),
+                )
+            }
+            Err(e) => {
+                return Response::error(
+                    id,
+                    error_codes::DATABASE_ERROR,
+                    format!("Failed to query database: {e}"),
+                )
+            }
+        };
+
+        (run, repo)
+    };
+
+    // Phase 2: Load workflows from filesystem (no DB lock held)
+    let branch = extract_branch_name(&run.ref_updates);
+    let workflows = match load_workflows_for_run(&repo.gate_path, &run.head_sha, branch.as_deref())
+    {
+        Ok(w) => w,
+        Err(e) => {
+            return Response::error(
+                id,
+                error_codes::INTERNAL_ERROR,
+                format!("Failed to load workflows: {e}"),
+            )
+        }
+    };
+
+    let workflow = match workflows
+        .iter()
+        .find(|(_, wf)| wf.jobs.contains_key(&params.job_key))
+    {
+        Some((_, wf)) => wf.clone(),
+        None => {
+            return Response::error(
+                id,
+                error_codes::INTERNAL_ERROR,
+                format!(
+                    "Job '{}' not found in any workflow for this run",
+                    params.job_key
+                ),
+            )
+        }
+    };
+
+    let downstream = collect_downstream(&params.job_key, &workflow);
+    let mut reset_jobs = vec![params.job_key.clone()];
+    reset_jobs.extend(downstream.iter().cloned());
+
+    // Phase 3: Re-check guard + reset under lock (prevents TOCTOU races)
+    let jobs = {
+        let db = ctx.db.lock().await;
+
+        // Re-check that run hasn't become active since we released the lock
+        let fresh_jobs = match db.get_job_results_for_run(&run.id) {
+            Ok(j) => j,
+            Err(e) => {
+                return Response::error(
+                    id,
+                    error_codes::DATABASE_ERROR,
+                    format!("Failed to get job results: {e}"),
+                )
+            }
+        };
+        if run.is_running_from_jobs(&fresh_jobs) {
+            return Response::error(
+                id,
+                error_codes::INVALID_REPO_STATE,
+                "Cannot retry a job while the run is still running".to_string(),
+            );
+        }
+
+        // Re-check that the target job is still Failed/Skipped (another retry
+        // may have already reset it to Pending between phase 1 and now).
+        if let Some(target) = fresh_jobs.iter().find(|j| j.job_key == params.job_key) {
+            if target.status != JobStatus::Failed && target.status != JobStatus::Skipped {
+                return Response::error(
+                    id,
+                    error_codes::JOB_NOT_RETRYABLE,
+                    format!(
+                        "Job '{}' is no longer retryable (status: '{}')",
+                        params.job_key,
+                        airlock_core::job_status_to_string(target.status)
+                    ),
+                );
+            }
+        }
+
+        // Reset target + downstream jobs and their steps.
+        // The target job must reset successfully; downstream failures are non-fatal.
+        for job_key in &reset_jobs {
+            if let Some(job) = fresh_jobs.iter().find(|j| &j.job_key == job_key) {
+                let is_target = job_key == &params.job_key;
+                if let Err(e) = db.reset_job_to_pending(&job.id) {
+                    if is_target {
+                        return Response::error(
+                            id,
+                            error_codes::DATABASE_ERROR,
+                            format!("Failed to reset job '{}': {e}", job_key),
+                        );
+                    }
+                    warn!("Failed to reset downstream job '{}': {}", job_key, e);
+                }
+                if let Err(e) = db.reset_step_results_for_job(&job.id) {
+                    if is_target {
+                        return Response::error(
+                            id,
+                            error_codes::DATABASE_ERROR,
+                            format!("Failed to reset steps for job '{}': {e}", job_key),
+                        );
+                    }
+                    warn!(
+                        "Failed to reset steps for downstream job '{}': {}",
+                        job_key, e
+                    );
+                }
+            }
+        }
+
+        // Only clear run error if no other jobs are still failed (outside the reset set)
+        let other_failures = fresh_jobs
+            .iter()
+            .any(|j| j.status == JobStatus::Failed && !reset_jobs.contains(&j.job_key));
+        if !other_failures {
+            if let Err(e) = db.update_run_error(&params.run_id, None) {
+                warn!("Failed to clear run error: {}", e);
+            }
+        }
+
+        fresh_jobs
+    };
+
+    info!(
+        "Retrying job '{}' in run {} (resetting {} jobs: {:?})",
+        params.job_key,
+        run.id,
+        reset_jobs.len(),
+        reset_jobs,
+    );
+
+    // Build job_id_map from fresh_jobs (the authoritative state after reset)
+    let job_id_map: HashMap<String, String> = jobs
+        .iter()
+        .map(|j| (j.job_key.clone(), j.id.clone()))
+        .collect();
+    let job_key = params.job_key.clone();
+    let job_config = match workflow.jobs.get(&job_key) {
+        Some(c) => c.clone(),
+        None => {
+            return Response::error(
+                id,
+                error_codes::INTERNAL_ERROR,
+                format!("Job '{}' no longer found in workflow config", job_key),
+            )
+        }
+    };
+    let run_clone = run.clone();
+    let repo_clone = repo.clone();
+
+    // Spawn background task to execute the retried job.
+    // RunUpdated is emitted after acquiring the permit so the UI doesn't
+    // show "running" while the job is still queued.
+    let downstream_keys: Vec<String> = reset_jobs[1..].to_vec();
+    tokio::spawn(async move {
+        let ref_names: Vec<String> = run_clone
+            .ref_updates
+            .iter()
+            .map(|u| u.ref_name.clone())
+            .collect();
+        let permit = ctx.run_queue.acquire(&run_clone.repo_id, &ref_names).await;
+
+        ctx.emit(crate::ipc::AirlockEvent::RunUpdated {
+            repo_id: run_clone.repo_id.clone(),
+            run_id: run_clone.id.clone(),
+            status: "running".to_string(),
+        });
+
+        // Resolve worktree and execute
+        let (worktree_path, _lease) = match resolve_job_worktree(
+            &ctx,
+            &job_key,
+            &run_clone,
+            &repo_clone,
+            &job_id_map,
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(e) => {
+                error!(
+                    "Failed to resolve worktree for retry of '{}': {}",
+                    job_key, e
+                );
+                // Mark target job as failed
+                let db = ctx.db.lock().await;
+                if let Some(job_id) = job_id_map.get(&job_key) {
+                    let _ = db.update_job_status(
+                        job_id,
+                        JobStatus::Failed,
+                        None,
+                        None,
+                        Some(&format!("Worktree setup failed: {e}")),
+                    );
+                }
+                // Mark downstream jobs as skipped so the run reaches a final state
+                for ds_key in &downstream_keys {
+                    if let Some(job_id) = job_id_map.get(ds_key.as_str()) {
+                        let _ = db.update_job_status(job_id, JobStatus::Skipped, None, None, None);
+                    }
+                }
+                drop(db);
+                emit_run_final_status(&ctx, &run_clone).await;
+                drop(permit);
+                return;
+            }
+        };
+
+        // Use the permit's cancellation token so a newer push can cancel this retry
+        let status = execute_single_job(
+            &ctx,
+            &run_clone,
+            &repo_clone,
+            &job_key,
+            &job_config,
+            &job_id_map,
+            &worktree_path,
+            &permit.token,
+        )
+        .await;
+
+        // Let the DAG machinery handle downstream jobs
+        resume_dag_after_job_completion(&ctx, &run_clone, &repo_clone, &workflow, &job_key, status)
+            .await;
+        emit_run_final_status(&ctx, &run_clone).await;
+        drop(permit);
+    });
+
+    let result = RetryJobResult {
+        run_id: params.run_id,
+        job_key: params.job_key,
+        success: true,
+        reset_jobs,
+    };
+
+    Response::success(id, serde_json::to_value(result).unwrap())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use airlock_core::WorkflowConfig;
+
+    fn make_workflow(yaml: &str) -> WorkflowConfig {
+        serde_yaml::from_str(yaml).unwrap()
+    }
+
+    #[test]
+    fn test_collect_downstream_linear() {
+        // A -> B -> C
+        let wf = make_workflow(
+            "jobs:
+  a:
+    steps: []
+  b:
+    needs: a
+    steps: []
+  c:
+    needs: b
+    steps: []",
+        );
+        let mut result = collect_downstream("a", &wf);
+        result.sort();
+        assert_eq!(result, vec!["b", "c"]);
+    }
+
+    #[test]
+    fn test_collect_downstream_diamond() {
+        // A -> {B, C} -> D
+        let wf = make_workflow(
+            "jobs:
+  a:
+    steps: []
+  b:
+    needs: a
+    steps: []
+  c:
+    needs: a
+    steps: []
+  d:
+    needs: [b, c]
+    steps: []",
+        );
+
+        let mut result = collect_downstream("a", &wf);
+        result.sort();
+        assert_eq!(result, vec!["b", "c", "d"]);
+
+        // Retrying B only collects D
+        let result = collect_downstream("b", &wf);
+        assert_eq!(result, vec!["d"]);
+    }
+
+    #[test]
+    fn test_collect_downstream_no_deps() {
+        // A -> B, C (leaf)
+        let wf = make_workflow(
+            "jobs:
+  a:
+    steps: []
+  b:
+    needs: a
+    steps: []
+  c:
+    steps: []",
+        );
+        let result = collect_downstream("c", &wf);
+        assert!(result.is_empty());
+    }
 }

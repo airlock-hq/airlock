@@ -112,6 +112,13 @@ async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
       return description as T;
     }
 
+    case 'retry_job': {
+      const runId = args?.runId as string;
+      const jobKey = args?.jobKey as string;
+      console.log(`[Mock] Retry job ${jobKey} in run ${runId}`);
+      return true as T;
+    }
+
     case 'reprocess_run': {
       const runId = args?.runId as string;
       console.log(`[Mock] Reprocess run ${runId}`);

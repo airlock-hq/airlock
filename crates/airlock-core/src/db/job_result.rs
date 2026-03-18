@@ -258,6 +258,27 @@ impl Database {
         Ok(results)
     }
 
+    /// Reset a job to Pending status, clearing started_at, completed_at, error, and worktree_path.
+    pub fn reset_job_to_pending(&self, job_id: &str) -> Result<()> {
+        let rows_affected = self
+            .conn
+            .execute(
+                "UPDATE job_results SET status = 'pending', started_at = NULL, completed_at = NULL, error = NULL, worktree_path = NULL
+                 WHERE id = ?1",
+                [job_id],
+            )
+            .map_err(|e| {
+                AirlockError::Database(format!("Failed to reset job to pending: {e}"))
+            })?;
+
+        if rows_affected == 0 {
+            return Err(AirlockError::NotFound("JobResult".into(), job_id.into()));
+        }
+
+        tracing::debug!("Reset job result to pending: {}", job_id);
+        Ok(())
+    }
+
     /// Update the worktree_path for a job result.
     pub fn update_job_worktree_path(&self, id: &str, worktree_path: &str) -> Result<()> {
         let rows_affected = self

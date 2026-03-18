@@ -191,6 +191,20 @@ async fn reprocess_run(state: State<'_, AppState>, run_id: String) -> Result<boo
         .map_err(|e| e.to_string())
 }
 
+/// Retry a specific failed/skipped job within a run
+#[tauri::command]
+async fn retry_job(
+    state: State<'_, AppState>,
+    run_id: String,
+    job_key: String,
+) -> Result<bool, String> {
+    state
+        .ipc_client
+        .retry_job(&run_id, &job_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Cancel a running pipeline run
 #[tauri::command]
 async fn cancel_run(state: State<'_, AppState>, run_id: String) -> Result<bool, String> {
@@ -532,6 +546,7 @@ pub fn run() {
             get_intent_diff,
             get_intent_tour,
             reprocess_run,
+            retry_job,
             cancel_run,
             approve_intent,
             reject_intent,

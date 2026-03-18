@@ -2,7 +2,8 @@
 
 use super::error::IpcError;
 use super::types::{
-    DaemonCancelRunResult, DaemonGetRunsResult, DaemonReprocessRunResult, DaemonRunDetailResult,
+    DaemonCancelRunResult, DaemonGetRunsResult, DaemonReprocessRunResult, DaemonRetryJobResult,
+    DaemonRunDetailResult,
 };
 use super::IpcClient;
 use crate::{ApplyPatchesResult, ApproveStepResult, GetRunDiffResult, RunDetail, RunInfo};
@@ -59,6 +60,19 @@ impl IpcClient {
             .await?;
 
         let daemon_result: DaemonReprocessRunResult = serde_json::from_value(result)?;
+        Ok(daemon_result.success)
+    }
+
+    /// Retry a specific failed/skipped job within a run
+    pub async fn retry_job(&self, run_id: &str, job_key: &str) -> Result<bool, IpcError> {
+        let result = self
+            .send_request(
+                "retry_job",
+                serde_json::json!({ "run_id": run_id, "job_key": job_key }),
+            )
+            .await?;
+
+        let daemon_result: DaemonRetryJobResult = serde_json::from_value(result)?;
         Ok(daemon_result.success)
     }
 

@@ -103,6 +103,7 @@ pub mod error_codes {
     pub const GIT_ERROR: i32 = -32020;
     pub const DATABASE_ERROR: i32 = -32021;
     pub const STEP_NOT_FOUND: i32 = -32024;
+    pub const JOB_NOT_RETRYABLE: i32 = -32025;
 }
 
 /// IPC method names.
@@ -132,6 +133,7 @@ pub mod methods {
     pub const GET_RUN_DIFF: &str = "get_run_diff";
     pub const APPLY_PATCHES: &str = "apply_patches";
     pub const CANCEL_RUN: &str = "cancel_run";
+    pub const RETRY_JOB: &str = "retry_job";
 }
 
 // =============================================================================
@@ -248,6 +250,13 @@ pub struct ApplyPatchesParams {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CancelRunParams {
     pub run_id: String,
+}
+
+/// Parameters for the `retry_job` method.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RetryJobParams {
+    pub run_id: String,
+    pub job_key: String,
 }
 
 /// Parameters for the `get_config` method.
@@ -467,6 +476,17 @@ pub struct ReprocessRunResult {
 pub struct CancelRunResult {
     pub run_id: String,
     pub success: bool,
+}
+
+/// Result for the `retry_job` method.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RetryJobResult {
+    pub run_id: String,
+    pub job_key: String,
+    pub success: bool,
+    /// Job keys that were reset (target + downstream dependents).
+    #[serde(default)]
+    pub reset_jobs: Vec<String>,
 }
 
 // =============================================================================

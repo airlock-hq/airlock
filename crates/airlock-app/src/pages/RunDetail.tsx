@@ -9,6 +9,7 @@ import {
   getRepoNameFromUrl,
   reprocessRun,
   cancelRun,
+  retryJob,
   approveStep,
   readArtifact,
   applyPatches,
@@ -83,6 +84,7 @@ export function RunDetail() {
   }, [repos, repoId]);
   const [reprocessing, setReprocessing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [retryingJob, setRetryingJob] = useState<string | null>(null);
   const [approvingStep, setApprovingStep] = useState<StepSelection | null>(null);
   const [allComments, setAllComments] = useState<CodeComment[]>([]);
   const [selectedComments, setSelectedComments] = useState<Set<string>>(new Set());
@@ -118,6 +120,22 @@ export function RunDetail() {
       setCancelling(false);
     }
   };
+
+  const handleRetryJob = useCallback(
+    async (jobKey: string) => {
+      if (!runId) return;
+      try {
+        setRetryingJob(jobKey);
+        await retryJob(runId, jobKey);
+        await refresh();
+      } catch (e) {
+        console.error('Retry job failed:', e);
+      } finally {
+        setRetryingJob(null);
+      }
+    },
+    [runId, refresh]
+  );
 
   const handleApproveStep = useCallback(
     async (jobKey: string, stepName: string) => {
@@ -555,6 +573,8 @@ export function RunDetail() {
                 artifacts={detail.artifacts}
                 onApproveStep={handleApproveStep}
                 approvingStep={approvingStep}
+                onRetryJob={handleRetryJob}
+                retryingJob={retryingJob}
               />
             </TabsContent>
 
