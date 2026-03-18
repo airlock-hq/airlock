@@ -245,18 +245,12 @@ jobs:
 
           echo "Finding PRs between ${prev_tag} and ${TAG_NAME}"
 
-          # Get the date of the previous release to scope the commit list
-          prev_date=$(gh api repos/${{ github.repository }}/releases \
-            --jq "[.[] | select(.tag_name != \"${TAG_NAME}\")] | first | .published_at")
+          # Use compare API — excludes base tag's commits (unlike commits?since= which is inclusive)
+          # Note: capped at 250 commits, but sufficient for typical release cadences
+          commits=$(gh api repos/${{ github.repository }}/compare/${prev_tag}...${TAG_NAME} \
+            --jq '.commits[].sha')
 
-          # Use the commits list API with real pagination (compare API caps at 250)
-          commits=$(gh api repos/${{ github.repository }}/commits \
-            --paginate \
-            -f sha="${TAG_NAME}" \
-            -f since="${prev_date}" \
-            --jq '.[].sha')
-
-          # Collect unique PR numbers across all commits first (avoids duplicate timeline queries)
+          # Collect unique PR numbers across all commits (avoids duplicate queries per PR)
           declare -A seen_prs
           for sha in $commits; do
             prs=$(gh api repos/${{ github.repository }}/commits/${sha}/pulls \
@@ -266,21 +260,16 @@ jobs:
             done
           done
 
-          # For each unique PR, find linked issues and comment
+          # For each unique PR, find linked issues via body regex and comment
           declare -A seen_issues
           for pr in "${!seen_prs[@]}"; do
-            # Get issues linked via sidebar (connected events use .url, not .source)
-            connected_issues=$(gh api repos/${{ github.repository }}/issues/${pr}/timeline \
-              --paginate --jq '.[] | select(.event == "connected") | .url' 2>/dev/null \
-              | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+' || true)
-
             # Check the PR body for "Fixes #N" / "Closes #N" patterns (same-repo only, excludes org/repo#N)
-            body_issues=$(gh api repos/${{ github.repository }}/pulls/${pr} \
+            issues=$(gh api repos/${{ github.repository }}/pulls/${pr} \
               --jq '.body' 2>/dev/null \
               | grep -oiE '(fix(es|ed)?|close[sd]?|resolve[sd]?)\s+#[0-9]+' \
               | grep -oE '[0-9]+' || true)
 
-            for issue in $connected_issues $body_issues; do
+            for issue in $issues; do
               if [ -z "${seen_issues[$issue]+x}" ]; then
                 seen_issues[$issue]=1
                 echo "Commenting on issue #${issue}"
