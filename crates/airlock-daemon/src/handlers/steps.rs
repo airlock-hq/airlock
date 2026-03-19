@@ -343,6 +343,11 @@ async fn resume_pipeline_after_approval(
             job_key: approved_job_key.to_string(),
             status: "passed".to_string(),
         });
+        ctx.emit(AirlockEvent::RunUpdated {
+            repo_id: run.repo_id.clone(),
+            run_id: run.id.clone(),
+            status: "updated".to_string(),
+        });
 
         // Resume DAG: check if dependent jobs can now start
         resume_dag_after_job_completion(&ctx, &run, &repo, &workflow, approved_job_key, job_status)
@@ -452,6 +457,11 @@ async fn resume_pipeline_after_approval(
             run_id: run.id.clone(),
             job_key: approved_job_key.to_string(),
             status: status_str.to_string(),
+        });
+        ctx.emit(AirlockEvent::RunUpdated {
+            repo_id: run.repo_id.clone(),
+            run_id: run.id.clone(),
+            status: "updated".to_string(),
         });
 
         // Resume DAG: check if dependent jobs can now start

@@ -145,7 +145,7 @@ export interface RefreshOnEventsOptions {
   stepName?: string | null;
   /** Event types to listen for (defaults to all refresh-worthy events) */
   events?: string[];
-  /** Debounce time in ms (default: 100) */
+  /** Debounce time in ms (default: 500) */
   debounceMs?: number;
 }
 
@@ -179,7 +179,7 @@ export function useRefreshOnEvents(refresh: () => void, options: RefreshOnEvents
       AIRLOCK_EVENTS.JOB_COMPLETED,
       AIRLOCK_EVENTS.STEP_COMPLETED,
     ],
-    debounceMs = 100,
+    debounceMs = 500,
   } = options;
 
   const refreshRef = useRef(refresh);

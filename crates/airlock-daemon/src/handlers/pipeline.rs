@@ -608,6 +608,11 @@ pub(super) async fn skip_job(
         job_key: job_key.to_string(),
         status: "skipped".to_string(),
     });
+    ctx.emit(AirlockEvent::RunUpdated {
+        repo_id: run.repo_id.clone(),
+        run_id: run.id.clone(),
+        status: "updated".to_string(),
+    });
 
     job_statuses.insert(job_key.to_string(), JobStatus::Skipped);
 }
@@ -639,6 +644,11 @@ pub(super) async fn fail_job_worktree(
         run_id: run.id.clone(),
         job_key: job_key.to_string(),
         status: "failed".to_string(),
+    });
+    ctx.emit(AirlockEvent::RunUpdated {
+        repo_id: run.repo_id.clone(),
+        run_id: run.id.clone(),
+        status: "updated".to_string(),
     });
 
     job_statuses.insert(job_key.to_string(), JobStatus::Failed);
@@ -1056,6 +1066,11 @@ pub(super) async fn execute_single_job(
         run_id: run.id.clone(),
         job_key: job_key.to_string(),
     });
+    ctx.emit(AirlockEvent::RunUpdated {
+        repo_id: run.repo_id.clone(),
+        run_id: run.id.clone(),
+        status: "updated".to_string(),
+    });
 
     // Ensure worktree exists
     if !worktree_path.exists() {
@@ -1076,6 +1091,11 @@ pub(super) async fn execute_single_job(
                 run_id: run.id.clone(),
                 job_key: job_key.to_string(),
                 status: "failed".to_string(),
+            });
+            ctx.emit(AirlockEvent::RunUpdated {
+                repo_id: run.repo_id.clone(),
+                run_id: run.id.clone(),
+                status: "updated".to_string(),
             });
             return JobStatus::Failed;
         }
@@ -1167,6 +1187,11 @@ pub(super) async fn execute_single_job(
         run_id: run.id.clone(),
         job_key: job_key.to_string(),
         status: status_str.to_string(),
+    });
+    ctx.emit(AirlockEvent::RunUpdated {
+        repo_id: run.repo_id.clone(),
+        run_id: run.id.clone(),
+        status: "updated".to_string(),
     });
 
     info!("Job '{}' completed with status: {}", job_key, status_str);
