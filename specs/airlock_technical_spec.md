@@ -526,6 +526,8 @@ shell: bash # Shell to use: sh, bash, zsh (default: user's login shell via $SHEL
 continue-on-error: false # Continue pipeline if step fails
 require-approval: false # Pause pipeline for user approval (true | false | if_patches)
 apply-patch: false # Auto-apply pending patches after step passes
+model: haiku # Agent model override (sets AIRLOCK_AGENT_MODEL env var)
+adapter: claude-code # Agent adapter override (sets AIRLOCK_AGENT_ADAPTER env var)
 
 # Optional metadata
 description: Generate PR description via AI agent

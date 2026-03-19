@@ -399,6 +399,8 @@ run: | # Command to execute
   set -euo pipefail
   echo "hello"
 shell: bash # Optional: sh, bash, zsh
+model: haiku # Optional: agent model override (sets AIRLOCK_AGENT_MODEL)
+adapter: claude-code # Optional: agent adapter override (sets AIRLOCK_AGENT_ADAPTER)
 description: Generate PR description via AI agent
 ```
 
