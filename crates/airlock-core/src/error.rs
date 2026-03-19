@@ -1,4 +1,12 @@
 //! Error types for Airlock.
+//!
+//! ## Error convention
+//!
+//! Library-level functions in `airlock-core` return `AirlockError` (via the
+//! `Result<T>` alias below) for typed, matchable errors. Application-level
+//! orchestration (CLI commands, `init.rs`) uses `anyhow::Result` for
+//! context-chaining convenience. The Tauri app layer maps errors to strings
+//! as required by Tauri's IPC boundary.
 
 use thiserror::Error;
 

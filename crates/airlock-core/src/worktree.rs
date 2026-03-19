@@ -14,9 +14,7 @@ use crate::types::SplitHunk;
 use std::path::Path;
 use std::process::Command;
 
-// =============================================================================
-// Stage-Based Pipeline Functions (Recommended)
-// =============================================================================
+// --- Stage-Based Pipeline Functions (Recommended) ---
 
 /// Creates a run worktree for stage-based pipeline execution.
 ///
@@ -241,9 +239,9 @@ pub fn reset_persistent_worktree(
     Ok(())
 }
 
-// =============================================================================
-// Legacy Intent-Centric Pipeline Functions (DEPRECATED)
-// =============================================================================
+// --- Legacy Intent-Centric Pipeline Functions (DEPRECATED) ---
+// TODO(migration): Remove after steps 10.13-10.16 complete the stage-based migration.
+// These functions are still called by existing intent-processing code paths.
 
 /// Creates a new git worktree at the specified path, checked out at the given base SHA.
 ///

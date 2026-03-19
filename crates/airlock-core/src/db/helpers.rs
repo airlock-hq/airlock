@@ -6,7 +6,6 @@
 use crate::error::{AirlockError, Result};
 use crate::types::{JobStatus, StepStatus};
 
-/// Convert JobStatus to string for database storage.
 pub fn job_status_to_string(status: JobStatus) -> &'static str {
     match status {
         JobStatus::Pending => "pending",
@@ -18,7 +17,6 @@ pub fn job_status_to_string(status: JobStatus) -> &'static str {
     }
 }
 
-/// Convert string from database to JobStatus.
 pub fn string_to_job_status(s: &str) -> Result<JobStatus> {
     match s {
         "pending" => Ok(JobStatus::Pending),
@@ -31,7 +29,6 @@ pub fn string_to_job_status(s: &str) -> Result<JobStatus> {
     }
 }
 
-/// Convert StepStatus to string for database storage.
 pub fn step_status_to_string(status: StepStatus) -> &'static str {
     match status {
         StepStatus::Pending => "pending",
@@ -43,7 +40,6 @@ pub fn step_status_to_string(status: StepStatus) -> &'static str {
     }
 }
 
-/// Convert string from database to StepStatus.
 pub fn string_to_step_status(s: &str) -> Result<StepStatus> {
     match s {
         "pending" => Ok(StepStatus::Pending),

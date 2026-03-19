@@ -1,4 +1,8 @@
 //! SQL schema definitions for Airlock database.
+//!
+//! Authorization note: Airlock is a single-user local tool where the daemon
+//! listens on a Unix domain socket. Access control relies on filesystem
+//! permissions rather than row-level security in SQLite.
 
 /// Create repos table.
 pub const CREATE_REPOS_TABLE: &str = r#"

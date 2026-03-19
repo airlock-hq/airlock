@@ -41,70 +41,56 @@ impl AirlockPaths {
         Self { root }
     }
 
-    /// Get the root directory (~/.airlock).
     pub fn root(&self) -> &PathBuf {
         &self.root
     }
 
-    /// Get the global config file path (~/.airlock/config.yml).
     pub fn global_config(&self) -> PathBuf {
         self.root.join("config.yml")
     }
 
-    /// Get the state database path (~/.airlock/state.sqlite).
     pub fn database(&self) -> PathBuf {
         self.root.join("state.sqlite")
     }
 
-    /// Get the repos directory (~/.airlock/repos).
     pub fn repos_dir(&self) -> PathBuf {
         self.root.join("repos")
     }
 
-    /// Get the path for a specific repo's bare git directory.
     pub fn repo_gate(&self, repo_id: &str) -> PathBuf {
         self.repos_dir().join(format!("{}.git", repo_id))
     }
 
-    /// Get the artifacts directory (~/.airlock/artifacts).
     pub fn artifacts_dir(&self) -> PathBuf {
         self.root.join("artifacts")
     }
 
-    /// Get the artifacts directory for a specific repo.
     pub fn repo_artifacts(&self, repo_id: &str) -> PathBuf {
         self.artifacts_dir().join(repo_id)
     }
 
-    /// Get the artifacts directory for a specific run.
     pub fn run_artifacts(&self, repo_id: &str, run_id: &str) -> PathBuf {
         self.repo_artifacts(repo_id).join(run_id)
     }
 
-    /// Get the locks directory (~/.airlock/locks).
     pub fn locks_dir(&self) -> PathBuf {
         self.root.join("locks")
     }
 
-    /// Get the lock file path for a specific repo.
     /// Used for synchronizing sync operations.
     pub fn repo_lock(&self, repo_id: &str) -> PathBuf {
         self.locks_dir().join(format!("{}.lock", repo_id))
     }
 
-    /// Get the bin directory (~/.airlock/bin).
     /// Contains wrapper scripts like the upload-pack wrapper.
     pub fn bin_dir(&self) -> PathBuf {
         self.root.join("bin")
     }
 
-    /// Get the upload-pack wrapper script path (~/.airlock/bin/airlock-upload-pack).
     pub fn upload_pack_wrapper(&self) -> PathBuf {
         self.bin_dir().join("airlock-upload-pack")
     }
 
-    /// Get the worktrees directory (~/.airlock/worktrees).
-    /// This is where temporary worktrees for intent processing are created.
     pub fn worktrees_dir(&self) -> PathBuf {
         self.root.join("worktrees")
     }
@@ -208,7 +194,6 @@ impl AirlockPaths {
         }
     }
 
-    /// Ensure all required directories exist.
     pub fn ensure_dirs(&self) -> Result<()> {
         let dirs = [
             self.root.clone(),

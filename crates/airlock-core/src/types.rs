@@ -4,9 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-// =============================================================================
-// Approval Mode
-// =============================================================================
+// --- Approval Mode ---
 
 /// Controls when a step pauses for user approval.
 ///
@@ -68,9 +66,7 @@ impl<'de> Deserialize<'de> for ApprovalMode {
     }
 }
 
-// =============================================================================
-// Step-Based Pipeline Types
-// =============================================================================
+// --- Step-Based Pipeline Types ---
 
 /// Status of a pipeline step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -544,9 +540,7 @@ impl Run {
     }
 }
 
-// =============================================================================
-// Legacy Intent Types (To be removed in Steps 10.13-10.16)
-// =============================================================================
+// --- Legacy Intent Types (To be removed in Steps 10.13-10.16) ---
 
 /// Category of an intent.
 ///
@@ -873,9 +867,7 @@ pub struct TourResult {
     pub generated_at: i64,
 }
 
-// =============================================================================
-// Sync Types
-// =============================================================================
+// --- Sync Types ---
 
 /// A record of an upstream sync operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -896,9 +888,7 @@ pub struct SyncLog {
     pub synced_at: i64,
 }
 
-// =============================================================================
-// Diff Analysis Types
-// =============================================================================
+// --- Diff Analysis Types ---
 
 /// Status of a file in the diff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -955,9 +945,7 @@ pub struct FileChange {
     pub hunks: Vec<DiffHunk>,
 }
 
-// =============================================================================
-// Clean Stage Types
-// =============================================================================
+// --- Clean Stage Types ---
 
 /// Result of the clean stage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
