@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.71](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.70...airlock-v0.1.71) (2026-03-19)
+
+
+### Bug Fixes
+
+* **app:** reduce event-driven refetch storm causing desktop lag ([#88](https://github.com/airlock-hq/airlock/issues/88)) ([88be8ac](https://github.com/airlock-hq/airlock/commit/88be8acba97a517764cab790ddd3d3a76b11c6ef))
+
 ## [0.1.70](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.69...airlock-v0.1.70) (2026-03-19)
 
 
