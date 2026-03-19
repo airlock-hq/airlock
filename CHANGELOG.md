@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.72](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.71...airlock-v0.1.72) (2026-03-19)
+
+
+### Features
+
+* per-step model and adapter config ([#90](https://github.com/airlock-hq/airlock/issues/90)) ([e0dafdf](https://github.com/airlock-hq/airlock/commit/e0dafdf5cf3fc13b6398b7f492f94324a957908e))
+
 ## [0.1.71](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.70...airlock-v0.1.71) (2026-03-19)
 
 
