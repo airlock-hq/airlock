@@ -575,6 +575,12 @@ pub async fn execute_stage_command_with_streaming(
         for (key, value) in &stage.env {
             process_env.insert(key.clone(), value.clone());
         }
+        if let Some(ref model) = stage.model {
+            process_env.insert("AIRLOCK_AGENT_MODEL".to_string(), model.clone());
+        }
+        if let Some(ref adapter) = stage.adapter {
+            process_env.insert("AIRLOCK_AGENT_ADAPTER".to_string(), adapter.clone());
+        }
 
         let mut cmd = Command::new(shell);
         cmd.args(args)
@@ -1134,6 +1140,8 @@ mod tests {
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: None,
+            model: None,
+            adapter: None,
             apply_patch: false,
         }
     }
@@ -2257,6 +2265,8 @@ mod tests {
                 continue_on_error: false,
                 require_approval: ApprovalMode::Never,
                 timeout: None,
+                model: None,
+                adapter: None,
                 apply_patch: false,
             };
             loader
@@ -2285,6 +2295,8 @@ mod tests {
                 require_approval: ApprovalMode::Never,
                 timeout: None,
                 uses: None,
+                model: None,
+                adapter: None,
                 apply_patch: false,
             })
         }

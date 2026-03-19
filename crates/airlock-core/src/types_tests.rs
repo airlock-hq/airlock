@@ -102,6 +102,8 @@ fn test_step_definition_serialization_and_defaults() {
         require_approval: ApprovalMode::Never,
         timeout: None,
         apply_patch: false,
+        model: None,
+        adapter: None,
     };
 
     let json = serde_json::to_string(&step).unwrap();
@@ -148,6 +150,8 @@ fn test_step_definition_effective_run() {
         require_approval: ApprovalMode::Never,
         timeout: None,
         apply_patch: false,
+        model: None,
+        adapter: None,
     };
     assert_eq!(step.effective_run(), Some("npm test"));
 
@@ -162,6 +166,8 @@ fn test_step_definition_effective_run() {
         require_approval: ApprovalMode::Never,
         timeout: None,
         apply_patch: false,
+        model: None,
+        adapter: None,
     };
     assert_eq!(step.effective_run(), None);
     assert!(step.is_reusable());
@@ -200,6 +206,50 @@ env:
         step.env.get("AIRLOCK_RISK_THRESHOLD"),
         Some(&"high".to_string())
     );
+}
+
+#[test]
+fn test_step_definition_model_yaml() {
+    let yaml = r#"
+name: describe
+uses: airlock-hq/airlock/defaults/describe@main
+model: haiku
+"#;
+    let step: StepDefinition = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(step.model, Some("haiku".to_string()));
+}
+
+#[test]
+fn test_step_definition_adapter_yaml() {
+    let yaml = r#"
+name: describe
+uses: airlock-hq/airlock/defaults/describe@main
+adapter: codex
+model: gpt-4o
+"#;
+    let step: StepDefinition = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(step.adapter, Some("codex".to_string()));
+    assert_eq!(step.model, Some("gpt-4o".to_string()));
+}
+
+#[test]
+fn test_step_definition_adapter_omitted() {
+    let yaml = r#"
+name: lint
+uses: airlock-hq/airlock/defaults/lint@main
+"#;
+    let step: StepDefinition = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(step.adapter, None);
+}
+
+#[test]
+fn test_step_definition_model_omitted() {
+    let yaml = r#"
+name: lint
+uses: airlock-hq/airlock/defaults/lint@main
+"#;
+    let step: StepDefinition = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(step.model, None);
 }
 
 // =========================================================================

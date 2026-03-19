@@ -104,7 +104,10 @@ pub async fn agent(
         },
         cwd: std::env::current_dir().ok(),
         output_schema,
-        model: agent_options.as_ref().and_then(|o| o.model.clone()),
+        model: std::env::var("AIRLOCK_AGENT_MODEL")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .or_else(|| agent_options.as_ref().and_then(|o| o.model.clone())),
         max_turns: agent_options.as_ref().and_then(|o| o.max_turns),
         ..Default::default()
     };
@@ -267,6 +270,39 @@ mod tests {
         match saved {
             Some(v) => std::env::set_var("AIRLOCK_AGENT_ADAPTER", v),
             None => std::env::remove_var("AIRLOCK_AGENT_ADAPTER"),
+        }
+    }
+
+    #[test]
+    fn test_agent_model_env_var_overrides_config() {
+        // When AIRLOCK_AGENT_MODEL is set, it should be used over config
+        let saved = std::env::var("AIRLOCK_AGENT_MODEL").ok();
+        std::env::set_var("AIRLOCK_AGENT_MODEL", "haiku");
+        let model = std::env::var("AIRLOCK_AGENT_MODEL")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .or(Some("opus-from-config".to_string()));
+        assert_eq!(model, Some("haiku".to_string()));
+        // Restore
+        match saved {
+            Some(v) => std::env::set_var("AIRLOCK_AGENT_MODEL", v),
+            None => std::env::remove_var("AIRLOCK_AGENT_MODEL"),
+        }
+    }
+
+    #[test]
+    fn test_agent_model_env_var_empty_falls_through() {
+        // Empty AIRLOCK_AGENT_MODEL should fall through to config
+        let saved = std::env::var("AIRLOCK_AGENT_MODEL").ok();
+        std::env::set_var("AIRLOCK_AGENT_MODEL", "");
+        let model = std::env::var("AIRLOCK_AGENT_MODEL")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .or(Some("opus-from-config".to_string()));
+        assert_eq!(model, Some("opus-from-config".to_string()));
+        match saved {
+            Some(v) => std::env::set_var("AIRLOCK_AGENT_MODEL", v),
+            None => std::env::remove_var("AIRLOCK_AGENT_MODEL"),
         }
     }
 

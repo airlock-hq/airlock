@@ -116,6 +116,12 @@ pub struct StageYaml {
     /// Auto-apply pending patches after this step passes.
     #[serde(default, alias = "apply_patch", rename = "apply-patch")]
     pub apply_patch: bool,
+    /// Model override for agent steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Agent adapter override for agent steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adapter: Option<String>,
     /// Description of what this action does.
     #[serde(default)]
     pub description: Option<String>,
@@ -343,6 +349,8 @@ impl StageLoader {
                 stage_yaml.require_approval
             },
             timeout: stage.timeout.or(stage_yaml.timeout),
+            model: stage.model.clone().or_else(|| stage_yaml.model.clone()),
+            adapter: stage.adapter.clone().or_else(|| stage_yaml.adapter.clone()),
             apply_patch: stage.apply_patch || stage_yaml.apply_patch,
         };
 
@@ -987,6 +995,8 @@ continue-on-error: true
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, None).await.unwrap();
@@ -1028,6 +1038,8 @@ continue_on_error: true
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, None).await.unwrap();
@@ -1074,6 +1086,8 @@ continue_on_error: true
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, None).await.unwrap();
@@ -1112,6 +1126,8 @@ shell: bash
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, None).await.unwrap();
@@ -1152,6 +1168,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, None).await.unwrap();
@@ -1267,6 +1285,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, None).await.unwrap();
@@ -1415,6 +1435,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, Some(&worktree)).await.unwrap();
@@ -1444,6 +1466,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, Some(&worktree)).await.unwrap();
@@ -1472,6 +1496,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let result = loader.resolve_stage(&stage, Some(&worktree)).await;
@@ -1502,6 +1528,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let result = loader.resolve_stage(&stage, Some(&worktree)).await;
@@ -1529,6 +1557,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let result = loader.resolve_stage(&stage, Some(&worktree)).await;
@@ -1563,6 +1593,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let resolved = loader.resolve_stage(&stage, Some(&worktree)).await.unwrap();
@@ -1585,6 +1617,8 @@ env:
             require_approval: ApprovalMode::Never,
             timeout: None,
             apply_patch: false,
+            model: None,
+            adapter: None,
         };
 
         let result = loader.resolve_stage(&stage, None).await;

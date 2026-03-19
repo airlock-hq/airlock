@@ -1832,6 +1832,8 @@ mod tests {
             continue_on_error: false,
             require_approval: ApprovalMode::Never,
             timeout: Some(10),
+            model: None,
+            adapter: None,
             apply_patch: false,
         };
 

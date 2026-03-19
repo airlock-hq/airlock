@@ -174,6 +174,16 @@ pub struct StepDefinition {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
 
+    /// Model override for agent steps. When set, this is passed to the agent
+    /// adapter via `AIRLOCK_AGENT_MODEL` environment variable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+
+    /// Agent adapter override for agent steps (e.g., "claude-code", "codex").
+    /// When set, this is passed via `AIRLOCK_AGENT_ADAPTER` environment variable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adapter: Option<String>,
+
     /// Auto-apply pending patches after this step passes.
     /// When `true`, the executor applies all patches from `$AIRLOCK_ARTIFACTS/patches/`
     /// and commits them, similar to running `airlock exec freeze`.
