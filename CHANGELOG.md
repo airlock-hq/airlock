@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.70](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.69...airlock-v0.1.70) (2026-03-19)
+
+
+### Features
+
+* local file refs in `uses` ([#86](https://github.com/airlock-hq/airlock/issues/86)) ([8377191](https://github.com/airlock-hq/airlock/commit/83771910304a678598b45221b5de58184c5a0ef8))
+
 ## [0.1.69](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.68...airlock-v0.1.69) (2026-03-19)
 
 
