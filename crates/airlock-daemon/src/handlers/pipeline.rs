@@ -757,7 +757,10 @@ pub(super) async fn execute_step_sequence(
         // Resolve reusable action
         let mut resolved_step = if step.is_reusable() {
             debug!("Resolving reusable action: {:?}", step.uses);
-            match stage_loader.resolve_stage(step).await {
+            match stage_loader
+                .resolve_stage(step, Some(params.worktree_path))
+                .await
+            {
                 Ok(resolved) => resolved,
                 Err(e) => {
                     error!(

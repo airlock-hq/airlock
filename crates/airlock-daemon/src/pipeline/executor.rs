@@ -2260,7 +2260,7 @@ mod tests {
                 apply_patch: false,
             };
             loader
-                .resolve_stage(&unresolved)
+                .resolve_stage(&unresolved, None)
                 .await
                 .expect("Failed to resolve bundled rebase stage")
         }

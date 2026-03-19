@@ -7,6 +7,7 @@
 //!
 //! The `uses:` field supports the following formats:
 //! - `owner/repo/path@version` - Full path within a repository
+//! - `./path` - Local file reference resolved relative to the worktree root
 //!
 //! ## Version Specifiers
 //!
@@ -182,20 +183,31 @@ impl StageLoader {
     ///
     /// This will:
     /// 1. Parse the `uses:` reference
-    /// 2. For first-party `airlock-hq/airlock/defaults/*@main`, use the bundled YAML
-    /// 3. Otherwise check the local cache (with TTL for mutable refs)
-    /// 4. If not cached, fetch from GitHub
-    /// 5. Read the step.yml (or legacy action.yml/stage.yaml) file
-    /// 6. Merge inline properties (inline properties override step.yml)
+    /// 2. For `./path` references, resolve from the worktree root
+    /// 3. For first-party `airlock-hq/airlock/defaults/*@main`, use the bundled YAML
+    /// 4. Otherwise check the local cache (with TTL for mutable refs)
+    /// 5. If not cached, fetch from GitHub
+    /// 6. Read the step.yml (or legacy action.yml/stage.yaml) file
+    /// 7. Merge inline properties (inline properties override step.yml)
     ///
+    /// When `worktree_path` is `Some`, `./`-prefixed references are resolved relative to it.
     /// Returns the resolved step definition with the `run` command populated.
-    pub async fn resolve_stage(&self, stage: &StepDefinition) -> Result<StepDefinition> {
+    pub async fn resolve_stage(
+        &self,
+        stage: &StepDefinition,
+        worktree_path: Option<&Path>,
+    ) -> Result<StepDefinition> {
         let use_ref = stage
             .uses
             .as_ref()
             .ok_or_else(|| anyhow!("Step '{}' has no 'uses' reference to resolve", stage.name))?;
 
         info!("Resolving reusable action: {}", use_ref);
+
+        // Fast path: local file reference (./path)
+        if use_ref.starts_with("./") {
+            return self.resolve_local_stage(stage, use_ref, worktree_path);
+        }
 
         // Parse the reference
         let reference = parse_stage_reference(use_ref)
@@ -226,6 +238,69 @@ impl StageLoader {
         let stage_yaml = self.read_stage_yaml(&yaml_path)?;
 
         self.merge_stage(stage, &stage_yaml, Some(&stage_dir))
+    }
+
+    /// Resolve a local file reference (`./path`) from the worktree.
+    ///
+    /// Looks for `step.yml` > `action.yml` > `stage.yaml` in the referenced directory,
+    /// with path traversal protection to ensure the resolved path stays within the worktree.
+    fn resolve_local_stage(
+        &self,
+        stage: &StepDefinition,
+        use_ref: &str,
+        worktree_path: Option<&Path>,
+    ) -> Result<StepDefinition> {
+        let worktree = worktree_path.ok_or_else(|| {
+            anyhow!(
+                "Step '{}' uses local reference '{}' but no worktree is available",
+                stage.name,
+                use_ref
+            )
+        })?;
+
+        let relative = use_ref.strip_prefix("./").unwrap();
+        let stage_dir = worktree.join(relative);
+
+        // Path traversal protection: canonicalize both paths and verify containment
+        let canonical_worktree = worktree.canonicalize().with_context(|| {
+            format!(
+                "Failed to canonicalize worktree path: {}",
+                worktree.display()
+            )
+        })?;
+        let canonical_stage_dir = stage_dir.canonicalize().with_context(|| {
+            format!(
+                "Local step directory not found: {} (resolved from '{}')",
+                stage_dir.display(),
+                use_ref
+            )
+        })?;
+        if !canonical_stage_dir.starts_with(&canonical_worktree) {
+            return Err(anyhow!(
+                "Local step reference '{}' resolves outside the worktree (path traversal blocked)",
+                use_ref
+            ));
+        }
+
+        // Look for step definition file: step.yml > action.yml > stage.yaml
+        let step_yml_path = canonical_stage_dir.join("step.yml");
+        let action_yml_path = canonical_stage_dir.join("action.yml");
+        let stage_yaml_path = canonical_stage_dir.join("stage.yaml");
+        let yaml_path = if step_yml_path.exists() {
+            step_yml_path
+        } else if action_yml_path.exists() {
+            action_yml_path
+        } else if stage_yaml_path.exists() {
+            stage_yaml_path
+        } else {
+            return Err(anyhow!(
+                "No step.yml, action.yml, or stage.yaml found in local step directory: {}",
+                canonical_stage_dir.display()
+            ));
+        };
+
+        let stage_yaml = self.read_stage_yaml(&yaml_path)?;
+        self.merge_stage(stage, &stage_yaml, Some(&canonical_stage_dir))
     }
 
     /// Merge inline step properties with the resolved stage YAML.
@@ -914,7 +989,7 @@ continue-on-error: true
             apply_patch: false,
         };
 
-        let resolved = loader.resolve_stage(&stage).await.unwrap();
+        let resolved = loader.resolve_stage(&stage, None).await.unwrap();
 
         assert_eq!(resolved.name, "lint");
         assert_eq!(resolved.run, Some("npm run lint".to_string()));
@@ -955,7 +1030,7 @@ continue_on_error: true
             apply_patch: false,
         };
 
-        let resolved = loader.resolve_stage(&stage).await.unwrap();
+        let resolved = loader.resolve_stage(&stage, None).await.unwrap();
 
         assert_eq!(resolved.name, "lint");
         assert_eq!(resolved.run, Some("npm run lint".to_string()));
@@ -1001,7 +1076,7 @@ continue_on_error: true
             apply_patch: false,
         };
 
-        let resolved = loader.resolve_stage(&stage).await.unwrap();
+        let resolved = loader.resolve_stage(&stage, None).await.unwrap();
 
         // Should use step.yml (bash), not stage.yaml (zsh)
         assert_eq!(resolved.shell, Some("bash".to_string()));
@@ -1039,7 +1114,7 @@ shell: bash
             apply_patch: false,
         };
 
-        let resolved = loader.resolve_stage(&stage).await.unwrap();
+        let resolved = loader.resolve_stage(&stage, None).await.unwrap();
 
         // Inline properties should override
         assert_eq!(resolved.run, Some("npm run lint:strict".to_string()));
@@ -1079,7 +1154,7 @@ env:
             apply_patch: false,
         };
 
-        let resolved = loader.resolve_stage(&stage).await.unwrap();
+        let resolved = loader.resolve_stage(&stage, None).await.unwrap();
         assert_eq!(resolved.run, Some("echo \"$MODE\"".to_string()));
         assert_eq!(resolved.env.get("MODE"), Some(&"strict".to_string()));
     }
@@ -1194,7 +1269,7 @@ env:
             apply_patch: false,
         };
 
-        let resolved = loader.resolve_stage(&stage).await.unwrap();
+        let resolved = loader.resolve_stage(&stage, None).await.unwrap();
 
         assert_eq!(resolved.name, "lint");
         assert!(resolved.run.is_some());
@@ -1311,6 +1386,213 @@ env:
         // Should return the cached path without attempting re-fetch
         let result = loader.get_or_fetch_stage(&reference).await.unwrap();
         assert_eq!(result, cache_dir);
+    }
+
+    // --- Local file reference tests ---
+
+    #[tokio::test]
+    async fn test_resolve_local_stage() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().join("cache"));
+
+        // Create a local step directory with step.yml
+        let worktree = temp_dir.path().join("worktree");
+        let step_dir = worktree.join("my-steps").join("lint");
+        std::fs::create_dir_all(&step_dir).unwrap();
+        std::fs::write(
+            step_dir.join("step.yml"),
+            "run: npm run lint\nshell: bash\n",
+        )
+        .unwrap();
+
+        let stage = StepDefinition {
+            name: "lint".to_string(),
+            run: None,
+            uses: Some("./my-steps/lint".to_string()),
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let resolved = loader.resolve_stage(&stage, Some(&worktree)).await.unwrap();
+        assert_eq!(resolved.name, "lint");
+        assert_eq!(resolved.run, Some("npm run lint".to_string()));
+        assert_eq!(resolved.shell, Some("bash".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_local_stage_action_yml_fallback() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().join("cache"));
+
+        let worktree = temp_dir.path().join("worktree");
+        let step_dir = worktree.join("steps").join("fmt");
+        std::fs::create_dir_all(&step_dir).unwrap();
+        // Only action.yml, no step.yml
+        std::fs::write(step_dir.join("action.yml"), "run: cargo fmt\nshell: bash\n").unwrap();
+
+        let stage = StepDefinition {
+            name: "fmt".to_string(),
+            run: None,
+            uses: Some("./steps/fmt".to_string()),
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let resolved = loader.resolve_stage(&stage, Some(&worktree)).await.unwrap();
+        assert_eq!(resolved.run, Some("cargo fmt".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_local_stage_path_traversal_blocked() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().join("cache"));
+
+        let worktree = temp_dir.path().join("worktree");
+        std::fs::create_dir_all(&worktree).unwrap();
+        // Create a step outside the worktree
+        let outside_dir = temp_dir.path().join("outside");
+        std::fs::create_dir_all(&outside_dir).unwrap();
+        std::fs::write(outside_dir.join("step.yml"), "run: echo pwned\n").unwrap();
+
+        let stage = StepDefinition {
+            name: "escape".to_string(),
+            run: None,
+            uses: Some("./../outside".to_string()),
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let result = loader.resolve_stage(&stage, Some(&worktree)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("path traversal blocked"),
+            "Expected path traversal error, got: {}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_local_stage_missing_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().join("cache"));
+
+        let worktree = temp_dir.path().join("worktree");
+        std::fs::create_dir_all(&worktree).unwrap();
+
+        let stage = StepDefinition {
+            name: "missing".to_string(),
+            run: None,
+            uses: Some("./nonexistent/step".to_string()),
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let result = loader.resolve_stage(&stage, Some(&worktree)).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_local_stage_no_step_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().join("cache"));
+
+        let worktree = temp_dir.path().join("worktree");
+        let step_dir = worktree.join("empty-step");
+        std::fs::create_dir_all(&step_dir).unwrap();
+        // Directory exists but has no YAML files
+
+        let stage = StepDefinition {
+            name: "empty".to_string(),
+            run: None,
+            uses: Some("./empty-step".to_string()),
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let result = loader.resolve_stage(&stage, Some(&worktree)).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No step.yml, action.yml, or stage.yaml found"));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_local_stage_merge_overrides() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().join("cache"));
+
+        let worktree = temp_dir.path().join("worktree");
+        let step_dir = worktree.join("steps").join("lint");
+        std::fs::create_dir_all(&step_dir).unwrap();
+        std::fs::write(
+            step_dir.join("step.yml"),
+            "run: npm run lint\nshell: bash\ncontinue-on-error: false\n",
+        )
+        .unwrap();
+
+        let stage = StepDefinition {
+            name: "lint".to_string(),
+            run: Some("npm run lint:strict".to_string()),
+            uses: Some("./steps/lint".to_string()),
+            shell: Some("zsh".to_string()),
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let resolved = loader.resolve_stage(&stage, Some(&worktree)).await.unwrap();
+        assert_eq!(resolved.run, Some("npm run lint:strict".to_string()));
+        assert_eq!(resolved.shell, Some("zsh".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_local_stage_no_worktree() {
+        let temp_dir = TempDir::new().unwrap();
+        let loader = StageLoader::with_cache_dir(temp_dir.path().join("cache"));
+
+        let stage = StepDefinition {
+            name: "local".to_string(),
+            run: None,
+            uses: Some("./my-step".to_string()),
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: ApprovalMode::Never,
+            timeout: None,
+            apply_patch: false,
+        };
+
+        let result = loader.resolve_stage(&stage, None).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("no worktree is available"));
     }
 
     #[tokio::test]
