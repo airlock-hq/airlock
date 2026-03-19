@@ -453,11 +453,16 @@ When `airlock artifact patch` captures worktree changes:
 
 ### 5.7 Reusable Steps
 
-Steps can be loaded from public Git repositories using the `uses:` syntax:
+Steps can be loaded from public Git repositories or local directories using the `uses:` syntax:
 
 ```yaml
+# From a Git repository
 - name: describe
   uses: airlock-hq/airlock/defaults/describe@v1
+
+# From a local directory (relative to repo root)
+- name: custom-lint
+  uses: ./my-steps/lint
 ```
 
 **Property overrides:** Inline properties override values from `step.yml`:
@@ -483,11 +488,12 @@ Resolution order: inline properties > step.yml defaults
 **Step fetching:**
 
 1. Parse `uses:` field (e.g., `airlock-hq/airlock/defaults/describe@v1`)
-2. **Bundled defaults fast-path:** If the reference matches a first-party default (`airlock-hq/airlock/defaults/*@main`), use the YAML embedded in the binary via `include_str!()`. This skips all cache and network I/O, ensuring defaults are always up-to-date with the installed binary version.
-3. Check cache: `~/.airlock/actions/<owner>/<repo>/<path>@<version>/`
-4. **TTL check for mutable refs:** If the cached ref is mutable (branch name like `@main`, or semver-major like `@v1`), check if the cache is older than 1 hour. Stale caches are removed and re-fetched. Immutable refs (`@v1.2.3` exact semver, `@abc123def` commit SHA) are cached indefinitely. If stale cache removal fails, the stale copy is used as a graceful fallback.
-5. If not cached, fetch from GitHub (sparse checkout or raw content)
-6. Run the step's `run` command with standard environment variables
+2. **Local file fast-path:** If the reference starts with `./`, resolve the path relative to the worktree root. Path traversal outside the worktree is blocked. Looks for `step.yml` > `action.yml` > `stage.yaml` in the referenced directory.
+3. **Bundled defaults fast-path:** If the reference matches a first-party default (`airlock-hq/airlock/defaults/*@main`), use the YAML embedded in the binary via `include_str!()`. This skips all cache and network I/O, ensuring defaults are always up-to-date with the installed binary version.
+4. Check cache: `~/.airlock/actions/<owner>/<repo>/<path>@<version>/`
+5. **TTL check for mutable refs:** If the cached ref is mutable (branch name like `@main`, or semver-major like `@v1`), check if the cache is older than 1 hour. Stale caches are removed and re-fetched. Immutable refs (`@v1.2.3` exact semver, `@abc123def` commit SHA) are cached indefinitely. If stale cache removal fails, the stale copy is used as a graceful fallback.
+6. If not cached, fetch from GitHub (sparse checkout or raw content)
+7. Run the step's `run` command with standard environment variables
 
 **Default steps** are bundled into the binary and also published in this repo under `defaults/`:
 

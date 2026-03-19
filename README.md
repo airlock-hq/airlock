@@ -126,7 +126,7 @@ jobs:
 
 Jobs declare dependencies via `needs:` and run in parallel when possible. Steps with `apply-patch: true` auto-commit any patches they produce.
 
-Steps can be inline shell commands or reusable definitions loaded from Git repos via `uses:`.
+Steps can be inline shell commands or reusable definitions loaded via `uses:` — from Git repos (`owner/repo/path@version`) or local files (`./path`).
 
 The desktop app runs from the system tray: closing the window hides it, and new pushes trigger an OS notification.
 
