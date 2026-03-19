@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.69](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.68...airlock-v0.1.69) (2026-03-19)
+
+
+### Features
+
+* **daemon:** add retry_job IPC method for retrying failed/skipped jobs ([#83](https://github.com/airlock-hq/airlock/issues/83)) ([#84](https://github.com/airlock-hq/airlock/issues/84)) ([507c9c8](https://github.com/airlock-hq/airlock/commit/507c9c82cc529b5c95c769f4dd4ae7154350ba47))
+
 ## [0.1.68](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.67...airlock-v0.1.68) (2026-03-18)
 
 
