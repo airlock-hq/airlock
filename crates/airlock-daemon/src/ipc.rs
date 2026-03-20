@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 // Re-export shared types from airlock-core
 pub use airlock_core::ipc::{
-    AgentConfigInfo, AirlockEvent, ApplyPatchesResult, ApproveStepResult, ArtifactInfo,
-    CommitDiffInfo, GetConfigResult, GetRunDiffResult, GlobalConfigInfo, GlobalConfigUpdate,
-    JobResultInfo, PatchError, RepoConfigInfo, RepoConfigUpdate, RunInfo, StepResultInfo,
-    StorageConfigInfo, SyncConfigInfo, UpdateConfigResult, WorkflowFileInfo,
+    AddressCommentsResult, AgentConfigInfo, AirlockEvent, ApplyPatchesResult, ApproveStepResult,
+    ArtifactInfo, CommitDiffInfo, GetConfigResult, GetRunDiffResult, GlobalConfigInfo,
+    GlobalConfigUpdate, JobResultInfo, PatchError, RepoConfigInfo, RepoConfigUpdate, RunInfo,
+    StepResultInfo, StorageConfigInfo, SyncConfigInfo, UpdateConfigResult, WorkflowFileInfo,
 };
 
 /// JSON-RPC 2.0 notification (no id, no response expected).
@@ -136,6 +136,7 @@ pub mod methods {
     pub const RETRY_JOB: &str = "retry_job";
     pub const GET_ALL_RUNS: &str = "get_all_runs";
     pub const GET_RUN_COUNTS: &str = "get_run_counts";
+    pub const ADDRESS_COMMENTS: &str = "address_comments";
 }
 
 // =============================================================================
@@ -246,6 +247,22 @@ pub struct ApplyPatchesParams {
 
     /// Paths to patch artifact JSON files.
     pub patch_paths: Vec<String>,
+}
+
+/// Parameters for the `address_comments` method.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddressCommentsParams {
+    pub run_id: String,
+    pub comments: Vec<AddressCommentItem>,
+}
+
+/// A single critique comment to address.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddressCommentItem {
+    pub file: String,
+    pub line: u32,
+    pub message: String,
+    pub severity: String,
 }
 
 /// Parameters for the `cancel_run` method.

@@ -22,6 +22,6 @@ pub use diff::{
 pub use events::AirlockEvent;
 
 pub use types::{
-    ApplyPatchesResult, ApproveStepResult, ArtifactInfo, JobResultInfo, PatchError, RunInfo,
-    StepResultInfo,
+    AddressCommentsResult, ApplyPatchesResult, ApproveStepResult, ArtifactInfo, JobResultInfo,
+    PatchError, RunInfo, StepResultInfo,
 };

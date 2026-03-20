@@ -167,3 +167,14 @@ pub struct PatchError {
     pub path: String,
     pub error: String,
 }
+
+/// Result for the `address_comments` method.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddressCommentsResult {
+    pub run_id: String,
+    pub success: bool,
+    pub started: bool,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}

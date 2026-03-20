@@ -15,10 +15,10 @@ use tauri::{Manager, State, WindowEvent};
 
 // Re-export shared IPC types from airlock-core for use throughout the app
 pub use airlock_core::ipc::{
-    ApplyPatchesResult, ApproveIntentResult, ApproveStepResult, ArtifactInfo, CommitDiffInfo,
-    DiffHunkInfo, GetRunDiffResult, IntentDiffResult, IntentTourResult, JobResultInfo,
-    LineAnnotationInfo, PatchError, RejectIntentResult, RunInfo, StepResultInfo, TourInfo,
-    TourStepInfo,
+    AddressCommentsResult, ApplyPatchesResult, ApproveIntentResult, ApproveStepResult,
+    ArtifactInfo, CommitDiffInfo, DiffHunkInfo, GetRunDiffResult, IntentDiffResult,
+    IntentTourResult, JobResultInfo, LineAnnotationInfo, PatchError, RejectIntentResult, RunInfo,
+    StepResultInfo, TourInfo, TourStepInfo,
 };
 
 /// Application state containing the IPC client
@@ -307,6 +307,20 @@ async fn apply_patches(
         .map_err(|e| e.to_string())
 }
 
+/// Address selected critique comments via agent
+#[tauri::command]
+async fn address_comments(
+    state: State<'_, AppState>,
+    run_id: String,
+    comments: Vec<serde_json::Value>,
+) -> Result<AddressCommentsResult, String> {
+    state
+        .ipc_client
+        .address_comments(&run_id, &comments)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Get configuration (global and optionally repo-specific)
 #[tauri::command]
 async fn get_config(
@@ -584,6 +598,7 @@ pub fn run() {
             update_config,
             read_artifact,
             apply_patches,
+            address_comments,
             show_window,
         ])
         .run(tauri::generate_context!())
