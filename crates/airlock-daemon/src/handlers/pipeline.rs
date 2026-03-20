@@ -1495,7 +1495,7 @@ pub(super) fn step_status_str(status: StepStatus) -> &'static str {
 ///
 /// Also transitions any non-terminal jobs and steps to their final state
 /// so the UI never shows stale "Running" indicators after cancellation.
-async fn mark_run_cancelled(ctx: &Arc<HandlerContext>, run: &Run) {
+pub(super) async fn mark_run_cancelled(ctx: &Arc<HandlerContext>, run: &Run) {
     let db = ctx.db.lock().await;
     // Only set the default cancellation message if no error is already present
     let existing = db.get_run(&run.id).ok().flatten();

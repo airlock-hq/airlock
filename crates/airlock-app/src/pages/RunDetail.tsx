@@ -447,7 +447,7 @@ export function RunDetail() {
               </a>
             </Button>
           )}
-          {detail?.run.status === 'running' ? (
+          {detail?.run.status === 'running' || detail?.run.status === 'awaiting_approval' ? (
             <Button
               variant="ghost"
               size="sm"
