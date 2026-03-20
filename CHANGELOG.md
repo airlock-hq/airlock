@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.73](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.72...airlock-v0.1.73) (2026-03-20)
+
+
+### Features
+
+* add inline critique comments to PRs ([#99](https://github.com/airlock-hq/airlock/issues/99)) ([ce218c7](https://github.com/airlock-hq/airlock/commit/ce218c7edfaffc9aff503ee5cadca8aa15d3a31b))
+
+
+### Bug Fixes
+
+* **cli:** batch fetch job results for runs and status ([#97](https://github.com/airlock-hq/airlock/issues/97)) ([a95f965](https://github.com/airlock-hq/airlock/commit/a95f9657097b2bab421e35f93a3579bed4b397ee))
+* **core:** optimized get_all_runs and run counts ([#95](https://github.com/airlock-hq/airlock/issues/95)) ([fe0145d](https://github.com/airlock-hq/airlock/commit/fe0145d84de1b5ea29d9d5393c941116e4c08633))
+* **run:** allow stopping runs awaiting approval ([#98](https://github.com/airlock-hq/airlock/issues/98)) ([a874f01](https://github.com/airlock-hq/airlock/commit/a874f0167e114630408fab25f7512f13aa9a08a8))
+
 ## [0.1.72](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.71...airlock-v0.1.72) (2026-03-19)
 
 
