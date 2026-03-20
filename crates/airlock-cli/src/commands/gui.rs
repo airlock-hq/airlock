@@ -23,10 +23,17 @@ mod tests {
     use airlock_core::gui::{find_gui_binary, GUI_BINARY_NAME, GUI_PATH_ENV_VAR};
     use std::env;
     use std::fs::File;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    /// Tests that mutate `GUI_PATH_ENV_VAR` must hold this lock so they don't
+    /// race against each other when `cargo test` runs them in parallel.
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_find_gui_binary_env_var() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
         // Create a temporary directory with a fake GUI binary
         let temp_dir = TempDir::new().unwrap();
         let gui_path = temp_dir.path().join(GUI_BINARY_NAME);
@@ -34,7 +41,7 @@ mod tests {
 
         // Set the environment variable
         let original_env = env::var(GUI_PATH_ENV_VAR).ok();
-        env::set_var(GUI_PATH_ENV_VAR, &gui_path);
+        unsafe { env::set_var(GUI_PATH_ENV_VAR, &gui_path) };
 
         // Should find via env var
         let result = find_gui_binary();
@@ -43,20 +50,22 @@ mod tests {
 
         // Restore original env
         if let Some(orig) = original_env {
-            env::set_var(GUI_PATH_ENV_VAR, orig);
+            unsafe { env::set_var(GUI_PATH_ENV_VAR, orig) };
         } else {
-            env::remove_var(GUI_PATH_ENV_VAR);
+            unsafe { env::remove_var(GUI_PATH_ENV_VAR) };
         }
     }
 
     #[test]
     fn test_find_gui_binary_env_var_not_file() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
         // Set env var to a directory (not a file)
         let temp_dir = TempDir::new().unwrap();
         let dir_path = temp_dir.path();
 
         let original_env = env::var(GUI_PATH_ENV_VAR).ok();
-        env::set_var(GUI_PATH_ENV_VAR, dir_path);
+        unsafe { env::set_var(GUI_PATH_ENV_VAR, dir_path) };
 
         // Should not find (it's a directory, not a file)
         // This will fall through to other checks
@@ -66,15 +75,15 @@ mod tests {
 
         // Restore original env
         if let Some(orig) = original_env {
-            env::set_var(GUI_PATH_ENV_VAR, orig);
+            unsafe { env::set_var(GUI_PATH_ENV_VAR, orig) };
         } else {
-            env::remove_var(GUI_PATH_ENV_VAR);
+            unsafe { env::remove_var(GUI_PATH_ENV_VAR) };
         }
     }
 
     #[test]
     fn test_find_gui_binary_same_directory() {
-        // Create a temporary directory with a fake GUI binary
+        // No env mutation needed — no lock required.
         let temp_dir = TempDir::new().unwrap();
         let gui_path = temp_dir.path().join(GUI_BINARY_NAME);
         File::create(&gui_path).unwrap();
@@ -93,9 +102,11 @@ mod tests {
 
     #[test]
     fn test_find_gui_binary_not_found() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
         // Ensure env var is not set
         let original_env = env::var(GUI_PATH_ENV_VAR).ok();
-        env::remove_var(GUI_PATH_ENV_VAR);
+        unsafe { env::remove_var(GUI_PATH_ENV_VAR) };
 
         // Clear any other paths that might exist by testing in isolation
         // This test verifies the error message is correct
@@ -111,7 +122,7 @@ mod tests {
 
         // Restore original env
         if let Some(orig) = original_env {
-            env::set_var(GUI_PATH_ENV_VAR, orig);
+            unsafe { env::set_var(GUI_PATH_ENV_VAR, orig) };
         }
     }
 }
