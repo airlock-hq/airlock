@@ -6,7 +6,10 @@ use super::types::{
     DaemonReprocessRunResult, DaemonRetryJobResult, DaemonRunDetailResult,
 };
 use super::IpcClient;
-use crate::{ApplyPatchesResult, ApproveStepResult, GetRunDiffResult, RunDetail, RunInfo};
+use crate::{
+    AddressCommentsResult, ApplyPatchesResult, ApproveStepResult, GetRunDiffResult, RunDetail,
+    RunInfo,
+};
 
 impl IpcClient {
     /// Get runs for a repository
@@ -147,6 +150,21 @@ impl IpcClient {
             )
             .await?;
 
+        Ok(serde_json::from_value(result)?)
+    }
+
+    /// Address selected critique comments via agent
+    pub async fn address_comments(
+        &self,
+        run_id: &str,
+        comments: &[serde_json::Value],
+    ) -> Result<AddressCommentsResult, IpcError> {
+        let result = self
+            .send_request(
+                "address_comments",
+                serde_json::json!({ "run_id": run_id, "comments": comments }),
+            )
+            .await?;
         Ok(serde_json::from_value(result)?)
     }
 }

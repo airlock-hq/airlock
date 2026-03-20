@@ -31,6 +31,7 @@ reqwest = { workspace = true }
 tempfile = { workspace = true }
 filetime = "0.2"
 tokio-util = { workspace = true }
+futures = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

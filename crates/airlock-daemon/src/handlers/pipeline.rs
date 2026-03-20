@@ -655,7 +655,7 @@ pub(super) async fn fail_job_worktree(
 }
 
 /// Create a log streaming callback that both emits events and writes to disk.
-fn create_log_callback(
+pub(super) fn create_log_callback(
     ctx: &Arc<HandlerContext>,
     repo_id: &str,
     run_id: &str,

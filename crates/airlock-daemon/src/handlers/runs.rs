@@ -311,6 +311,14 @@ pub async fn handle_reprocess_run(
         }
     }
 
+    // Delete old artifacts so the fresh run starts clean
+    let artifacts_path = ctx.paths.run_artifacts(&run.repo_id, &params.run_id);
+    if artifacts_path.exists() {
+        if let Err(e) = std::fs::remove_dir_all(&artifacts_path) {
+            warn!("Failed to delete old artifacts: {}", e);
+        }
+    }
+
     // Clear any previous error on the run
     run.error = None;
 

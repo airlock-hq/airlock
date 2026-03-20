@@ -117,6 +117,7 @@ pub async fn dispatch(ctx: Arc<HandlerContext>, request: Request) -> Response {
         methods::APPROVE_STEP => steps::handle_approve_step(ctx, request.params, id).await,
         methods::GET_RUN_DIFF => steps::handle_get_run_diff(ctx, request.params, id).await,
         methods::APPLY_PATCHES => steps::handle_apply_patches(ctx, request.params, id).await,
+        methods::ADDRESS_COMMENTS => steps::handle_address_comments(ctx, request.params, id).await,
         _ => Response::error(
             id,
             error_codes::METHOD_NOT_FOUND,

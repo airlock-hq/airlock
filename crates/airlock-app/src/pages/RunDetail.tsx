@@ -13,6 +13,7 @@ import {
   approveStep,
   readArtifact,
   applyPatches,
+  addressComments,
 } from '@/hooks/use-daemon';
 import type { PatchArtifact } from '@/components/push-request/PatchesTab';
 import { getCommentKey, getPatchId, type CodeComment } from '@/lib/artifact-keys';
@@ -30,6 +31,7 @@ import {
   Check,
   Square,
   ExternalLink,
+  Wand2,
 } from 'lucide-react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -94,6 +96,7 @@ export function RunDetail() {
   const [artifactDataLoading, setArtifactDataLoading] = useState(false);
   const [applyingAndApproving, setApplyingAndApproving] = useState(false);
   const [commentsCopied, setCommentsCopied] = useState(false);
+  const [addressingComments, setAddressingComments] = useState(false);
 
   const handleReprocess = async () => {
     if (!runId) return;
@@ -368,6 +371,27 @@ export function RunDetail() {
     setCommentsCopied(true);
     setTimeout(() => setCommentsCopied(false), 1500);
   }, [allComments, selectedComments]);
+
+  // Address selected comments via agent
+  const handleAddressComments = useCallback(async () => {
+    const selected = allComments.filter((c) => selectedComments.has(getCommentKey(c)));
+    if (!runId || selected.length === 0) return;
+    try {
+      setAddressingComments(true);
+      const result = await addressComments(
+        runId,
+        selected.map((c) => ({ file: c.file, line: c.line, message: c.message, severity: c.severity }))
+      );
+      if (!result.success) {
+        console.error('Address comments failed:', result.error);
+      }
+      await refresh();
+    } catch (e) {
+      console.error('Address comments failed:', e);
+    } finally {
+      setAddressingComments(false);
+    }
+  }, [runId, allComments, selectedComments, refresh]);
 
   // Apply selected patches then approve
   const handleApplyAndApprove = useCallback(async () => {
@@ -653,6 +677,25 @@ export function RunDetail() {
 
           {detail?.run.status === 'awaiting_approval' && (
             <>
+              <Button
+                variant="signal-outline"
+                size="sm"
+                disabled={addressingComments || selectedComments.size === 0}
+                onClick={handleAddressComments}
+              >
+                {addressingComments ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Addressing...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="mr-1.5 h-3.5 w-3.5" />
+                    Address {selectedComments.size} {selectedComments.size === 1 ? 'comment' : 'comments'}
+                  </>
+                )}
+              </Button>
+
               {selectedPendingPatchCount > 0 && (
                 <Button
                   variant="signal-outline"

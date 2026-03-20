@@ -189,6 +189,7 @@ The Push Request view is where you review and approve changes before they ship.
 - Comments from review stages anchored to specific lines
 - Tab badge shows the number of critique comments
 - Comments can be toggled for copy/share selection
+- Selected comments can be sent to an agent to auto-fix, which commits changes and reprocesses the pipeline
 
 **Patches** — Suggested fixes from stages:
 

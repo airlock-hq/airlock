@@ -414,6 +414,24 @@ export async function applyPatches(runId: string, patchPaths: string[]): Promise
 }
 
 // =============================================================================
+// Address Comments Types and Functions
+// =============================================================================
+
+export interface AddressCommentsResult {
+  run_id: string;
+  success: boolean;
+  started: boolean;
+  error: string | null;
+}
+
+export async function addressComments(
+  runId: string,
+  comments: { file: string; line: number; message: string; severity: string }[]
+): Promise<AddressCommentsResult> {
+  return invoke<AddressCommentsResult>('address_comments', { runId, comments });
+}
+
+// =============================================================================
 // Artifact Reading Types and Functions
 // =============================================================================
 
