@@ -246,6 +246,77 @@ impl Database {
         Ok(runs)
     }
 
+    /// List runs that have at least one non-terminal job (pending/running/awaiting_approval).
+    ///
+    /// Much cheaper than `list_all_runs` for count-only use cases because it
+    /// skips the vast majority of historical (completed/failed) runs.
+    pub fn list_potentially_active_runs(&self) -> Result<Vec<Run>> {
+        let query = format!(
+            "SELECT DISTINCT {} FROM runs r \
+             INNER JOIN job_results j ON j.run_id = r.id \
+             WHERE j.status IN ('pending', 'running', 'awaiting_approval') \
+             AND r.superseded = 0 AND r.error IS NULL",
+            SELECT_RUN_COLUMNS
+                .split(", ")
+                .map(|col| format!("r.{col}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&query)
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
+
+        let runs = stmt
+            .query_map([], row_to_run)
+            .map_err(|e| AirlockError::Database(format!("Failed to query runs: {e}")))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| AirlockError::Database(format!("Failed to collect runs: {e}")))?;
+
+        Ok(runs)
+    }
+
+    /// Count active runs by derived status in a single SQL query.
+    ///
+    /// Returns `(running_count, awaiting_count)` without fetching individual
+    /// job results — the status priority logic from `derived_status_from_jobs`
+    /// is replicated directly in SQL.
+    pub fn count_active_run_statuses(&self) -> Result<(u32, u32)> {
+        let (running, awaiting) = self
+            .conn
+            .query_row(
+                "SELECT
+                   COALESCE(SUM(CASE
+                     WHEN has_running = 1 THEN 1
+                     WHEN has_awaiting = 0 AND has_failed = 0 AND has_pending = 1 THEN 1
+                     ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                     WHEN has_running = 0 AND has_awaiting = 1 THEN 1
+                     ELSE 0
+                   END), 0)
+                 FROM (
+                   SELECT r.id,
+                     MAX(CASE WHEN j.status = 'running' THEN 1 ELSE 0 END) as has_running,
+                     MAX(CASE WHEN j.status = 'awaiting_approval' THEN 1 ELSE 0 END) as has_awaiting,
+                     MAX(CASE WHEN j.status = 'pending' THEN 1 ELSE 0 END) as has_pending,
+                     MAX(CASE WHEN j.status = 'failed' THEN 1 ELSE 0 END) as has_failed
+                   FROM runs r
+                   INNER JOIN job_results j ON j.run_id = r.id
+                   WHERE r.superseded = 0 AND r.error IS NULL
+                   GROUP BY r.id
+                   HAVING MAX(CASE WHEN j.status IN ('pending', 'running', 'awaiting_approval') THEN 1 ELSE 0 END) = 1
+                 ) sub",
+                [],
+                |row| Ok((row.get::<_, u32>(0)?, row.get::<_, u32>(1)?)),
+            )
+            .map_err(|e| {
+                AirlockError::Database(format!("Failed to count active run statuses: {e}"))
+            })?;
+
+        Ok((running, awaiting))
+    }
+
     /// Compute the derived status string for a run from its job results.
     ///
     /// This is a convenience method that wraps `get_job_results_for_run` + `Run::derived_status_from_jobs()`.

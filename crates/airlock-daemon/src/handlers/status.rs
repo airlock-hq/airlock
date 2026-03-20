@@ -76,6 +76,7 @@ pub async fn handle_status(
         RunInfo {
             id: r.id.clone(),
             repo_id: None,
+            repo_name: None,
             status,
             branch: if r.branch.is_empty() {
                 None
