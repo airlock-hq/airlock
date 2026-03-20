@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.74](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.73...airlock-v0.1.74) (2026-03-20)
+
+
+### Features
+
+* add address_comments agent flow ([#102](https://github.com/airlock-hq/airlock/issues/102)) ([232d183](https://github.com/airlock-hq/airlock/commit/232d183e3ed62531fc4ee87f5f38a8b84bfd21c5))
+
+
+### Bug Fixes
+
+* serialize GUI env-var tests with mutex to prevent race condition ([#100](https://github.com/airlock-hq/airlock/issues/100)) ([84cfb67](https://github.com/airlock-hq/airlock/commit/84cfb67c340ea3b9986c5b1a1ad6a0abe7374385))
+
 ## [0.1.73](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.72...airlock-v0.1.73) (2026-03-20)
 
 
