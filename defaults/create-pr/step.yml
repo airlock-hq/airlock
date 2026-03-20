@@ -94,6 +94,15 @@ run: |
     - Key changes made
     - How was this tested
 
+  ## Inline Critique Comments
+  After creating (or updating) the PR/MR, check if the directory \`\$AIRLOCK_ARTIFACTS/comments/\` exists and contains JSON files. These are critique comments from the code review step. Each file is a JSON array of objects with \`file\`, \`line\`, \`message\`, and \`severity\` (error/warning/info) fields.
+
+  If there are comments, post them as **inline review comments** on the PR/MR so they appear on the relevant lines of code:
+  - **GitHub**: Use \`gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews\` to create a review with inline comments. Set \`event\` to \`COMMENT\` (not \`REQUEST_CHANGES\`). Each comment needs \`path\` (file), \`line\` (line number), and \`body\` (the message prefixed with a severity emoji: 🔴 error, 🟡 warning, 💬 info).
+  - **GitLab**: Use \`glab api\` to create merge request discussion notes with position info.
+  - **Bitbucket**: Use \`bb\` or the Bitbucket API to create inline comments.
+  - If posting inline comments fails (e.g. line is not part of the diff), skip that comment silently and continue with the rest.
+
   ## Important Notes
   - The branch has already been pushed to the remote
   - If the PR/MR already exists, update its title/description and return its URL instead of failing
