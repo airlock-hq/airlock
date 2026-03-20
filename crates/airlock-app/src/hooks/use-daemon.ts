@@ -18,6 +18,8 @@ export interface RunInfo {
   id: string;
   repo_id: string;
   status: string;
+  /** Repo name derived from upstream URL (only set by get_all_runs) */
+  repo_name?: string;
   /** Branch being pushed */
   branch?: string;
   /** Currently executing step name (for running pipelines) */
@@ -515,25 +517,14 @@ export async function updateConfig(global?: GlobalConfigUpdate, repo?: RepoConfi
   return invoke<UpdateConfigResult>('update_config', { global, repo });
 }
 
-// Hook for getting all runs across all repos
+// Hook for getting all runs across all repos (single IPC call)
 export function useAllRuns(limit?: number) {
   const fetcher = useCallback(async () => {
-    const repos = await invoke<RepoInfo[]>('list_repos');
-    const allRunsPromises = repos.map(async (repo) => {
-      const repoRuns = await invoke<RunInfo[]>('get_runs', {
-        repoId: repo.id,
-        limit: limit ?? 10,
-      });
-      const repoName = getRepoNameFromUrl(repo.upstream_url);
-      return repoRuns.map((run) => ({ ...run, repo_name: repoName }));
-    });
-    const allRunsArrays = await Promise.all(allRunsPromises);
-    const allRuns = allRunsArrays.flat();
-    allRuns.sort((a, b) => b.created_at - a.created_at);
-    return limit ? allRuns.slice(0, limit) : allRuns;
+    const runs = await invoke<RunInfo[]>('get_all_runs', { limit });
+    return runs;
   }, [limit]);
 
-  const { data: runs, error, loading, refresh } = useDaemonQuery<(RunInfo & { repo_name: string })[]>(fetcher, []);
+  const { data: runs, error, loading, refresh } = useDaemonQuery<RunInfo[]>(fetcher, []);
 
   // Auto-refresh on run-level events only (daemon emits RunUpdated on job transitions)
   useRefreshOnEvents(refresh, {
@@ -546,6 +537,32 @@ export function useAllRuns(limit?: number) {
   });
 
   return { runs, error, loading, refresh };
+}
+
+// Hook for getting lightweight run counts (running + awaiting)
+export function useRunCounts() {
+  const fetcher = useCallback(async () => {
+    const [running, awaiting] = await invoke<[number, number]>('get_run_counts');
+    return { running, awaiting };
+  }, []);
+
+  const {
+    data: counts,
+    error,
+    loading,
+    refresh,
+  } = useDaemonQuery<{ running: number; awaiting: number }>(fetcher, { running: 0, awaiting: 0 });
+
+  useRefreshOnEvents(refresh, {
+    events: [
+      AIRLOCK_EVENTS.RUN_CREATED,
+      AIRLOCK_EVENTS.RUN_UPDATED,
+      AIRLOCK_EVENTS.RUN_COMPLETED,
+      AIRLOCK_EVENTS.RUN_SUPERSEDED,
+    ],
+  });
+
+  return { counts, error, loading, refresh };
 }
 
 // Helper to extract repo name from URL

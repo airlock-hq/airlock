@@ -54,6 +54,27 @@ async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
       return runs as T;
     }
 
+    case 'get_all_runs': {
+      const limit = args?.limit as number | undefined;
+      // Build repo_id → repo_name map
+      const repoNameMap: Record<string, string> = {};
+      for (const repo of mockData.mockRepos) {
+        repoNameMap[repo.id] = repo.upstream_url.replace(/.*[:/]([^/]+\/[^/.]+)(\.git)?$/, '$1');
+      }
+      const allRuns = Object.entries(mockData.mockRuns).flatMap(([, runs]) =>
+        runs.map((r) => ({ ...r, repo_name: repoNameMap[r.repo_id] ?? r.repo_id }))
+      );
+      allRuns.sort((a, b) => b.created_at - a.created_at);
+      return (limit ? allRuns.slice(0, limit) : allRuns) as T;
+    }
+
+    case 'get_run_counts': {
+      const allRuns = Object.values(mockData.mockRuns).flat();
+      const running = allRuns.filter((r) => r.status === 'running').length;
+      const awaiting = allRuns.filter((r) => r.status === 'awaiting_approval').length;
+      return [running, awaiting] as T;
+    }
+
     case 'get_run_detail': {
       const runId = args?.runId as string;
       const detail = mockData.getRunDetail(runId);

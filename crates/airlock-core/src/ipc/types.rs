@@ -10,6 +10,9 @@ pub struct RunInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repo_id: Option<String>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo_name: Option<String>,
+
     /// Derived from job/step results.
     pub status: String,
 

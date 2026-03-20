@@ -199,6 +199,7 @@ fn export_runs(db: &Database, repo_id: &str, output_dir: &Path) -> Result<Vec<Ex
         run_infos.push(RunInfo {
             id: run.id,
             repo_id: Some(repo_id.to_string()),
+            repo_name: None,
             status,
             branch: if run.branch.is_empty() {
                 None

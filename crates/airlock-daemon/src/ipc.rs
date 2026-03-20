@@ -134,6 +134,8 @@ pub mod methods {
     pub const APPLY_PATCHES: &str = "apply_patches";
     pub const CANCEL_RUN: &str = "cancel_run";
     pub const RETRY_JOB: &str = "retry_job";
+    pub const GET_ALL_RUNS: &str = "get_all_runs";
+    pub const GET_RUN_COUNTS: &str = "get_run_counts";
 }
 
 // =============================================================================
@@ -257,6 +259,20 @@ pub struct CancelRunParams {
 pub struct RetryJobParams {
     pub run_id: String,
     pub job_key: String,
+}
+
+/// Parameters for the `get_all_runs` method.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetAllRunsParams {
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Result for the `get_run_counts` method.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetRunCountsResult {
+    pub running: u32,
+    pub awaiting: u32,
 }
 
 /// Parameters for the `get_config` method.

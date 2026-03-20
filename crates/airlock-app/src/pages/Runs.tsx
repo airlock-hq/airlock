@@ -29,10 +29,6 @@ function formatTimeAgo(timestamp: number): string {
   return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
 }
 
-interface RunWithRepo extends RunInfo {
-  repo_name: string;
-}
-
 function RunStatusDot({ status }: { status: string }) {
   const props: Record<string, { variant: 'success' | 'danger' | 'warning' | 'signal' | 'muted'; pulse?: boolean }> = {
     running: { variant: 'warning' },
@@ -62,7 +58,7 @@ function statusLabel(status: string): string {
   }
 }
 
-function RunRow({ run }: { run: RunWithRepo }) {
+function RunRow({ run }: { run: RunInfo }) {
   const derivedStatus = getDerivedStatus(run.status);
 
   return (
@@ -76,7 +72,7 @@ function RunRow({ run }: { run: RunWithRepo }) {
           {run.branch || `Run #${run.id.slice(-8)}`}
         </Link>
       </div>
-      <span className="text-small text-foreground-muted">{run.repo_name}</span>
+      <span className="text-small text-foreground-muted">{run.repo_name ?? ''}</span>
       <span className="text-micro text-foreground-muted font-mono">{formatTimeAgo(run.created_at)}</span>
       <div className="flex items-center justify-end">
         <div className="text-micro text-foreground-muted/60 font-mono">{statusLabel(derivedStatus)}</div>
@@ -139,7 +135,7 @@ export function Runs() {
       filtered = filtered.filter(
         (r) =>
           r.branch?.toLowerCase().includes(query) ||
-          r.repo_name.toLowerCase().includes(query) ||
+          r.repo_name?.toLowerCase().includes(query) ||
           r.id.toLowerCase().includes(query)
       );
     }

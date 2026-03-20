@@ -136,6 +136,60 @@ impl Database {
         Ok(job_results)
     }
 
+    /// Batch-fetch job results for multiple runs in a single query.
+    ///
+    /// Returns results grouped by `run_id`. Runs with no job results will not
+    /// appear in the map. Empty input returns an empty map without hitting the DB.
+    pub fn get_job_results_for_runs(
+        &self,
+        run_ids: &[&str],
+    ) -> Result<std::collections::HashMap<String, Vec<JobResult>>> {
+        if run_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let placeholders: Vec<&str> = run_ids.iter().map(|_| "?").collect();
+        let sql = format!(
+            "SELECT id, run_id, job_key, name, status, job_order, started_at, completed_at, error, worktree_path \
+             FROM job_results WHERE run_id IN ({}) ORDER BY run_id, job_order ASC",
+            placeholders.join(", ")
+        );
+
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(|e| AirlockError::Database(format!("Failed to prepare statement: {e}")))?;
+
+        let params = rusqlite::params_from_iter(run_ids.iter());
+        let rows = stmt
+            .query_map(params, |row| {
+                Ok(JobResultRow {
+                    id: row.get(0)?,
+                    run_id: row.get(1)?,
+                    job_key: row.get(2)?,
+                    name: row.get(3)?,
+                    status_str: row.get(4)?,
+                    job_order: row.get(5)?,
+                    started_at: row.get(6)?,
+                    completed_at: row.get(7)?,
+                    error: row.get(8)?,
+                    worktree_path: row.get(9)?,
+                })
+            })
+            .map_err(|e| AirlockError::Database(format!("Failed to query job results: {e}")))?;
+
+        let mut map: std::collections::HashMap<String, Vec<JobResult>> =
+            std::collections::HashMap::new();
+        for row in rows {
+            let row =
+                row.map_err(|e| AirlockError::Database(format!("Failed to read row: {e}")))?;
+            let run_id = row.run_id.clone();
+            map.entry(run_id).or_default().push(row.into_job_result()?);
+        }
+
+        Ok(map)
+    }
+
     /// Update a job result's status and timestamps.
     pub fn update_job_status(
         &self,

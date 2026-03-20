@@ -9,10 +9,10 @@ use super::pipeline::{
 use super::util::{load_artifacts, parse_params};
 use super::HandlerContext;
 use crate::ipc::{
-    error_codes, CancelRunParams, CancelRunResult, GetRunDetailParams, GetRunDetailResult,
-    GetRunsParams, GetRunsResult, JobResultInfo, RefUpdateParam, ReprocessRunParams,
-    ReprocessRunResult, Response, RetryJobParams, RetryJobResult, RunDetailInfo, RunInfo,
-    StepResultInfo,
+    error_codes, CancelRunParams, CancelRunResult, GetAllRunsParams, GetRunCountsResult,
+    GetRunDetailParams, GetRunDetailResult, GetRunsParams, GetRunsResult, JobResultInfo,
+    RefUpdateParam, ReprocessRunParams, ReprocessRunResult, Response, RetryJobParams,
+    RetryJobResult, RunDetailInfo, RunInfo, StepResultInfo,
 };
 use airlock_core::{step_status_to_string, JobStatus, WorkflowConfig};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -63,36 +63,26 @@ pub async fn handle_get_runs(
         }
     };
 
-    // For each run, get job results to compute derived status and completed_at
-    let mut run_infos = Vec::with_capacity(runs.len());
-    for r in runs {
-        let job_results = db.get_job_results_for_run(&r.id).unwrap_or_default();
-        let status = r.derived_status_from_jobs(&job_results).to_string();
-        // Compute completed_at from max job completed_at when run is done
-        let completed_at = if status == "completed" || status == "failed" || status == "superseded"
-        {
-            job_results.iter().filter_map(|j| j.completed_at).max()
-        } else {
-            None
-        };
-        run_infos.push(RunInfo {
-            id: r.id,
-            repo_id: Some(params.repo_id.clone()),
-            status,
-            branch: if r.branch.is_empty() {
-                None
-            } else {
-                Some(r.branch)
-            },
-            base_sha: None,
-            head_sha: None,
-            current_step: r.current_step,
-            created_at: r.created_at,
-            updated_at: Some(r.updated_at),
-            completed_at,
-            error: r.error,
-        });
-    }
+    // Batch-fetch job results for all runs in one query
+    let run_ids: Vec<&str> = runs.iter().map(|r| r.id.as_str()).collect();
+    let jobs_map = match db.get_job_results_for_runs(&run_ids) {
+        Ok(m) => m,
+        Err(e) => {
+            return Response::error(
+                id,
+                error_codes::DATABASE_ERROR,
+                format!("Failed to fetch job results: {e}"),
+            )
+        }
+    };
+
+    let run_infos: Vec<RunInfo> = runs
+        .iter()
+        .map(|r| {
+            let jobs = jobs_map.get(&r.id).map(|v| v.as_slice()).unwrap_or(&[]);
+            build_run_info(r, jobs, None)
+        })
+        .collect();
 
     let result = GetRunsResult { runs: run_infos };
 
@@ -429,6 +419,172 @@ pub async fn handle_cancel_run(
         success: true,
     };
 
+    Response::success(id, serde_json::to_value(result).unwrap())
+}
+
+/// Extract a human-readable `owner/repo` name from a git URL.
+///
+/// Handles SCP-style (`git@host:user/repo.git`), `ssh://`, and HTTPS URLs.
+fn repo_name_from_url(url: &str) -> String {
+    // SCP-style SSH: git@github.com:user/repo.git
+    // Must have '@' before ':', no "://" (which is a scheme), and the
+    // part after ':' must not start with a digit (which would be a port).
+    if !url.contains("://") {
+        if let Some(colon) = url.rfind(':') {
+            let before = &url[..colon];
+            let after = &url[colon + 1..];
+            if before.contains('@')
+                && !after.is_empty()
+                && !after.starts_with(|c: char| c.is_ascii_digit())
+            {
+                return after.trim_end_matches(".git").to_string();
+            }
+        }
+    }
+
+    // Everything else (HTTPS, ssh://): take last two path segments
+    let segments: Vec<&str> = url.trim_end_matches(".git").rsplit('/').collect();
+    if segments.len() >= 2 {
+        return format!("{}/{}", segments[1], segments[0]);
+    }
+
+    url.to_string()
+}
+
+/// Build a `RunInfo` from a `Run` and pre-fetched job results.
+fn build_run_info(
+    r: &airlock_core::Run,
+    job_results: &[airlock_core::JobResult],
+    repo_name: Option<String>,
+) -> RunInfo {
+    let status = r.derived_status_from_jobs(job_results).to_string();
+    let completed_at = if status == "completed" || status == "failed" || status == "superseded" {
+        job_results.iter().filter_map(|j| j.completed_at).max()
+    } else {
+        None
+    };
+    RunInfo {
+        id: r.id.clone(),
+        repo_id: Some(r.repo_id.clone()),
+        repo_name,
+        status,
+        branch: if r.branch.is_empty() {
+            None
+        } else {
+            Some(r.branch.clone())
+        },
+        base_sha: None,
+        head_sha: None,
+        current_step: r.current_step.clone(),
+        created_at: r.created_at,
+        updated_at: Some(r.updated_at),
+        completed_at,
+        error: r.error.clone(),
+    }
+}
+
+/// Handle the `get_all_runs` method — single query for all runs across repos.
+///
+/// Returns the most recent `limit` runs, but always includes any active runs
+/// (running/awaiting) even if they fall outside the limit window.
+pub async fn handle_get_all_runs(
+    ctx: Arc<HandlerContext>,
+    params: serde_json::Value,
+    id: serde_json::Value,
+) -> Response {
+    let params: GetAllRunsParams = match parse_params(params, &id) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+
+    let db = ctx.db.lock().await;
+
+    let runs = match db.list_all_runs(params.limit) {
+        Ok(r) => r,
+        Err(e) => {
+            return Response::error(
+                id,
+                error_codes::DATABASE_ERROR,
+                format!("Failed to list runs: {e}"),
+            )
+        }
+    };
+
+    // Build repo_id → repo_name map
+    let repos = db.list_repos().unwrap_or_default();
+    let repo_name_map: HashMap<String, String> = repos
+        .iter()
+        .map(|r| (r.id.clone(), repo_name_from_url(&r.upstream_url)))
+        .collect();
+
+    // Merge any active runs that fell outside the limit so the frontend
+    // never shows a count mismatch with the TelemetryBar.
+    let included_ids: HashSet<String> = runs.iter().map(|r| r.id.clone()).collect();
+    let active_runs = db.list_potentially_active_runs().unwrap_or_default();
+    let extra_active: Vec<&airlock_core::Run> = active_runs
+        .iter()
+        .filter(|r| !included_ids.contains(&r.id))
+        .collect();
+
+    // Batch-fetch job results for all runs (main + extra active) in one query
+    let all_run_ids: Vec<&str> = runs
+        .iter()
+        .map(|r| r.id.as_str())
+        .chain(extra_active.iter().map(|r| r.id.as_str()))
+        .collect();
+    let jobs_map = match db.get_job_results_for_runs(&all_run_ids) {
+        Ok(m) => m,
+        Err(e) => {
+            return Response::error(
+                id,
+                error_codes::DATABASE_ERROR,
+                format!("Failed to fetch job results: {e}"),
+            )
+        }
+    };
+
+    let mut run_infos: Vec<RunInfo> = runs
+        .iter()
+        .map(|r| {
+            let jobs = jobs_map.get(&r.id).map(|v| v.as_slice()).unwrap_or(&[]);
+            build_run_info(r, jobs, repo_name_map.get(&r.repo_id).cloned())
+        })
+        .collect();
+
+    for r in &extra_active {
+        let jobs = jobs_map.get(&r.id).map(|v| v.as_slice()).unwrap_or(&[]);
+        let info = build_run_info(r, jobs, repo_name_map.get(&r.repo_id).cloned());
+        if info.status == "running" || info.status == "awaiting_approval" {
+            run_infos.push(info);
+        }
+    }
+
+    // Re-sort by created_at descending after merging
+    run_infos.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    let result = GetRunsResult { runs: run_infos };
+    Response::success(id, serde_json::to_value(result).unwrap())
+}
+
+/// Handle the `get_run_counts` method — lightweight counts of running/awaiting runs.
+///
+/// Uses `list_potentially_active_runs` (SQL JOIN) to fetch only runs with
+/// non-terminal jobs, then derives status for just those few runs.
+pub async fn handle_get_run_counts(ctx: Arc<HandlerContext>, id: serde_json::Value) -> Response {
+    let db = ctx.db.lock().await;
+
+    let (running, awaiting) = match db.count_active_run_statuses() {
+        Ok(counts) => counts,
+        Err(e) => {
+            return Response::error(
+                id,
+                error_codes::DATABASE_ERROR,
+                format!("Failed to count active runs: {e}"),
+            )
+        }
+    };
+
+    let result = GetRunCountsResult { running, awaiting };
     Response::success(id, serde_json::to_value(result).unwrap())
 }
 
@@ -797,6 +953,160 @@ pub async fn handle_retry_job(
 mod tests {
     use super::*;
     use airlock_core::WorkflowConfig;
+
+    // =========================================================================
+    // repo_name_from_url tests
+    // =========================================================================
+
+    // -- SCP-style SSH (git@host:owner/repo) ---------------------------------
+
+    #[test]
+    fn test_scp_ssh_with_dot_git() {
+        assert_eq!(
+            repo_name_from_url("git@github.com:user/repo.git"),
+            "user/repo"
+        );
+    }
+
+    #[test]
+    fn test_scp_ssh_without_dot_git() {
+        assert_eq!(repo_name_from_url("git@github.com:user/repo"), "user/repo");
+    }
+
+    #[test]
+    fn test_scp_ssh_nested_path() {
+        assert_eq!(
+            repo_name_from_url("git@gitlab.com:org/sub/repo.git"),
+            "org/sub/repo"
+        );
+    }
+
+    #[test]
+    fn test_scp_ssh_custom_host() {
+        assert_eq!(
+            repo_name_from_url("deploy@internal.example.com:team/project.git"),
+            "team/project"
+        );
+    }
+
+    // -- ssh:// scheme URLs --------------------------------------------------
+
+    #[test]
+    fn test_ssh_scheme_standard() {
+        assert_eq!(
+            repo_name_from_url("ssh://git@github.com/user/repo.git"),
+            "user/repo"
+        );
+    }
+
+    #[test]
+    fn test_ssh_scheme_with_port() {
+        assert_eq!(
+            repo_name_from_url("ssh://git@host:22/user/repo.git"),
+            "user/repo"
+        );
+    }
+
+    #[test]
+    fn test_ssh_scheme_custom_port() {
+        assert_eq!(
+            repo_name_from_url("ssh://git@host:2222/user/repo.git"),
+            "user/repo"
+        );
+    }
+
+    // -- HTTPS URLs ----------------------------------------------------------
+
+    #[test]
+    fn test_https_with_dot_git() {
+        assert_eq!(
+            repo_name_from_url("https://github.com/user/repo.git"),
+            "user/repo"
+        );
+    }
+
+    #[test]
+    fn test_https_without_dot_git() {
+        assert_eq!(
+            repo_name_from_url("https://github.com/user/repo"),
+            "user/repo"
+        );
+    }
+
+    #[test]
+    fn test_https_gitlab() {
+        assert_eq!(
+            repo_name_from_url("https://gitlab.com/org/project.git"),
+            "org/project"
+        );
+    }
+
+    #[test]
+    fn test_https_self_hosted() {
+        assert_eq!(
+            repo_name_from_url("https://git.internal.corp/team/service.git"),
+            "team/service"
+        );
+    }
+
+    #[test]
+    fn test_https_with_port() {
+        assert_eq!(
+            repo_name_from_url("https://git.example.com:8443/user/repo.git"),
+            "user/repo"
+        );
+    }
+
+    // -- HTTP URLs -----------------------------------------------------------
+
+    #[test]
+    fn test_http_url() {
+        assert_eq!(
+            repo_name_from_url("http://github.com/user/repo.git"),
+            "user/repo"
+        );
+    }
+
+    // -- Local / file paths --------------------------------------------------
+
+    #[test]
+    fn test_local_path() {
+        assert_eq!(
+            repo_name_from_url("/home/user/repos/myproject.git"),
+            "repos/myproject"
+        );
+    }
+
+    #[test]
+    fn test_file_scheme() {
+        assert_eq!(
+            repo_name_from_url("file:///home/user/repos/myproject.git"),
+            "repos/myproject"
+        );
+    }
+
+    // -- Edge cases ----------------------------------------------------------
+
+    #[test]
+    fn test_trailing_slash() {
+        // Unusual but shouldn't panic
+        let result = repo_name_from_url("https://github.com/user/repo/");
+        assert_eq!(result, "repo/");
+    }
+
+    #[test]
+    fn test_bare_string_no_slashes() {
+        assert_eq!(repo_name_from_url("repo"), "repo");
+    }
+
+    #[test]
+    fn test_single_segment_with_dot_git() {
+        assert_eq!(repo_name_from_url("repo.git"), "repo.git");
+    }
+
+    // =========================================================================
+    // collect_downstream tests
+    // =========================================================================
 
     fn make_workflow(yaml: &str) -> WorkflowConfig {
         serde_yaml::from_str(yaml).unwrap()

@@ -1,5 +1,5 @@
 import { StatusDot, type StatusDotProps } from '@airlock-hq/design-system/react';
-import { useDaemonHealth, useRepos, useAllRuns } from '@/hooks/use-daemon';
+import { useDaemonHealth, useRepos, useRunCounts } from '@/hooks/use-daemon';
 import { isTauri } from '@/lib/tauri';
 
 /**
@@ -9,12 +9,12 @@ import { isTauri } from '@/lib/tauri';
 export function TelemetryBar() {
   const { health, loading: healthLoading } = useDaemonHealth();
   const { repos } = useRepos();
-  const { runs } = useAllRuns(50);
+  const { counts } = useRunCounts();
 
   const daemonStatus = healthLoading ? 'loading' : health?.healthy ? 'healthy' : 'offline';
   const repoCount = repos.length;
-  const executingCount = runs.filter((r) => r.status === 'running').length;
-  const awaitingCount = runs.filter((r) => r.status === 'pending_review' || r.status === 'awaiting_approval').length;
+  const executingCount = counts.running;
+  const awaitingCount = counts.awaiting;
 
   const items: { label: string; value: string; dot?: boolean; variant?: StatusDotProps['variant']; pulse?: boolean }[] =
     [

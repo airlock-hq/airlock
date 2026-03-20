@@ -143,3 +143,14 @@ pub(crate) struct DaemonCancelRunResult {
 pub(crate) struct DaemonRetryJobResult {
     pub success: bool,
 }
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DaemonGetAllRunsResult {
+    pub runs: Vec<RunInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DaemonGetRunCountsResult {
+    pub running: u32,
+    pub awaiting: u32,
+}

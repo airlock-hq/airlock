@@ -2,8 +2,8 @@
 
 use super::error::IpcError;
 use super::types::{
-    DaemonCancelRunResult, DaemonGetRunsResult, DaemonReprocessRunResult, DaemonRetryJobResult,
-    DaemonRunDetailResult,
+    DaemonCancelRunResult, DaemonGetAllRunsResult, DaemonGetRunCountsResult, DaemonGetRunsResult,
+    DaemonReprocessRunResult, DaemonRetryJobResult, DaemonRunDetailResult,
 };
 use super::IpcClient;
 use crate::{ApplyPatchesResult, ApproveStepResult, GetRunDiffResult, RunDetail, RunInfo};
@@ -37,6 +37,7 @@ impl IpcClient {
             run: RunInfo {
                 id: daemon_result.run.id,
                 repo_id: Some(daemon_result.run.repo_id),
+                repo_name: None,
                 status: daemon_result.run.status,
                 branch: daemon_result.run.branch,
                 base_sha: daemon_result.run.base_sha,
@@ -84,6 +85,27 @@ impl IpcClient {
 
         let daemon_result: DaemonCancelRunResult = serde_json::from_value(result)?;
         Ok(daemon_result.success)
+    }
+
+    /// Get all runs across all repos
+    pub async fn get_all_runs(&self, limit: Option<u32>) -> Result<Vec<RunInfo>, IpcError> {
+        let params = match limit {
+            Some(l) => serde_json::json!({ "limit": l }),
+            None => serde_json::json!({}),
+        };
+
+        let result = self.send_request("get_all_runs", params).await?;
+        let daemon_result: DaemonGetAllRunsResult = serde_json::from_value(result)?;
+        Ok(daemon_result.runs)
+    }
+
+    /// Get counts of running and awaiting runs
+    pub async fn get_run_counts(&self) -> Result<(u32, u32), IpcError> {
+        let result = self
+            .send_request("get_run_counts", serde_json::json!({}))
+            .await?;
+        let daemon_result: DaemonGetRunCountsResult = serde_json::from_value(result)?;
+        Ok((daemon_result.running, daemon_result.awaiting))
     }
 
     /// Approve a step (resume pipeline execution)

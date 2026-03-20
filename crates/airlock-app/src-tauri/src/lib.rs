@@ -205,6 +205,29 @@ async fn retry_job(
         .map_err(|e| e.to_string())
 }
 
+/// Get all runs across all repos
+#[tauri::command]
+async fn get_all_runs(
+    state: State<'_, AppState>,
+    limit: Option<u32>,
+) -> Result<Vec<RunInfo>, String> {
+    state
+        .ipc_client
+        .get_all_runs(limit)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get counts of running and awaiting runs
+#[tauri::command]
+async fn get_run_counts(state: State<'_, AppState>) -> Result<(u32, u32), String> {
+    state
+        .ipc_client
+        .get_run_counts()
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Cancel a running pipeline run
 #[tauri::command]
 async fn cancel_run(state: State<'_, AppState>, run_id: String) -> Result<bool, String> {
@@ -542,6 +565,8 @@ pub fn run() {
             list_repos,
             get_repo_status,
             get_runs,
+            get_all_runs,
+            get_run_counts,
             get_run_detail,
             get_intent_diff,
             get_intent_tour,

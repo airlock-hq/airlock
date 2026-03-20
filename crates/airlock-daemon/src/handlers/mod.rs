@@ -109,6 +109,8 @@ pub async fn dispatch(ctx: Arc<HandlerContext>, request: Request) -> Response {
         methods::REPROCESS_RUN => runs::handle_reprocess_run(ctx, request.params, id).await,
         methods::CANCEL_RUN => runs::handle_cancel_run(ctx, request.params, id).await,
         methods::RETRY_JOB => runs::handle_retry_job(ctx, request.params, id).await,
+        methods::GET_ALL_RUNS => runs::handle_get_all_runs(ctx, request.params, id).await,
+        methods::GET_RUN_COUNTS => runs::handle_get_run_counts(ctx, id).await,
         methods::GET_CONFIG => config::handle_get_config(ctx, request.params, id).await,
         methods::UPDATE_CONFIG => config::handle_update_config(ctx, request.params, id).await,
         // Step-based pipeline handlers
