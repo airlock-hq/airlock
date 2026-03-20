@@ -543,7 +543,7 @@ Some operations require Airlock internals and remain as `airlock exec`:
 | ------------------------ | ---------------------------------------------------- |
 | `airlock exec freeze`    | Commit patches, lock worktree (see 5.3)              |
 | `airlock exec push`      | Push current branch to upstream                      |
-| `airlock exec create-pr` | Create pull request on GitHub via `gh` CLI           |
+| `airlock exec create-pr` | Create PR on GitHub via `gh` CLI; post critique comments as inline reviews |
 | `airlock exec await`     | Request human approval before continuing pipeline    |
 
 ### 5.9 Agent CLI Helper
