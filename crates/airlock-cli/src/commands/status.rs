@@ -93,14 +93,22 @@ fn run_with_paths(working_dir: &Path, paths: &AirlockPaths) -> Result<()> {
         .list_runs(&repo.id, Some(10))
         .context("Failed to query recent runs")?;
 
+    // Batch-fetch job results for all runs (active + recent) in one query
+    let mut all_run_ids: Vec<&str> = active_runs.iter().map(|r| r.id.as_str()).collect();
+    for r in &recent_runs {
+        if !all_run_ids.contains(&r.id.as_str()) {
+            all_run_ids.push(r.id.as_str());
+        }
+    }
+    let jobs_map = db.get_job_results_for_runs(&all_run_ids)?;
+
     // Count by derived status
     let mut running_count = 0;
     let mut pending_count = 0;
     for r in &active_runs {
-        let status = db
-            .compute_run_status(r)
-            .unwrap_or_else(|_| "unknown".to_string());
-        match status.as_str() {
+        let jobs = jobs_map.get(&r.id).map(|v| v.as_slice()).unwrap_or(&[]);
+        let status = r.derived_status_from_jobs(jobs);
+        match status {
             "running" | "pending" => running_count += 1,
             "awaiting_approval" => pending_count += 1,
             _ => {}
@@ -171,10 +179,9 @@ fn run_with_paths(working_dir: &Path, paths: &AirlockPaths) -> Result<()> {
         let mut forwarded = 0;
         let mut failed = 0;
         for r in &recent_runs {
-            let status = db
-                .compute_run_status(r)
-                .unwrap_or_else(|_| "unknown".to_string());
-            match status.as_str() {
+            let jobs = jobs_map.get(&r.id).map(|v| v.as_slice()).unwrap_or(&[]);
+            let status = r.derived_status_from_jobs(jobs);
+            match status {
                 "completed" => forwarded += 1,
                 "failed" => failed += 1,
                 _ => {}

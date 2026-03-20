@@ -83,11 +83,13 @@ fn run_with_paths(working_dir: &Path, paths: &AirlockPaths, args: &RunsArgs) -> 
     println!("{:<14} {:<18} {:<20} REFS", "RUN ID", "STATUS", "CREATED");
     println!("{}", "─".repeat(70));
 
+    let run_ids: Vec<&str> = runs.iter().map(|r| r.id.as_str()).collect();
+    let jobs_map = db.get_job_results_for_runs(&run_ids)?;
+
     for run in &runs {
-        let derived = db
-            .compute_run_status(run)
-            .unwrap_or_else(|_| "unknown".to_string());
-        let status_str = format_status(&derived);
+        let jobs = jobs_map.get(&run.id).map(|v| v.as_slice()).unwrap_or(&[]);
+        let derived = run.derived_status_from_jobs(jobs);
+        let status_str = format_status(derived);
         let created_str = format_time_ago(run.created_at);
         let refs_str = format_refs(&run.ref_updates);
 
