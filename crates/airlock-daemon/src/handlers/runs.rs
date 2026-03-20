@@ -4,7 +4,8 @@
 
 use super::pipeline::{
     emit_run_final_status, execute_pipeline, execute_single_job, extract_branch_name,
-    load_workflows_for_run, resolve_job_worktree, resume_dag_after_job_completion,
+    load_workflows_for_run, mark_run_cancelled, resolve_job_worktree,
+    resume_dag_after_job_completion,
 };
 use super::util::{load_artifacts, parse_params};
 use super::HandlerContext;
@@ -411,6 +412,16 @@ pub async fn handle_cancel_run(
     };
     ctx.run_queue
         .cancel_active(&run.repo_id, ref_names.as_deref());
+
+    // When no jobs are actively running (e.g. awaiting_approval), the pipeline
+    // DAG executor has already returned — nobody is polling the cancellation
+    // token. Directly transition jobs/steps and emit RunCompleted here.
+    // When jobs ARE running, the pipeline loop will handle it after detecting
+    // the token, so we skip to avoid a duplicate RunCompleted event.
+    let has_running_jobs = jobs.iter().any(|j| j.status == JobStatus::Running);
+    if !has_running_jobs {
+        mark_run_cancelled(&ctx, &run).await;
+    }
 
     info!("Cancelled run {} for repo {}", run.id, run.repo_id);
 
