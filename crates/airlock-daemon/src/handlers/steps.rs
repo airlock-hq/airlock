@@ -1180,6 +1180,7 @@ pub async fn handle_address_comments(
 
     let step_name = awaiting_step.name.clone();
     let step_id = awaiting_step.id.clone();
+    let step_order = awaiting_step.step_order;
 
     // Look up worktree
     let worktree_path = find_job_worktree(&ctx.paths, &run, &job_key, &db);
@@ -1237,6 +1238,7 @@ pub async fn handle_address_comments(
             job_id,
             step_name,
             step_id,
+            step_order,
             worktree_path,
             comments,
             git_author_name,
@@ -1258,6 +1260,7 @@ async fn address_comments_background(
     job_id: String,
     step_name: String,
     step_id: String,
+    step_order: i32,
     worktree_path: std::path::PathBuf,
     comments: Vec<AddressCommentItem>,
     git_author_name: Option<String>,
@@ -1430,12 +1433,31 @@ async fn address_comments_background(
     };
 
     if !has_changes {
-        log_callback("stdout", "Agent made no changes.\n".to_string());
-        // Mark step as passed (no changes needed or agent couldn't fix)
-        mark_step_passed(
-            &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch,
-        )
-        .await;
+        log_callback(
+            "stdout",
+            "Agent made no changes. Resuming pipeline...\n".to_string(),
+        );
+        // Mark step as passed and resume the pipeline so downstream steps
+        // continue automatically (rather than leaving the job stuck in
+        // AwaitingApproval with nothing for the user to act on).
+        {
+            let db = ctx.db.lock().await;
+            if let Ok(Some(mut step)) = db.get_step_result(&step_id) {
+                step.status = StepStatus::Passed;
+                step.completed_at = Some(now_epoch());
+                let _ = db.update_step_result(&step);
+            }
+            let _ = db.update_job_status(&job_id, JobStatus::Running, None, None, None);
+        }
+        ctx.emit(AirlockEvent::StepCompleted {
+            repo_id: repo_id.to_string(),
+            run_id: run_id.to_string(),
+            job_key: job_key.to_string(),
+            step_name: step_name.to_string(),
+            status: "passed".to_string(),
+            branch: branch.to_string(),
+        });
+        resume_pipeline_after_approval(ctx, run, repo, &job_key, &step_name, step_order).await;
         return;
     }
 
@@ -1545,6 +1567,17 @@ async fn address_comments_background(
         }
     }
 
+    // Release the old pool slot so the fresh pipeline can acquire it.
+    // The agent committed into this worktree; the new SHA is already in the
+    // gate via update_ref, so reset_persistent_worktree will pick it up.
+    if let Some(lease) = ctx
+        .worktree_pool
+        .find_lease_by_path(&repo_id, &worktree_path)
+        .await
+    {
+        ctx.worktree_pool.release(&repo_id, lease.slot_index).await;
+    }
+
     ctx.emit(AirlockEvent::RunUpdated {
         repo_id: repo_id.clone(),
         run_id: run_id.clone(),
@@ -1616,44 +1649,6 @@ async fn mark_step_failed(
         job_key: job_key.to_string(),
         step_name: step_name.to_string(),
         status: "failed".to_string(),
-        branch: branch.to_string(),
-    });
-    ctx.emit(AirlockEvent::RunUpdated {
-        repo_id: repo_id.to_string(),
-        run_id: run_id.to_string(),
-        status: "updated".to_string(),
-    });
-}
-
-/// Helper to mark a step as passed and emit events.
-#[allow(clippy::too_many_arguments)]
-async fn mark_step_passed(
-    ctx: &Arc<HandlerContext>,
-    step_id: &str,
-    job_id: &str,
-    repo_id: &str,
-    run_id: &str,
-    job_key: &str,
-    step_name: &str,
-    branch: &str,
-) {
-    let db = ctx.db.lock().await;
-    if let Ok(Some(mut step)) = db.get_step_result(step_id) {
-        step.status = StepStatus::Passed;
-        step.completed_at = Some(now_epoch());
-        let _ = db.update_step_result(&step);
-    }
-    if let Err(e) = db.update_job_status(job_id, JobStatus::AwaitingApproval, None, None, None) {
-        warn!("Failed to restore job status: {}", e);
-    }
-    drop(db);
-
-    ctx.emit(AirlockEvent::StepCompleted {
-        repo_id: repo_id.to_string(),
-        run_id: run_id.to_string(),
-        job_key: job_key.to_string(),
-        step_name: step_name.to_string(),
-        status: "passed".to_string(),
         branch: branch.to_string(),
     });
     ctx.emit(AirlockEvent::RunUpdated {
