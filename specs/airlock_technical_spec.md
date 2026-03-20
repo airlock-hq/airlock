@@ -185,6 +185,7 @@ Communication via local IPC using JSON-RPC 2.0:
 - `GetRunArtifacts` — Get content, comments, patches for a run
 - `ApproveStage`, `RejectStage` — Stage approval actions
 - `ApplyPatches` — Apply selected patches and re-run or ship
+- `AddressComments` — Spawn an agent to fix selected critique comments, commit, and reprocess
 - `GetRunDiff` — Get diff for a run
 - `Status`, `Health` — System status
 
