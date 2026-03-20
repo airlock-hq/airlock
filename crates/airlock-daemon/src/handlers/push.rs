@@ -216,15 +216,19 @@ pub async fn process_coalesced_push(
 
                     // Collect paused jobs from superseded runs so we can skip them
                     // and release their pool slots after the DB lock drops.
-                    for superseded_run in &superseded {
-                        if let Ok(jobs) = db.get_job_results_for_run(&superseded_run.id) {
-                            for job in &jobs {
-                                if job.status == JobStatus::AwaitingApproval {
-                                    paused_jobs_to_release.push((
-                                        job.id.clone(),
-                                        superseded_run.repo_id.clone(),
-                                        job.worktree_path.as_ref().map(PathBuf::from),
-                                    ));
+                    let superseded_ids: Vec<&str> =
+                        superseded.iter().map(|r| r.id.as_str()).collect();
+                    if let Ok(superseded_jobs_map) = db.get_job_results_for_runs(&superseded_ids) {
+                        for superseded_run in &superseded {
+                            if let Some(jobs) = superseded_jobs_map.get(&superseded_run.id) {
+                                for job in jobs {
+                                    if job.status == JobStatus::AwaitingApproval {
+                                        paused_jobs_to_release.push((
+                                            job.id.clone(),
+                                            superseded_run.repo_id.clone(),
+                                            job.worktree_path.as_ref().map(PathBuf::from),
+                                        ));
+                                    }
                                 }
                             }
                         }
