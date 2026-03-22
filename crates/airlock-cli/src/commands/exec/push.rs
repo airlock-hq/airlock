@@ -12,7 +12,7 @@
 //! 3. Get upstream HEAD from gate's remote tracking ref
 //! 4. Check: is upstream HEAD an ancestor of worktree HEAD?
 //!    YES → regular push (fast-forward)
-//!    NO  → check rebase_state.json from rebase stage:
+//!    NO  → check `rebase_state.json` from rebase stage:
 //!      - If rebase recorded the same upstream SHA → force-with-lease (safe)
 //!      - If upstream moved since rebase, or no rebase state → hard failure
 //!

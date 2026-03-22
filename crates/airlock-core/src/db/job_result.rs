@@ -1,4 +1,4 @@
-//! JobResult CRUD operations.
+//! `JobResult` CRUD operations.
 
 use crate::error::{AirlockError, Result};
 use crate::types::{JobResult, JobStatus};
@@ -99,7 +99,7 @@ impl Database {
         }
     }
 
-    /// Get all job results for a run, ordered by job_order.
+    /// Get all job results for a run, ordered by `job_order`.
     pub fn get_job_results_for_run(&self, run_id: &str) -> Result<Vec<JobResult>> {
         let mut stmt = self
             .conn
@@ -276,7 +276,7 @@ impl Database {
         Ok(rows_affected as u32)
     }
 
-    /// Get all AwaitingApproval jobs that have a worktree_path, joined with their repo_id.
+    /// Get all `AwaitingApproval` jobs that have a `worktree_path`, joined with their `repo_id`.
     ///
     /// Used by worktree pool initialization to mark in-use slots after a restart.
     pub fn awaiting_approval_jobs_with_worktrees(&self) -> Result<Vec<(String, String, String)>> {
@@ -312,7 +312,7 @@ impl Database {
         Ok(results)
     }
 
-    /// Reset a job to Pending status, clearing started_at, completed_at, error, and worktree_path.
+    /// Reset a job to `Pending` status, clearing `started_at`, `completed_at`, `error`, and `worktree_path`.
     pub fn reset_job_to_pending(&self, job_id: &str) -> Result<()> {
         let rows_affected = self
             .conn
@@ -333,7 +333,7 @@ impl Database {
         Ok(())
     }
 
-    /// Update the worktree_path for a job result.
+    /// Update the `worktree_path` for a job result.
     pub fn update_job_worktree_path(&self, id: &str, worktree_path: &str) -> Result<()> {
         let rows_affected = self
             .conn

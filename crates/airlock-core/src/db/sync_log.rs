@@ -1,4 +1,4 @@
-//! SyncLog operations.
+//! `SyncLog` operations.
 
 use crate::error::{AirlockError, Result};
 use crate::types::SyncLog;

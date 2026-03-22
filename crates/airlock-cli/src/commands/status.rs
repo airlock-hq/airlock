@@ -11,7 +11,7 @@ use airlock_core::{git, AirlockPaths, Database};
 use super::format::format_time_ago;
 
 /// Check if the daemon is running by verifying the socket exists and is connectable.
-/// Returns (is_running, message) tuple.
+/// Returns (`is_running`, message) tuple.
 fn check_daemon_status(paths: &AirlockPaths) -> (bool, &'static str) {
     let socket_path = paths.socket();
 

@@ -1,6 +1,6 @@
 //! Database export functionality for generating fixtures from real data.
 //!
-//! This module reads data from the Airlock SQLite database and exports it
+//! This module reads data from the Airlock `SQLite` database and exports it
 //! using the exact same IPC types from `airlock_daemon::ipc`, ensuring that
 //! generated fixtures match production serialization exactly.
 
@@ -117,7 +117,7 @@ pub struct ExportedRepo {
     pub id: String,
 }
 
-/// Export all repositories to get_repos/all.json
+/// Export all repositories to `get_repos/all.json`
 fn export_repos(db: &Database, output_dir: &Path) -> Result<Vec<ExportedRepo>> {
     let repos = db.list_repos().context("Failed to list repos")?;
 
@@ -180,7 +180,7 @@ pub struct ExportedRun {
     pub id: String,
 }
 
-/// Export runs for a repository to get_runs/<repo_id>.json
+/// Export runs for a repository to `get_runs/<repo_id>.json`
 fn export_runs(db: &Database, repo_id: &str, output_dir: &Path) -> Result<Vec<ExportedRun>> {
     let runs = db.list_runs(repo_id, None).context("Failed to list runs")?;
 
@@ -229,7 +229,7 @@ fn export_runs(db: &Database, repo_id: &str, output_dir: &Path) -> Result<Vec<Ex
     Ok(exported)
 }
 
-/// Export run detail to get_run_detail/<run_id>.json
+/// Export run detail to `get_run_detail/<run_id>.json`
 fn export_run_detail(
     db: &Database,
     paths: &AirlockPaths,
@@ -314,7 +314,7 @@ fn export_run_detail(
     Ok(())
 }
 
-/// Export artifact content for a run to read_artifact/<hash>.json
+/// Export artifact content for a run to `read_artifact/<hash>.json`
 fn export_artifact_content(
     paths: &AirlockPaths,
     repo_id: &str,
@@ -387,7 +387,7 @@ fn simple_hash(s: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// Export run diff to get_run_diff/<run_id>.json
+/// Export run diff to `get_run_diff/<run_id>.json`
 fn export_run_diff(gate_path: &std::path::Path, run: &Run, output_dir: &Path) -> Result<bool> {
     // base_sha and head_sha are String, not Option<String>
     let base_sha = &run.base_sha;

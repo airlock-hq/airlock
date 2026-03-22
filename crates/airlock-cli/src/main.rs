@@ -82,7 +82,7 @@ enum Commands {
     /// Create artifacts for Push Request display
     ///
     /// These commands are designed to be called from within a pipeline stage.
-    /// They write artifacts to $AIRLOCK_ARTIFACTS.
+    /// They write artifacts to `$AIRLOCK_ARTIFACTS`.
     Artifact {
         #[command(subcommand)]
         action: ArtifactAction,
@@ -131,8 +131,8 @@ enum ExecAction {
 
     /// Apply patches and create a checkpoint commit
     ///
-    /// Reads patches from $AIRLOCK_ARTIFACTS/patches/ and applies them.
-    /// Creates a commit and writes the new SHA to $AIRLOCK_ARTIFACTS/.head_sha.
+    /// Reads patches from `$AIRLOCK_ARTIFACTS/patches/` and applies them.
+    /// Creates a commit and writes the new SHA to `$AIRLOCK_ARTIFACTS/.head_sha`.
     Freeze,
 
     /// Push changes to upstream via the gate

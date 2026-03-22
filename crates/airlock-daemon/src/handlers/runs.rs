@@ -357,7 +357,7 @@ pub async fn handle_reprocess_run(
 /// Cancels a currently running pipeline run. This:
 /// 1. Validates the run exists and is currently running
 /// 2. Sets the run error to "Stopped by user" in the database
-/// 3. Triggers the CancellationToken via the run queue
+/// 3. Triggers the `CancellationToken` via the run queue
 pub async fn handle_cancel_run(
     ctx: Arc<HandlerContext>,
     params: serde_json::Value,

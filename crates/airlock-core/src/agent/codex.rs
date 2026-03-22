@@ -108,7 +108,7 @@ fn build_args(request: &AgentRequest) -> Result<Vec<String>> {
 /// Write a JSON schema to a temporary file and return the path.
 ///
 /// The schema is normalized first: `"additionalProperties": false` is added
-/// to every object-type schema node, which the OpenAI API requires for
+/// to every object-type schema node, which the `OpenAI` API requires for
 /// structured outputs.
 fn write_temp_schema(schema: &serde_json::Value) -> Result<PathBuf> {
     let dir = std::env::temp_dir().join("airlock-codex");
@@ -125,9 +125,9 @@ fn write_temp_schema(schema: &serde_json::Value) -> Result<PathBuf> {
     Ok(file_path)
 }
 
-/// Recursively normalize a JSON schema for the OpenAI structured outputs API.
+/// Recursively normalize a JSON schema for the `OpenAI` structured outputs API.
 ///
-/// The OpenAI API requires:
+/// The `OpenAI` API requires:
 /// 1. `"additionalProperties": false` on every object-type node.
 /// 2. `"required"` must list **all** keys in `"properties"`.
 fn normalize_schema_for_openai(schema: &mut serde_json::Value) {

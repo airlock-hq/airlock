@@ -5,9 +5,9 @@
 //!   airlock exec agent "Extract info" --output-schema '{"type": "object", ...}'
 //!   airlock exec agent "Extract info" --output-schema schema.json
 //!   airlock exec agent "Summarize" --adapter codex
-//!   git diff $AIRLOCK_BASE_SHA $AIRLOCK_HEAD_SHA | airlock exec agent "Summarize"
+//!   git diff "$AIRLOCK_BASE_SHA" "$AIRLOCK_HEAD_SHA" | airlock exec agent "Summarize"
 //!
-//! Streaming is the only output mode. JSONL `AgentEvent` lines are written to
+//! Streaming is the only output mode. `JSONL` [`AgentEvent`] lines are written to
 //! **stderr** for real-time observability. The final result (text or structured
 //! JSON) is written to **stdout** only after the stream completes.
 

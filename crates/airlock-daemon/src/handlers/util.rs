@@ -34,7 +34,7 @@ pub fn now() -> i64 {
 ///
 /// This function scans the run artifact directory and returns information about
 /// all artifact files found, including:
-/// - Top-level files (description.json, pr_result.json, etc.)
+/// - Top-level files (`description.json`, `pr_result.json`, etc.)
 /// - Content artifacts in the content/ subdirectory (markdown files)
 ///
 /// Log files in the logs/ subdirectory are not included.

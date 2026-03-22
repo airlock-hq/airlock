@@ -22,7 +22,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
 /// Callback for streaming log output.
-/// Receives (stream_type: "stdout"|"stderr", content: String)
+/// Receives (`stream_type`: `"stdout"`|`"stderr"`, content: `String`)
 pub type LogStreamCallback = Arc<dyn Fn(&str, String) + Send + Sync>;
 
 /// Maximum size (in bytes) for a single log file. Writes beyond this are dropped.
@@ -335,15 +335,15 @@ pub struct StageExecutionResult {
     pub stderr: String,
     /// Duration of the execution in milliseconds.
     pub duration_ms: i64,
-    /// Whether the stage passed (exit_code == 0).
+    /// Whether the stage passed (`exit_code` == 0).
     pub passed: bool,
 }
 
 /// Create the stage logs directory.
 ///
 /// Directory structure:
-/// - With job_key: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<job_key>/<stage-name>/`
-/// - Without job_key: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<stage-name>/`
+/// - With `job_key`: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<job_key>/<stage-name>/`
+/// - Without `job_key`: `~/.airlock/artifacts/<repo-id>/<run-id>/logs/<stage-name>/`
 pub fn create_stage_logs_dir(
     paths: &AirlockPaths,
     repo_id: &str,
@@ -476,7 +476,7 @@ pub fn detect_default_branch(gate_path: &Path) -> String {
     "main".to_string()
 }
 
-/// Build the StageEnvironment for a stage execution.
+/// Build the [`StageEnvironment`] for a stage execution.
 pub fn build_stage_environment(params: &StageEnvironmentParams<'_>) -> Result<StageEnvironment> {
     // Create stage logs directory
     let logs_dir = create_stage_logs_dir(
@@ -518,8 +518,8 @@ pub fn build_stage_environment(params: &StageEnvironmentParams<'_>) -> Result<St
 /// Execute a stage command with optional log streaming and cancellation support.
 ///
 /// Similar to `execute_stage_command` but accepts an optional callback for
-/// streaming output in real-time. The callback receives (stream_type, content)
-/// where stream_type is "stdout" or "stderr".
+/// streaming output in real-time. The callback receives (`stream_type`, content)
+/// where `stream_type` is `"stdout"` or `"stderr"`.
 ///
 /// If `cancel` is provided and triggered, the child process is killed and
 /// a cancellation result is returned.

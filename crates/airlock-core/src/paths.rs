@@ -15,7 +15,7 @@ pub struct AirlockPaths {
 }
 
 impl AirlockPaths {
-    /// Create a new AirlockPaths instance using the default location.
+    /// Create a new [`AirlockPaths`] instance using the default location.
     ///
     /// The location can be overridden by setting the `AIRLOCK_HOME` environment variable.
     /// If not set, defaults to `~/.airlock`.
@@ -35,7 +35,7 @@ impl AirlockPaths {
         })
     }
 
-    /// Create a new AirlockPaths instance with a custom root directory.
+    /// Create a new [`AirlockPaths`] instance with a custom root directory.
     /// Useful for testing.
     pub fn with_root(root: PathBuf) -> Self {
         Self { root }

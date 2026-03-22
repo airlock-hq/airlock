@@ -1,4 +1,4 @@
-//! StepResult CRUD operations.
+//! `StepResult` CRUD operations.
 
 use crate::error::{AirlockError, Result};
 use crate::types::StepResult;
@@ -197,7 +197,7 @@ impl Database {
         Ok(())
     }
 
-    /// Reset all step results for a job to Pending, clearing exit_code, duration_ms, error, started_at, completed_at.
+    /// Reset all step results for a job to `Pending`, clearing `exit_code`, `duration_ms`, `error`, `started_at`, `completed_at`.
     pub fn reset_step_results_for_job(&self, job_id: &str) -> Result<u32> {
         let rows_affected = self
             .conn

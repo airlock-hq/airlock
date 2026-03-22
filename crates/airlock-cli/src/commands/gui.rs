@@ -28,6 +28,11 @@ mod tests {
 
     /// Tests that mutate `GUI_PATH_ENV_VAR` must hold this lock so they don't
     /// race against each other when `cargo test` runs them in parallel.
+    ///
+    /// # Safety
+    /// All `env::set_var` / `env::remove_var` calls below are safe because
+    /// `ENV_MUTEX` serializes access, ensuring no concurrent reads of the
+    /// modified environment variable.
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     #[test]
@@ -41,6 +46,7 @@ mod tests {
 
         // Set the environment variable
         let original_env = env::var(GUI_PATH_ENV_VAR).ok();
+        // SAFETY: ENV_MUTEX is held — no concurrent env reads.
         unsafe { env::set_var(GUI_PATH_ENV_VAR, &gui_path) };
 
         // Should find via env var
@@ -50,8 +56,10 @@ mod tests {
 
         // Restore original env
         if let Some(orig) = original_env {
+            // SAFETY: ENV_MUTEX is held — no concurrent env reads.
             unsafe { env::set_var(GUI_PATH_ENV_VAR, orig) };
         } else {
+            // SAFETY: ENV_MUTEX is held — no concurrent env reads.
             unsafe { env::remove_var(GUI_PATH_ENV_VAR) };
         }
     }
@@ -65,6 +73,7 @@ mod tests {
         let dir_path = temp_dir.path();
 
         let original_env = env::var(GUI_PATH_ENV_VAR).ok();
+        // SAFETY: ENV_MUTEX is held — no concurrent env reads.
         unsafe { env::set_var(GUI_PATH_ENV_VAR, dir_path) };
 
         // Should not find (it's a directory, not a file)
@@ -75,8 +84,10 @@ mod tests {
 
         // Restore original env
         if let Some(orig) = original_env {
+            // SAFETY: ENV_MUTEX is held — no concurrent env reads.
             unsafe { env::set_var(GUI_PATH_ENV_VAR, orig) };
         } else {
+            // SAFETY: ENV_MUTEX is held — no concurrent env reads.
             unsafe { env::remove_var(GUI_PATH_ENV_VAR) };
         }
     }
@@ -106,6 +117,7 @@ mod tests {
 
         // Ensure env var is not set
         let original_env = env::var(GUI_PATH_ENV_VAR).ok();
+        // SAFETY: ENV_MUTEX is held — no concurrent env reads.
         unsafe { env::remove_var(GUI_PATH_ENV_VAR) };
 
         // Clear any other paths that might exist by testing in isolation
@@ -122,6 +134,7 @@ mod tests {
 
         // Restore original env
         if let Some(orig) = original_env {
+            // SAFETY: ENV_MUTEX is held — no concurrent env reads.
             unsafe { env::set_var(GUI_PATH_ENV_VAR, orig) };
         }
     }

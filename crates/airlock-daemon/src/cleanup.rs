@@ -29,7 +29,7 @@ pub struct CleanupResult {
 /// 3. Deletes directories older than the configured threshold
 ///
 /// # Arguments
-/// * `paths` - The AirlockPaths instance providing directory locations
+/// * `paths` - The [`AirlockPaths`] instance providing directory locations
 ///
 /// # Returns
 /// A `CleanupResult` with statistics about the cleanup operation.
@@ -160,7 +160,7 @@ pub fn cleanup_old_artifacts(paths: &AirlockPaths) -> CleanupResult {
     result
 }
 
-/// Load the max_artifact_age_days from global config.
+/// Load the `max_artifact_age_days` from global config.
 /// Returns the default (30 days) if config cannot be loaded.
 fn load_max_artifact_age_days(paths: &AirlockPaths) -> u32 {
     let global_config_path = paths.global_config();

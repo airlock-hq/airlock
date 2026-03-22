@@ -225,7 +225,7 @@ pub struct ReprocessRunParams {
 pub struct ApproveStepParams {
     pub run_id: String,
     pub job_key: String,
-    /// Must be in AwaitingApproval status.
+    /// Must be in `AwaitingApproval` status.
     pub step_name: String,
 }
 
@@ -241,7 +241,7 @@ pub struct ApplyPatchesParams {
     pub run_id: String,
 
     /// Required when multiple jobs may be paused concurrently.
-    /// Falls back to the first AwaitingApproval job if omitted.
+    /// Falls back to the first `AwaitingApproval` job if omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub job_key: Option<String>,
 
@@ -417,7 +417,7 @@ pub struct GetRunDetailResult {
 pub struct RunDetailInfo {
     pub id: String,
     pub repo_id: String,
-    /// Derived from job/step results: running, completed, failed, awaiting_approval.
+    /// Derived from job/step results: running, completed, failed, `awaiting_approval`.
     pub status: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub branch: String,

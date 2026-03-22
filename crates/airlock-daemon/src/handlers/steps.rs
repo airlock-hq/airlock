@@ -24,7 +24,7 @@ use tracing::{debug, error, info, warn};
 /// Handle the `approve_step` method.
 ///
 /// Approves a step that is awaiting approval. This:
-/// 1. Validates the step exists and is in AwaitingApproval status
+/// 1. Validates the step exists and is in `AwaitingApproval` status
 /// 2. Marks the step as Passed
 /// 3. Updates the job status to Running
 /// 4. Resumes pipeline execution in the background
@@ -586,7 +586,7 @@ fn find_job_worktree(
 /// Handle the `apply_patches` method.
 ///
 /// Applies selected patch artifact files to the run's worktree, commits,
-/// and updates the run's head_sha in the database.
+/// and updates the run's `head_sha` in the database.
 pub async fn handle_apply_patches(
     ctx: Arc<HandlerContext>,
     params: serde_json::Value,

@@ -1,4 +1,4 @@
-//! StreamCollector: drains an [`AgentEventStream`] into an [`AgentResult`].
+//! `StreamCollector`: drains an [`AgentEventStream`] into an [`AgentResult`].
 //!
 //! This is the standard way for callers that need a collected result to consume
 //! the stream. It assembles `AgentMessage` entries from streaming events,
