@@ -51,7 +51,7 @@ pub trait AgentAdapter: Send + Sync {
 ///
 /// Supported names:
 /// - `"claude-code"` or `"claude"` — Claude Code adapter
-/// - `"codex"` — OpenAI Codex adapter
+/// - `"codex"` — `OpenAI` Codex adapter
 /// - `"auto"` — auto-detect the first available adapter on PATH
 ///
 /// All adapters are wrapped with [`IdleTimeoutAdapter`] to kill hung

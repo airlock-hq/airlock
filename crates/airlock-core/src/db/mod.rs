@@ -25,11 +25,11 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// Current database schema version for migrations.
-/// Version 4: Stage-based pipeline (removed intents, added stage_results)
-/// Version 5: Added stage_order column to stage_results for correct ordering
-/// Version 6: Removed artifacts_path column (artifacts now at run level)
-/// Version 7: Added superseded column to runs
-/// Version 8: Add workflow tracking to runs, add job_results table, replace stage_results with step_results
+/// Version 4: Stage-based pipeline (removed intents, added `stage_results`)
+/// Version 5: Added `stage_order` column to `stage_results` for correct ordering
+/// Version 6: Removed `artifacts_path` column (artifacts now at run level)
+/// Version 7: Added `superseded` column to runs
+/// Version 8: Add workflow tracking to runs, add `job_results` table, replace `stage_results` with `step_results`
 const SCHEMA_VERSION: i32 = 9;
 
 /// Database connection wrapper for Airlock state management.
@@ -60,7 +60,7 @@ impl Database {
         Ok(db)
     }
 
-    /// Open the default database using AirlockPaths.
+    /// Open the default database using [`AirlockPaths`].
     ///
     /// For the schema v4 migration (stage-based pipeline), this will delete
     /// the existing database if it's from a previous schema version.

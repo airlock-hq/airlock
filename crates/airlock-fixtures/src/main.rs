@@ -1,6 +1,6 @@
 //! Fixture generator for Airlock.
 //!
-//! This binary generates fixtures by exporting data from the Airlock SQLite database.
+//! This binary generates fixtures by exporting data from the Airlock `SQLite` database.
 //! It uses the exact same IPC types as the daemon to ensure generated fixtures match
 //! production serialization exactly.
 //!

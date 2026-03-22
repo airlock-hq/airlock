@@ -2,7 +2,7 @@
 //!
 //! Authorization note: Airlock is a single-user local tool where the daemon
 //! listens on a Unix domain socket. Access control relies on filesystem
-//! permissions rather than row-level security in SQLite.
+//! permissions rather than row-level security in `SQLite`.
 
 /// Create repos table.
 pub const CREATE_REPOS_TABLE: &str = r#"
@@ -17,7 +17,7 @@ pub const CREATE_REPOS_TABLE: &str = r#"
 "#;
 
 /// Runs table for workflow-based pipeline.
-/// Note: Status is derived from job_results/step_results, not stored directly.
+/// Note: Status is derived from `job_results`/`step_results`, not stored directly.
 pub const CREATE_RUNS_TABLE: &str = r#"
     CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY,
@@ -72,13 +72,13 @@ pub const CREATE_STEP_RESULTS_TABLE: &str = r#"
     )
 "#;
 
-/// Migration to add stage_order column (version 5).
+/// Migration to add `stage_order` column (version 5).
 pub const ADD_STAGE_ORDER_COLUMN: &str = r#"
     ALTER TABLE stage_results ADD COLUMN stage_order INTEGER NOT NULL DEFAULT 0
 "#;
 
-/// Migration to drop artifacts_path column (version 6).
-/// SQLite doesn't support DROP COLUMN directly, so we recreate the table.
+/// Migration to drop `artifacts_path` column (version 6).
+/// `SQLite` doesn't support `DROP COLUMN` directly, so we recreate the table.
 pub const MIGRATE_STAGE_RESULTS_V6: &str = r#"
     CREATE TABLE stage_results_new (
         id TEXT PRIMARY KEY,
@@ -109,7 +109,7 @@ pub const MIGRATE_STAGE_RESULTS_V6_RENAME: &str = r#"
     ALTER TABLE stage_results_new RENAME TO stage_results
 "#;
 
-/// Migration v6: Recreate index on old stage_results table (used only during migration).
+/// Migration v6: Recreate index on old `stage_results` table (used only during migration).
 pub const CREATE_STAGE_RESULTS_RUN_INDEX: &str = r#"
     CREATE INDEX IF NOT EXISTS idx_stage_results_run_id ON stage_results(run_id)
 "#;
@@ -168,7 +168,7 @@ pub const CREATE_SYNC_LOG_REPO_INDEX: &str = r#"
 // stage_results with step_results
 // =============================================================================
 
-/// Migration v8: Add workflow_file and workflow_name columns to runs.
+/// Migration v8: Add `workflow_file` and `workflow_name` columns to runs.
 pub const MIGRATE_RUNS_V8_ADD_WORKFLOW_FILE: &str = r#"
     ALTER TABLE runs ADD COLUMN workflow_file TEXT NOT NULL DEFAULT 'main.yml'
 "#;
@@ -177,7 +177,7 @@ pub const MIGRATE_RUNS_V8_ADD_WORKFLOW_NAME: &str = r#"
     ALTER TABLE runs ADD COLUMN workflow_name TEXT
 "#;
 
-/// Migration v8: Create job_results table.
+/// Migration v8: Create `job_results` table.
 pub const MIGRATE_V8_CREATE_JOB_RESULTS: &str = r#"
     CREATE TABLE IF NOT EXISTS job_results (
         id TEXT PRIMARY KEY,
@@ -193,7 +193,7 @@ pub const MIGRATE_V8_CREATE_JOB_RESULTS: &str = r#"
     )
 "#;
 
-/// Migration v8: Create new step_results table (replaces stage_results).
+/// Migration v8: Create new `step_results` table (replaces `stage_results`).
 pub const MIGRATE_V8_CREATE_STEP_RESULTS: &str = r#"
     CREATE TABLE IF NOT EXISTS step_results (
         id TEXT PRIMARY KEY,
@@ -212,12 +212,12 @@ pub const MIGRATE_V8_CREATE_STEP_RESULTS: &str = r#"
     )
 "#;
 
-/// Migration v8: Drop old stage_results table.
+/// Migration v8: Drop old `stage_results` table.
 pub const MIGRATE_V8_DROP_STAGE_RESULTS: &str = r#"
     DROP TABLE IF EXISTS stage_results
 "#;
 
-/// Migration v9: Add worktree_path column to job_results for pool recovery.
+/// Migration v9: Add `worktree_path` column to `job_results` for pool recovery.
 pub const MIGRATE_V9_ADD_WORKTREE_PATH: &str = r#"
     ALTER TABLE job_results ADD COLUMN worktree_path TEXT
 "#;

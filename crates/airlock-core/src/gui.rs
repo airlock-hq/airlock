@@ -16,7 +16,7 @@ pub const GUI_BINARY_NAME: &str = "airlock-app";
 pub const GUI_PATH_ENV_VAR: &str = "AIRLOCK_APP_PATH";
 
 /// Find the GUI binary using the following precedence:
-/// 1. AIRLOCK_APP_PATH environment variable
+/// 1. `AIRLOCK_APP_PATH` environment variable
 /// 2. Same directory as the current binary
 /// 3. Platform-specific install paths
 pub fn find_gui_binary() -> Result<PathBuf> {

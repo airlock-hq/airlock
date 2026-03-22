@@ -338,7 +338,7 @@ pub struct Run {
     pub repo_id: String,
 
     /// Ref updates that triggered this run.
-    /// DEPRECATED: Use branch, base_sha, head_sha instead.
+    /// DEPRECATED: Use `branch`, `base_sha`, `head_sha` instead.
     #[serde(default)]
     pub ref_updates: Vec<RefUpdate>,
 
@@ -435,7 +435,7 @@ impl Run {
     /// Get the derived status string for display purposes (from step results).
     ///
     /// DEPRECATED: Use `derived_status_from_jobs` instead for new code.
-    /// Returns one of: "superseded", "running", "completed", "failed", "awaiting_approval", "pending"
+    /// Returns one of: `"superseded"`, `"running"`, `"completed"`, `"failed"`, `"awaiting_approval"`, `"pending"`
     pub fn derived_status(&self, steps: &[StepResult]) -> &'static str {
         if self.is_superseded() {
             return "superseded";
@@ -503,7 +503,7 @@ impl Run {
     /// - `Failed` if any job is `Failed` (and none running/awaiting)
     /// - `Passed` (returned as "completed") if all jobs are `Passed`
     ///
-    /// Returns one of: "superseded", "running", "completed", "failed", "awaiting_approval", "pending"
+    /// Returns one of: `"superseded"`, `"running"`, `"completed"`, `"failed"`, `"awaiting_approval"`, `"pending"`
     pub fn derived_status_from_jobs(&self, jobs: &[JobResult]) -> &'static str {
         if self.is_superseded() {
             return "superseded";
@@ -640,7 +640,7 @@ pub struct Intent {
     #[serde(default)]
     pub hunk_ids: Vec<String>,
 
-    /// Name of the branch created for this intent (e.g., "airlock/{run_id}/{intent_id}").
+    /// Name of the branch created for this intent (e.g., `airlock/{run_id}/{intent_id}`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branch_name: Option<String>,
 
@@ -658,7 +658,7 @@ pub struct Intent {
 }
 
 /// Type alias for hunk dependency mapping.
-/// Maps hunk_id to list of dependency hunk_ids.
+/// Maps `hunk_id` to list of dependency `hunk_id`s.
 ///
 /// DEPRECATED: Will be removed when intent-centric pipeline is removed.
 pub type HunkDependencies = std::collections::HashMap<String, Vec<String>>;
@@ -668,7 +668,7 @@ pub type HunkDependencies = std::collections::HashMap<String, Vec<String>>;
 /// DEPRECATED: Will be removed when intent-centric pipeline is removed.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DependencyGraph {
-    /// Raw dependency mapping: hunk_id -> list of hunk_ids it depends on.
+    /// Raw dependency mapping: `hunk_id` -> list of `hunk_id`s it depends on.
     pub dependencies: HunkDependencies,
 
     /// Connected components (islands) of hunks.
@@ -680,7 +680,7 @@ pub struct DependencyGraph {
 /// DEPRECATED: Will be removed when intent-centric pipeline is removed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SplitHunk {
-    /// Unique identifier for this hunk (format: "file_path:hunk_index").
+    /// Unique identifier for this hunk (format: `file_path:hunk_index`).
     pub id: String,
     /// Path to the file this hunk belongs to.
     pub file_path: String,
@@ -841,7 +841,7 @@ pub struct TourStep {
 /// DEPRECATED: Will be removed when intent-centric pipeline is removed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineAnnotation {
-    /// Line number within the snippet (relative to start_line).
+    /// Line number within the snippet (relative to `start_line`).
     pub line_offset: u32,
     /// The annotation text.
     pub text: String,

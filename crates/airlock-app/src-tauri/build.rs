@@ -29,9 +29,7 @@ fn main() {
                 .status()
                 .expect("Failed to run npm ci");
 
-            if !status.success() {
-                panic!("npm ci failed");
-            }
+            assert!(status.success(), "npm ci failed");
         }
 
         // Build the frontend
@@ -42,9 +40,7 @@ fn main() {
             .status()
             .expect("Failed to run npm build");
 
-        if !status.success() {
-            panic!("Frontend build failed");
-        }
+        assert!(status.success(), "Frontend build failed");
 
         println!("cargo:warning=Frontend build complete.");
     }

@@ -22,7 +22,7 @@ struct TrackedRun {
 
 /// Per-repository slot holding a semaphore and tracked runs.
 struct RepoSlot {
-    /// Up to MAX_CONCURRENT_RUNS permits available.
+    /// Up to `MAX_CONCURRENT_RUNS` permits available.
     semaphore: Arc<Semaphore>,
     /// Monotonically increasing ID for runs in this slot.
     next_id: u64,

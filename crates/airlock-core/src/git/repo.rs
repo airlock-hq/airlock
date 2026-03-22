@@ -106,10 +106,10 @@ fn is_openssh_available() -> bool {
 /// 1. **Per-repo `core.sshCommand`** (e.g., `ssh -i ~/.ssh/key_for_this_repo`):
 ///    Copies the working repo's `core.sshCommand` to the gate.
 ///
-/// 2. **Hostname-based `~/.ssh/config`** (IdentityFile per Host):
+/// 2. **Hostname-based `~/.ssh/config`** (`IdentityFile` per Host):
 ///    Sets `core.sshCommand = "ssh -o IdentitiesOnly=yes"` on the gate to prevent
 ///    the SSH agent from offering keys for the wrong GitHub account. SSH will still
-///    read `~/.ssh/config` and use the correct IdentityFile for the hostname.
+///    read `~/.ssh/config` and use the correct `IdentityFile` for the hostname.
 pub fn configure_gate_ssh(
     working_repo_path: &Path,
     gate_path: &Path,

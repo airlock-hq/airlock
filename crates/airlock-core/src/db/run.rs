@@ -7,7 +7,7 @@ use rusqlite::{params, OptionalExtension};
 use super::Database;
 
 /// Helper to map a row to a Run struct.
-/// Column order: id, repo_id, branch, base_sha, head_sha, current_stage, error, superseded, workflow_file, workflow_name, created_at, updated_at
+/// Column order: `id`, `repo_id`, `branch`, `base_sha`, `head_sha`, `current_stage`, `error`, `superseded`, `workflow_file`, `workflow_name`, `created_at`, `updated_at`
 fn row_to_run(row: &rusqlite::Row) -> rusqlite::Result<Run> {
     let branch: String = row.get(2)?;
     let base_sha: String = row.get(3)?;
@@ -151,7 +151,7 @@ impl Database {
         Ok(())
     }
 
-    /// Update a run's head_sha (e.g., after applying patches).
+    /// Update a run's `head_sha` (e.g., after applying patches).
     pub fn update_run_head_sha(&self, id: &str, head_sha: &str) -> Result<()> {
         let updated_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -200,7 +200,7 @@ impl Database {
     /// Get runs that have non-completed stages.
     ///
     /// Active runs are those where at least one stage is not in a final state
-    /// (i.e., has stages that are pending, running, or awaiting_approval).
+    /// (i.e., has stages that are pending, running, or `awaiting_approval`).
     pub fn list_active_runs(&self, repo_id: &str) -> Result<Vec<Run>> {
         // First get all runs for the repo
         let runs = self.list_runs(repo_id, None)?;
@@ -246,7 +246,7 @@ impl Database {
         Ok(runs)
     }
 
-    /// List runs that have at least one non-terminal job (pending/running/awaiting_approval).
+    /// List runs that have at least one non-terminal job (pending/running/`awaiting_approval`).
     ///
     /// Much cheaper than `list_all_runs` for count-only use cases because it
     /// skips the vast majority of historical (completed/failed) runs.

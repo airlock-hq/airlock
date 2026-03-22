@@ -194,9 +194,9 @@ pub async fn execute_pipeline(
     execute_workflow_dag(&ctx, &run, &repo, workflow, &waves, &job_results, &cancel).await;
 }
 
-/// Create JobResult and StepResult records in the database for all jobs and steps.
+/// Create [`JobResult`] and [`StepResult`] records in the database for all jobs and steps.
 ///
-/// Returns a map of job_key -> (job_result_id, Vec<step_result_ids>).
+/// Returns a map of `job_key` -> (`job_result_id`, `Vec<step_result_ids>`).
 async fn create_job_and_step_records(
     ctx: &Arc<HandlerContext>,
     run: &Run,
@@ -271,7 +271,7 @@ async fn create_job_and_step_records(
 /// Checks `cancel` between waves and before each job.
 ///
 /// Worktrees are acquired from the pool and released after completion,
-/// except for paused (AwaitingApproval) jobs.
+/// except for paused (`AwaitingApproval`) jobs.
 async fn execute_workflow_dag(
     ctx: &Arc<HandlerContext>,
     run: &Run,
@@ -700,10 +700,10 @@ pub(super) struct StepSequenceParams<'a> {
     pub effective_base_sha: &'a str,
     pub cancel: Option<&'a CancellationToken>,
     /// If set, clear the approval gate on the step at this order index (pre-paused re-execution).
-    /// Uses step_order instead of name to avoid clearing approval on the wrong step
+    /// Uses `step_order` instead of name to avoid clearing approval on the wrong step
     /// when duplicate step names exist.
     pub clear_approval_for_step: Option<i32>,
-    /// The step_order offset for the first step in `steps`.
+    /// The `step_order` offset for the first step in `steps`.
     /// Used to match step results by `step_order` instead of name,
     /// avoiding corruption when duplicate step names exist.
     pub step_offset: usize,
@@ -1024,7 +1024,7 @@ pub(super) async fn execute_step_sequence(
 
 /// Execute a single job: set up worktree, run steps sequentially.
 ///
-/// Returns the final JobStatus. Checks `cancel` before each step.
+/// Returns the final [`JobStatus`]. Checks `cancel` before each step.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn execute_single_job(
     ctx: &Arc<HandlerContext>,
@@ -1476,7 +1476,7 @@ async fn release_leases_and_cleanup(
     }
 }
 
-/// Convert StepStatus to a string for IPC events.
+/// Convert [`StepStatus`] to a string for IPC events.
 pub(super) fn step_status_str(status: StepStatus) -> &'static str {
     match status {
         StepStatus::Passed => "passed",

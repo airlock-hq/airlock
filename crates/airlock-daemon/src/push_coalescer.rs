@@ -28,7 +28,7 @@ struct PendingPush {
 
 /// Manages push coalescing for all repositories.
 pub struct PushCoalescer {
-    /// Pending pushes by repo_id.
+    /// Pending pushes by `repo_id`.
     pending: Mutex<HashMap<String, PendingPush>>,
 }
 
@@ -93,7 +93,7 @@ impl PushCoalescer {
 
     /// Check if any pending pushes are ready to be processed.
     ///
-    /// Returns a list of (repo_id, ref_updates) for pushes that have passed
+    /// Returns a list of (`repo_id`, `ref_updates`) for pushes that have passed
     /// the debounce period.
     pub async fn ready_pushes(&self) -> Vec<(String, Vec<RefUpdate>)> {
         let mut pending = self.pending.lock().await;
@@ -176,7 +176,7 @@ pub fn find_overlapping_runs<'a>(new_refs: &[RefUpdate], active_runs: &'a [Run])
 ///
 /// This marks old runs as Superseded so the user only sees the latest run.
 /// Returns the full Run structs of superseded runs so callers can inherit
-/// their base_sha (fixing the superseding gap where changes would be
+/// their `base_sha` (fixing the superseding gap where changes would be
 /// forwarded without review).
 pub fn supersede_overlapping_runs(
     db: &Database,

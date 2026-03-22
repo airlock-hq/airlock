@@ -242,7 +242,7 @@ fn claude_code_event_stream(
 /// Map a single SDK [`Message`] into one or more [`AgentEvent`] values.
 ///
 /// A single SDK message can produce multiple events. For example, an
-/// `Assistant` message with both text and tool_use blocks produces
+/// `Assistant` message with both text and `tool_use` blocks produces
 /// `AssistantMessage`, `ToolUse`, etc.
 fn map_message_to_events(message: Message) -> Vec<Result<AgentEvent>> {
     match message {
@@ -373,7 +373,7 @@ fn map_message_to_events(message: Message) -> Vec<Result<AgentEvent>> {
 
 /// Map a [`StreamEvent`] to [`AgentEvent`] values.
 ///
-/// StreamEvent carries incremental deltas. We extract `TextDelta` from
+/// [`StreamEvent`] carries incremental deltas. We extract `TextDelta` from
 /// `content_block_delta` events.
 fn map_stream_event(event: &StreamEvent) -> Vec<Result<AgentEvent>> {
     let event_data = &event.event;
