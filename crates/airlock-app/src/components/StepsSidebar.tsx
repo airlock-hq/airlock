@@ -4,7 +4,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, Loader2, RefreshCw } from 'luc
 import { cn } from '@/lib/utils';
 import { getStatusConfig } from '@/lib/status-utils';
 import { useState } from 'react';
-import { formatStageName, formatDuration } from '@/components/stage-log-viewer/utils';
+import { formatStepName, formatDuration } from '@/components/step-log-viewer/utils';
 
 /** Identifier for a selected step: job key + step name */
 export interface StepSelection {
@@ -12,7 +12,7 @@ export interface StepSelection {
   stepName: string;
 }
 
-interface StagesSidebarProps {
+interface StepsSidebarProps {
   jobs: JobResultInfo[];
   steps: StepResultInfo[];
   selectedStep: StepSelection | null;
@@ -24,11 +24,11 @@ interface StagesSidebarProps {
 }
 
 /**
- * StagesSidebar displays a vertical list of pipeline jobs and steps with status icons.
+ * StepsSidebar displays a vertical list of pipeline jobs and steps with status icons.
  * For single-job workflows, steps are shown flat without a job wrapper.
  * For multi-job workflows, jobs appear as collapsible sections with nested steps.
  */
-export function StagesSidebar({
+export function StepsSidebar({
   jobs,
   steps,
   selectedStep,
@@ -37,7 +37,7 @@ export function StagesSidebar({
   approvingStep,
   onRetryJob,
   retryingJob,
-}: StagesSidebarProps) {
+}: StepsSidebarProps) {
   const isSingleJob = jobs.length <= 1;
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
 
@@ -122,7 +122,7 @@ export function StagesSidebar({
                     )}
                     {getStatusDot(job.status)}
                     <span className="text-small min-w-0 flex-1 truncate font-medium">
-                      {job.name || formatStageName(job.job_key)}
+                      {job.name || formatStepName(job.job_key)}
                     </span>
                     {onRetryJob && (job.status === 'failed' || job.status === 'skipped') && (
                       <button
@@ -192,7 +192,7 @@ function StepItem({ step, isSelected, onSelect, onApprove, approvingStep, indent
         {getStatusDot(step.status)}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-small truncate">{formatStageName(step.step)}</span>
+            <span className="text-small truncate">{formatStepName(step.step)}</span>
             {step.duration_ms != null && (
               <span className="text-micro text-foreground-muted shrink-0 font-mono">
                 {formatDuration(step.duration_ms)}

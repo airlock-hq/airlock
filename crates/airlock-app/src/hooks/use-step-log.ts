@@ -6,7 +6,7 @@ import { useLogChunkEvents } from './use-airlock-events';
 import type { LogChunkEvent } from './use-airlock-events';
 
 // Mock log content for browser testing
-const mockStageLogs: Record<string, { stdout: string; stderr: string }> = {
+const mockStepLogs: Record<string, { stdout: string; stderr: string }> = {
   rebase: {
     stdout: '',
     stderr: '',
@@ -101,7 +101,7 @@ const mockRunningOutput = [
   '    ✓ should validate currency code (8ms)',
 ];
 
-interface UseStageLogOptions {
+interface UseStepLogOptions {
   repoId: string;
   runId: string;
   jobKey: string;
@@ -109,7 +109,7 @@ interface UseStageLogOptions {
   isRunning: boolean;
 }
 
-interface UseStageLogResult {
+interface UseStepLogResult {
   stdout: string;
   stderr: string;
   loading: boolean;
@@ -118,7 +118,7 @@ interface UseStageLogResult {
   totalSize: { stdout: number; stderr: number };
 }
 
-export function useStageLog({ repoId, runId, jobKey, stepName, isRunning }: UseStageLogOptions): UseStageLogResult {
+export function useStepLog({ repoId, runId, jobKey, stepName, isRunning }: UseStepLogOptions): UseStepLogResult {
   const [stdout, setStdout] = useState('');
   const [stderr, setStderr] = useState('');
   const [loading, setLoading] = useState(true);
@@ -152,7 +152,7 @@ export function useStageLog({ repoId, runId, jobKey, stepName, isRunning }: UseS
     async (incremental: boolean = false) => {
       if (!isTauri) {
         // Use mock data for browser testing
-        const mockLogs = mockStageLogs[stepName];
+        const mockLogs = mockStepLogs[stepName];
         if (mockLogs) {
           if (isRunning && stepName === 'test') {
             // Simulate growing output for running steps

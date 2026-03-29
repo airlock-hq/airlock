@@ -1,4 +1,4 @@
-export { StageLogViewer } from './StageLogViewer';
+export { StepLogViewer } from './StepLogViewer';
 export { LogSection } from './LogSection';
 export { ArtifactSection } from './ArtifactSection';
 export { ArtifactIcon } from './ArtifactIcon';

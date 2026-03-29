@@ -2,7 +2,7 @@ import { Button, StatusDot } from '@airlock-hq/design-system/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@airlock-hq/design-system/react';
 import { ActivityTab, OverviewTab, ChangesTab, PatchesTab, ContentTab } from '@/components/push-request';
 import { StepProgressBar } from '@/components/push-request/activity-feed/StepProgressBar';
-import type { StepSelection } from '@/components/StagesSidebar';
+import type { StepSelection } from '@/components/StepsSidebar';
 import {
   useRunDetail,
   useRepos,

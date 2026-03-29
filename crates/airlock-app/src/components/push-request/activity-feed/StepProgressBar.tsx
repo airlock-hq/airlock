@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { getStatusConfig } from '@/lib/status-utils';
-import { formatStageName } from '@/components/stage-log-viewer/utils';
+import { formatStepName } from '@/components/step-log-viewer/utils';
 import type { StepResultInfo } from '@/hooks/use-daemon';
 
 interface StepProgressBarProps {
@@ -45,7 +45,7 @@ export function StepProgressBar({ steps, onStepClick }: StepProgressBarProps) {
                 config.barColor
               )}
               onClick={() => onStepClick(step.job_key || 'default', step.step)}
-              title={`${formatStageName(step.step)} — ${formatStatusLabel(step.status)}`}
+              title={`${formatStepName(step.step)} — ${formatStatusLabel(step.status)}`}
             />
           );
         })}

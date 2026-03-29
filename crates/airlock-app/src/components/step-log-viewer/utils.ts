@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import type { ArtifactInfo } from '@/hooks/use-daemon';
 
 /**
- * Utility functions for StageLogViewer components.
+ * Utility functions for StepLogViewer components.
  */
 
 export type TabItem = {
@@ -76,10 +76,10 @@ export function getFileExtension(filename: string): string {
   return filename.split('.').pop()?.toLowerCase() ?? '';
 }
 
-export function formatStageName(stage: string): string {
+export function formatStepName(step: string): string {
   const abbreviations = new Set(['pr', 'api', 'db', 'ui', 'id', 'url', 'sql', 'css', 'html', 'json', 'xml']);
 
-  return stage
+  return step
     .split(/[-_]/)
     .map((word) => {
       const lower = word.toLowerCase();
