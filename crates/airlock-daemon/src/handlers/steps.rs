@@ -1293,7 +1293,7 @@ async fn address_comments_background(
     if !worktree_path.exists() {
         let msg = "Worktree not found — pipeline may not be running";
         log_callback("stderr", format!("Error: {}\n", msg));
-        mark_step_failed(
+        revert_step_to_awaiting(
             &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, msg,
         )
         .await;
@@ -1306,7 +1306,7 @@ async fn address_comments_background(
         Err(e) => {
             let msg = format!("No agent CLI available: {}", e);
             log_callback("stderr", format!("Error: {}\n", msg));
-            mark_step_failed(
+            revert_step_to_awaiting(
                 &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, &msg,
             )
             .await;
@@ -1317,7 +1317,7 @@ async fn address_comments_background(
     if !adapter.is_available() {
         let msg = format!("Agent '{}' is not available on PATH", adapter.name());
         log_callback("stderr", format!("Error: {}\n", msg));
-        mark_step_failed(
+        revert_step_to_awaiting(
             &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, &msg,
         )
         .await;
@@ -1340,7 +1340,7 @@ async fn address_comments_background(
         Err(e) => {
             let msg = format!("Failed to start agent: {}", e);
             log_callback("stderr", format!("Error: {}\n", msg));
-            mark_step_failed(
+            revert_step_to_awaiting(
                 &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, &msg,
             )
             .await;
@@ -1385,7 +1385,7 @@ async fn address_comments_background(
     }
 
     if had_error {
-        mark_step_failed(
+        revert_step_to_awaiting(
             &ctx,
             &step_id,
             &job_id,
@@ -1414,7 +1414,7 @@ async fn address_comments_background(
     if let Err(e) = stage_output {
         let msg = format!("Failed to stage changes: {}", e);
         log_callback("stderr", format!("Error: {}\n", msg));
-        mark_step_failed(
+        revert_step_to_awaiting(
             &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, &msg,
         )
         .await;
@@ -1483,7 +1483,7 @@ async fn address_comments_background(
             let stderr = String::from_utf8_lossy(&o.stderr);
             let msg = format!("Failed to commit: {}", stderr);
             log_callback("stderr", format!("Error: {}\n", msg));
-            mark_step_failed(
+            revert_step_to_awaiting(
                 &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, &msg,
             )
             .await;
@@ -1492,7 +1492,7 @@ async fn address_comments_background(
         Err(e) => {
             let msg = format!("Failed to execute git commit: {}", e);
             log_callback("stderr", format!("Error: {}\n", msg));
-            mark_step_failed(
+            revert_step_to_awaiting(
                 &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, &msg,
             )
             .await;
@@ -1512,7 +1512,7 @@ async fn address_comments_background(
         _ => {
             let msg = "Failed to get new HEAD SHA after commit";
             log_callback("stderr", format!("Error: {}\n", msg));
-            mark_step_failed(
+            revert_step_to_awaiting(
                 &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, msg,
             )
             .await;
@@ -1618,9 +1618,12 @@ fn build_address_comments_prompt(comments: &[AddressCommentItem]) -> String {
     prompt
 }
 
-/// Helper to mark a step as failed and emit events.
+/// Revert a step (and its job) back to AwaitingApproval after a failed
+/// address-comments attempt.  The error is preserved in the step's `error`
+/// field for debugging, but the state returns to awaiting so the user can
+/// retry or approve manually.
 #[allow(clippy::too_many_arguments)]
-async fn mark_step_failed(
+async fn revert_step_to_awaiting(
     ctx: &Arc<HandlerContext>,
     step_id: &str,
     job_id: &str,
@@ -1633,9 +1636,9 @@ async fn mark_step_failed(
 ) {
     let db = ctx.db.lock().await;
     if let Ok(Some(mut step)) = db.get_step_result(step_id) {
-        step.status = StepStatus::Failed;
+        step.status = StepStatus::AwaitingApproval;
         step.error = Some(error_msg.to_string());
-        step.completed_at = Some(now_epoch());
+        step.completed_at = None;
         let _ = db.update_step_result(&step);
     }
     if let Err(e) = db.update_job_status(job_id, JobStatus::AwaitingApproval, None, None, None) {
@@ -1648,7 +1651,7 @@ async fn mark_step_failed(
         run_id: run_id.to_string(),
         job_key: job_key.to_string(),
         step_name: step_name.to_string(),
-        status: "failed".to_string(),
+        status: "awaiting_approval".to_string(),
         branch: branch.to_string(),
     });
     ctx.emit(AirlockEvent::RunUpdated {

@@ -40,10 +40,17 @@ impl AgentAdapter for ClaudeCodeAdapter {
     }
 
     fn is_available(&self) -> bool {
+        let user_path = crate::shell::resolve_user_path();
         let result = if cfg!(target_os = "windows") {
-            Command::new("where").arg("claude").output()
+            Command::new("where")
+                .arg("claude")
+                .env("PATH", user_path)
+                .output()
         } else {
-            Command::new("which").arg("claude").output()
+            Command::new("which")
+                .arg("claude")
+                .env("PATH", user_path)
+                .output()
         };
 
         match result {
@@ -79,6 +86,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
         // terminates the stream on unknown message variants).
         let mut cmd = tokio::process::Command::new("claude");
         cmd.args(&args)
+            .env("PATH", crate::shell::resolve_user_path())
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())

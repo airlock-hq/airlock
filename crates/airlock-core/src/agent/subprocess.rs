@@ -31,6 +31,7 @@ impl SubprocessReader {
     pub fn spawn(program: &str, args: &[&str], cwd: Option<&Path>) -> Result<Self> {
         let mut cmd = Command::new(program);
         cmd.args(args)
+            .env("PATH", crate::shell::resolve_user_path())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .stdin(Stdio::null())
@@ -95,10 +96,17 @@ pub fn parse_jsonl_line(line: &str) -> Result<Option<serde_json::Value>> {
 
 /// Check whether a CLI tool is available on PATH.
 pub fn is_cli_available(name: &str) -> bool {
+    let user_path = crate::shell::resolve_user_path();
     let result = if cfg!(target_os = "windows") {
-        std::process::Command::new("where").arg(name).output()
+        std::process::Command::new("where")
+            .arg(name)
+            .env("PATH", user_path)
+            .output()
     } else {
-        std::process::Command::new("which").arg(name).output()
+        std::process::Command::new("which")
+            .arg(name)
+            .env("PATH", user_path)
+            .output()
     };
 
     match result {

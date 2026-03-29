@@ -31,6 +31,7 @@ pub mod patches;
 pub mod paths;
 pub mod provider;
 pub mod service;
+pub mod shell;
 pub mod types;
 pub mod worktree;
 
