@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.75](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.74...airlock-v0.1.75) (2026-03-29)
+
+
+### Bug Fixes
+
+* inconsistent failure state of review step ([6c69d06](https://github.com/airlock-hq/airlock/commit/6c69d06643600846c530c4d16cef0fb15f43f88e))
+
 ## [0.1.74](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.73...airlock-v0.1.74) (2026-03-20)
 
 
