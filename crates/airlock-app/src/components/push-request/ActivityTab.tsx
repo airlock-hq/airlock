@@ -1,6 +1,6 @@
-import { StagesSidebar } from '@/components/StagesSidebar';
-import type { StepSelection } from '@/components/StagesSidebar';
-import { StageLogViewer } from '@/components/stage-log-viewer';
+import { StepsSidebar } from '@/components/StepsSidebar';
+import type { StepSelection } from '@/components/StepsSidebar';
+import { StepLogViewer } from '@/components/step-log-viewer';
 import type { StepResultInfo, JobResultInfo, ArtifactInfo } from '@/hooks/use-daemon';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@airlock-hq/design-system/react';
 import { useCallback, useMemo } from 'react';
@@ -84,7 +84,7 @@ export function ActivityTab({
   return (
     <ResizablePanelGroup direction="horizontal" autoSaveId="activity-panels">
       <ResizablePanel defaultSize={20} minSize={12} maxSize={35}>
-        <StagesSidebar
+        <StepsSidebar
           jobs={jobs}
           steps={steps}
           selectedStep={selectedStep}
@@ -101,7 +101,7 @@ export function ActivityTab({
       <ResizablePanel defaultSize={80} minSize={50}>
         <div className="h-full overflow-y-auto">
           {selectedStepInfo && selectedStep ? (
-            <StageLogViewer
+            <StepLogViewer
               step={selectedStepInfo}
               jobKey={selectedStep.jobKey}
               repoId={repoId}

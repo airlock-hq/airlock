@@ -2,7 +2,7 @@ import { StatusDot } from '@airlock-hq/design-system/react';
 import type { StepResultInfo, JobResultInfo } from '@/hooks/use-daemon';
 import { cn } from '@/lib/utils';
 import { getStatusConfig } from '@/lib/status-utils';
-import { formatStageName, formatDuration } from '@/components/stage-log-viewer/utils';
+import { formatStepName, formatDuration } from '@/components/step-log-viewer/utils';
 
 interface PipelineChartProps {
   jobs: JobResultInfo[];
@@ -47,7 +47,7 @@ export function PipelineChart({ jobs, steps, onStepClick }: PipelineChartProps) 
         className="group hover:bg-surface/40 flex cursor-pointer items-center gap-3 rounded px-2 py-1.5 transition-colors"
         onClick={() => onStepClick(jobKey, step.step)}
       >
-        <span className="text-small w-20 shrink-0 truncate text-right font-medium">{formatStageName(step.step)}</span>
+        <span className="text-small w-20 shrink-0 truncate text-right font-medium">{formatStepName(step.step)}</span>
         <div className="min-w-0 flex-1">
           <div
             className={cn('h-5 rounded-sm transition-all', getStatusConfig(step.status).barColor)}
@@ -79,7 +79,7 @@ export function PipelineChart({ jobs, steps, onStepClick }: PipelineChartProps) 
                       size="md"
                       pulse={getStatusConfig(job.status).pulse}
                     />
-                    <span className="text-small font-medium">{job.name || formatStageName(job.job_key)}</span>
+                    <span className="text-small font-medium">{job.name || formatStepName(job.job_key)}</span>
                   </div>
                   <div className="space-y-0.5 pl-2">{jobSteps.map(renderStep)}</div>
                 </div>

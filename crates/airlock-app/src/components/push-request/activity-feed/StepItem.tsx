@@ -1,7 +1,7 @@
 import { StatusDot, Badge } from '@airlock-hq/design-system/react';
 import { Loader2 } from 'lucide-react';
 import { getStatusConfig } from '@/lib/status-utils';
-import { formatStageName, formatDuration } from '@/components/stage-log-viewer/utils';
+import { formatStepName, formatDuration } from '@/components/step-log-viewer/utils';
 import type { FeedEvent } from './types';
 
 type StepEvent = Extract<FeedEvent, { type: 'step-running' | 'step-completed' | 'step-awaiting' }>;
@@ -45,7 +45,7 @@ export function StepItem({ event, onClick }: StepItemProps) {
     return (
       <div className="hover:bg-surface/40 flex cursor-pointer items-center gap-3 px-4 py-2.5" onClick={onClick}>
         <StatusDot variant={config.variant} pulse />
-        <span className="min-w-0 flex-1 truncate font-medium">{formatStageName(step.step)}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{formatStepName(step.step)}</span>
         <Loader2 className="text-warning h-4 w-4 animate-spin" />
       </div>
     );
@@ -55,7 +55,7 @@ export function StepItem({ event, onClick }: StepItemProps) {
     return (
       <div className="hover:bg-surface/40 flex cursor-pointer items-center gap-3 px-4 py-2.5" onClick={onClick}>
         <StatusDot variant={config.variant} pulse />
-        <span className="min-w-0 flex-1 truncate font-medium">{formatStageName(step.step)}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{formatStepName(step.step)}</span>
         <Badge variant="signal">Awaiting Approval</Badge>
       </div>
     );
@@ -65,7 +65,7 @@ export function StepItem({ event, onClick }: StepItemProps) {
   return (
     <div className="hover:bg-surface/40 flex cursor-pointer items-center gap-3 px-4 py-2.5" onClick={onClick}>
       <StatusDot variant={config.variant} />
-      <span className="min-w-0 flex-1 truncate font-medium">{formatStageName(step.step)}</span>
+      <span className="min-w-0 flex-1 truncate font-medium">{formatStepName(step.step)}</span>
       {step.duration_ms != null && (
         <span className="text-small text-foreground-muted shrink-0 font-mono">{formatDuration(step.duration_ms)}</span>
       )}

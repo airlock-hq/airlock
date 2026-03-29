@@ -11,7 +11,7 @@ interface LogContentProps {
 
 /**
  * LogContent displays log lines with search highlighting.
- * Supports auto-scroll for running stages.
+ * Supports auto-scroll for running steps.
  */
 export function LogContent({ content, searchQuery, isRunning }: LogContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);

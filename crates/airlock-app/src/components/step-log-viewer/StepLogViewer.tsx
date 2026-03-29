@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { Button } from '@airlock-hq/design-system/react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@airlock-hq/design-system/react';
 import type { StepResultInfo, ArtifactInfo } from '@/hooks/use-daemon';
-import { useStageLog } from '@/hooks/use-stage-log';
+import { useStepLog } from '@/hooks/use-step-log';
 import { Loader2, FileText, AlertCircle, Terminal, Search, X, FileJson, AlertTriangle, File } from 'lucide-react';
 import { Input } from '@airlock-hq/design-system/react';
 import { LogContent } from './LogContent';
 import { ArtifactContent } from './ArtifactContent';
 import { MarkdownViewer } from './MarkdownViewer';
-import { formatStageName, formatDuration, buildTabItems, getFileExtension, type TabItem } from './utils';
+import { formatStepName, formatDuration, buildTabItems, getFileExtension, type TabItem } from './utils';
 
-interface StageLogViewerProps {
+interface StepLogViewerProps {
   step: StepResultInfo;
   jobKey: string;
   repoId: string;
@@ -41,16 +41,16 @@ function TabIcon({ item }: { item: TabItem }) {
 }
 
 /**
- * StageLogViewer displays logs (stdout/stderr) for a pipeline step.
+ * StepLogViewer displays logs (stdout/stderr) for a pipeline step.
  * Uses a tabbed interface to switch between different outputs.
  * Supports real-time updates for running steps.
  */
-export function StageLogViewer({ step, jobKey, repoId, runId, artifacts = [] }: StageLogViewerProps) {
+export function StepLogViewer({ step, jobKey, repoId, runId, artifacts = [] }: StepLogViewerProps) {
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { stdout, stderr, loading, error, isPolling } = useStageLog({
+  const { stdout, stderr, loading, error, isPolling } = useStepLog({
     repoId,
     runId,
     jobKey,
@@ -159,7 +159,7 @@ export function StageLogViewer({ step, jobKey, repoId, runId, artifacts = [] }: 
       <div className="border-border-subtle flex items-center justify-between border-b px-3 py-1">
         <div className="flex items-center gap-2">
           <span className="text-micro text-foreground-muted font-mono tracking-widest uppercase">
-            {formatStageName(step.step)}
+            {formatStepName(step.step)}
           </span>
           {step.duration_ms != null && (
             <span className="text-micro text-foreground-muted">{formatDuration(step.duration_ms)}</span>
