@@ -167,14 +167,7 @@ export interface RefreshOnEventsOptions {
  * ```
  */
 export function useRefreshOnEvents(refresh: () => void, options: RefreshOnEventsOptions = {}): void {
-  const {
-    repoId,
-    runId,
-    jobKey,
-    stepName,
-    events: eventsProp,
-    debounceMs = 500,
-  } = options;
+  const { repoId, runId, jobKey, stepName, events: eventsProp, debounceMs = 500 } = options;
 
   // Stabilize the events array so the effect doesn't re-run on every render.
   // JSON.stringify is safe here because the array is small and contains only strings.
