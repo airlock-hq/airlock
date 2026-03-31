@@ -116,7 +116,8 @@ mod tests {
             &["remote", "add", "bare", bare_path.to_str().unwrap()],
             &work_path,
         );
-        git(&["push", "bare", "master"], &work_path);
+        let branch = git(&["rev-parse", "--abbrev-ref", "HEAD"], &work_path);
+        git(&["push", "bare", &branch], &work_path);
 
         // Read from the bare repo
         let content = show_file(&bare_path, &sha, "config.yaml").unwrap();
