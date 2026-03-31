@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.76](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.75...airlock-v0.1.76) (2026-03-31)
+
+
+### Bug Fixes
+
+* **refresh:** leading-edge debounce & stable events ([#107](https://github.com/airlock-hq/airlock/issues/107)) ([bf4cebf](https://github.com/airlock-hq/airlock/commit/bf4cebfd019ca2e3d1ea9c07060fe40e5873d6f8))
+
 ## [0.1.75](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.74...airlock-v0.1.75) (2026-03-29)
 
 
