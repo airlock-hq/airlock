@@ -5,7 +5,7 @@
  * and trigger refreshes when relevant events occur.
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { isTauri } from '@/lib/tauri';
 
 // Event types matching the Rust AirlockEvent enum
@@ -167,32 +167,51 @@ export interface RefreshOnEventsOptions {
  * ```
  */
 export function useRefreshOnEvents(refresh: () => void, options: RefreshOnEventsOptions = {}): void {
-  const {
-    repoId,
-    runId,
-    jobKey,
-    stepName,
-    events = [
-      AIRLOCK_EVENTS.RUN_CREATED,
-      AIRLOCK_EVENTS.RUN_UPDATED,
-      AIRLOCK_EVENTS.RUN_COMPLETED,
-      AIRLOCK_EVENTS.JOB_COMPLETED,
-      AIRLOCK_EVENTS.STEP_COMPLETED,
-    ],
-    debounceMs = 500,
-  } = options;
+  const { repoId, runId, jobKey, stepName, events: eventsProp, debounceMs = 500 } = options;
+
+  // Stabilize the events array so the effect doesn't re-run on every render.
+  // JSON.stringify is safe here because the array is small and contains only strings.
+  const eventsKey = eventsProp ? JSON.stringify(eventsProp) : '';
+  const events = useMemo(
+    () =>
+      eventsProp ?? [
+        AIRLOCK_EVENTS.RUN_CREATED,
+        AIRLOCK_EVENTS.RUN_UPDATED,
+        AIRLOCK_EVENTS.RUN_COMPLETED,
+        AIRLOCK_EVENTS.JOB_COMPLETED,
+        AIRLOCK_EVENTS.STEP_COMPLETED,
+      ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eventsKey]
+  );
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFiredAt = useRef<number>(0);
 
-  // Debounced refresh
+  // Leading+trailing debounce: fire immediately on the first event, then
+  // debounce subsequent events so rapid bursts collapse into one trailing
+  // refresh.  This ensures the UI picks up state transitions (e.g. a step
+  // moving to "running") without waiting for the full debounce window.
   const debouncedRefresh = useCallback(() => {
+    const now = Date.now();
+    const elapsed = now - lastFiredAt.current;
+
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
+
+    if (elapsed >= debounceMs) {
+      // Leading edge: fire immediately
+      lastFiredAt.current = now;
+      refreshRef.current();
+    }
+
+    // Always schedule a trailing edge so the final state is captured
     debounceTimer.current = setTimeout(() => {
+      lastFiredAt.current = Date.now();
       refreshRef.current();
     }, debounceMs);
   }, [debounceMs]);
