@@ -95,11 +95,12 @@ fn create_run_with_real_shas(
 #[test]
 fn test_diff_computation_for_new_branch() {
     let (temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(
         output.status.success(),
         "Initial push failed: {}",
@@ -152,11 +153,12 @@ fn test_diff_computation_for_new_branch() {
 #[test]
 fn test_diff_computation_for_branch_update() {
     let (temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success(), "Initial push failed");
 
     let base_sha = get_head_sha(&working_path);
@@ -168,10 +170,15 @@ fn test_diff_computation_for_branch_update() {
         "Update with new file",
     );
 
-    let _run_id =
-        create_run_with_real_shas(&db, &repo_id, "refs/heads/master", &base_sha, &head_sha);
+    let _run_id = create_run_with_real_shas(
+        &db,
+        &repo_id,
+        &format!("refs/heads/{}", branch),
+        &base_sha,
+        &head_sha,
+    );
 
-    let output = git_command(&["push", "origin", "master"], &working_path);
+    let output = git_command(&["push", "origin", &branch], &working_path);
     assert!(output.status.success(), "Update push failed");
 
     let diff_result = compute_diff(gate_path, &base_sha, &head_sha);
@@ -189,14 +196,15 @@ fn test_diff_computation_for_branch_update() {
 #[test]
 fn test_run_with_real_shas_and_steps() {
     let (temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success());
 
-    let _master_sha = get_head_sha(&working_path);
+    let _base_sha = get_head_sha(&working_path);
 
     create_branch(&working_path, "feature/with-steps");
     let head_sha = create_commit(
@@ -212,7 +220,7 @@ fn test_run_with_real_shas_and_steps() {
     );
     assert!(output.status.success());
 
-    let merge_base_output = git_command(&["merge-base", "master", &head_sha], &working_path);
+    let merge_base_output = git_command(&["merge-base", &branch, &head_sha], &working_path);
     let expected_merge_base = String::from_utf8_lossy(&merge_base_output.stdout)
         .trim()
         .to_string();
@@ -248,11 +256,12 @@ fn test_run_with_real_shas_and_steps() {
 #[test]
 fn test_multiple_commits_on_branch_diff() {
     let (temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success());
 
     let base_sha = get_head_sha(&working_path);
@@ -329,8 +338,9 @@ fn test_init_creates_correct_remote_structure() {
 #[test]
 fn test_escape_hatch_push_to_upstream() {
     let (temp_dir, _paths, working_path, _repo_id, _db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success());
 
     create_commit(
@@ -340,7 +350,7 @@ fn test_escape_hatch_push_to_upstream() {
         "Test escape hatch",
     );
 
-    let output = git_command(&["push", "bypass-airlock", "master"], &working_path);
+    let output = git_command(&["push", "bypass-airlock", &branch], &working_path);
     assert!(
         output.status.success(),
         "Push to upstream (escape hatch) should work: {}",
@@ -353,6 +363,7 @@ fn test_escape_hatch_push_to_upstream() {
 #[test]
 fn test_diff_with_file_modifications_deletions_and_additions() {
     let (temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
@@ -370,7 +381,7 @@ fn test_diff_with_file_modifications_deletions_and_additions() {
         "Add file to delete",
     );
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success());
 
     let base_sha = get_head_sha(&working_path);
@@ -428,8 +439,9 @@ fn test_diff_with_file_modifications_deletions_and_additions() {
 #[test]
 fn test_run_state_transitions_with_real_repo() {
     let (temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success());
 
     let base_sha = get_head_sha(&working_path);
@@ -516,11 +528,12 @@ fn test_run_state_transitions_with_real_repo() {
 #[test]
 fn test_fetch_through_gate_reflects_upstream_updates() {
     let (_temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success());
 
     git::mirror_from_remote(gate_path, "origin").expect("First mirror should succeed");
@@ -552,7 +565,8 @@ fn test_fetch_through_gate_reflects_upstream_updates() {
         "Upstream commit by another developer",
     );
 
-    let push_output = git_command(&["push", "origin", "master"], &upstream_clone_dir);
+    let clone_branch = default_branch(&upstream_clone_dir);
+    let push_output = git_command(&["push", "origin", &clone_branch], &upstream_clone_dir);
     assert!(push_output.status.success());
 
     git::mirror_from_remote(gate_path, "origin").expect("Second mirror should succeed");
@@ -560,15 +574,13 @@ fn test_fetch_through_gate_reflects_upstream_updates() {
     let fetch_output = git_command(&["fetch", "origin"], &working_path);
     assert!(fetch_output.status.success());
 
-    let log_output = git_command(
-        &["log", "--oneline", "-1", "refs/remotes/origin/master"],
-        &working_path,
-    );
+    let remote_ref = format!("refs/remotes/origin/{}", branch);
+    let log_output = git_command(&["log", "--oneline", "-1", &remote_ref], &working_path);
     assert!(log_output.status.success());
     let log_str = String::from_utf8_lossy(&log_output.stdout);
     assert!(log_str.contains("Upstream commit by another developer"));
 
-    let rev_output = git_command(&["rev-parse", "refs/remotes/origin/master"], &working_path);
+    let rev_output = git_command(&["rev-parse", &remote_ref], &working_path);
     let fetched_sha = String::from_utf8_lossy(&rev_output.stdout)
         .trim()
         .to_string();
@@ -613,6 +625,7 @@ fn test_init_configures_upload_pack_wrapper() {
 #[test]
 fn test_show_file_reads_workflow_from_pushed_commit_not_working_dir() {
     let (_temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
@@ -642,7 +655,7 @@ jobs:
         &working_path,
     );
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(
         output.status.success(),
         "Push failed: {}",
@@ -690,12 +703,13 @@ jobs:
 #[test]
 fn test_show_file_returns_different_workflows_for_different_branches() {
     let (_temp_dir, _paths, working_path, repo_id, db) = setup_airlock_env();
+    let branch = default_branch(&working_path);
 
     let repo = db.get_repo(&repo_id).unwrap().unwrap();
     let gate_path = &repo.gate_path;
 
-    // Create workflow on master
-    let config_master = r#"name: Master Pipeline
+    // Create workflow on default branch
+    let config_default = r#"name: Default Pipeline
 
 on:
   push:
@@ -705,20 +719,23 @@ jobs:
   default:
     steps:
       - name: test
-        run: echo master
+        run: echo default-branch
 "#;
     fs::create_dir_all(working_path.join(".airlock/workflows")).unwrap();
     fs::write(
         working_path.join(".airlock/workflows/main.yml"),
-        config_master,
+        config_default,
     )
     .unwrap();
     git_command(&["add", ".airlock/workflows/main.yml"], &working_path);
-    git_command(&["commit", "-m", "Add workflow for master"], &working_path);
+    git_command(
+        &["commit", "-m", "Add workflow for default branch"],
+        &working_path,
+    );
 
-    let output = git_command(&["push", "-u", "origin", "master"], &working_path);
+    let output = git_command(&["push", "-u", "origin", &branch], &working_path);
     assert!(output.status.success());
-    let master_sha = get_head_sha(&working_path);
+    let default_sha = get_head_sha(&working_path);
 
     // Create a feature branch with a different workflow
     create_branch(&working_path, "feature/custom-pipeline");
@@ -754,9 +771,10 @@ jobs:
     assert!(output.status.success());
     let feature_sha = get_head_sha(&working_path);
 
-    // Read config from master's commit
-    let master_content = show_file(gate_path, &master_sha, ".airlock/workflows/main.yml").unwrap();
-    assert!(master_content.contains("echo master"));
+    // Read config from default branch's commit
+    let default_content =
+        show_file(gate_path, &default_sha, ".airlock/workflows/main.yml").unwrap();
+    assert!(default_content.contains("echo default-branch"));
 
     // Read config from feature branch's commit
     let feature_content =
@@ -765,11 +783,11 @@ jobs:
     assert!(feature_content.contains("echo feature-test"));
 
     // Verify the configs are actually different
-    assert_ne!(master_content, feature_content);
+    assert_ne!(default_content, feature_content);
 
     // Verify both parse as valid WorkflowConfigs
-    let master_config: WorkflowConfig = parse_workflow_config(&master_content).unwrap();
-    assert_eq!(master_config.name, Some("Master Pipeline".to_string()));
+    let default_config: WorkflowConfig = parse_workflow_config(&default_content).unwrap();
+    assert_eq!(default_config.name, Some("Default Pipeline".to_string()));
 
     let feature_config: WorkflowConfig = parse_workflow_config(&feature_content).unwrap();
     assert_eq!(feature_config.name, Some("Feature Pipeline".to_string()));
@@ -792,18 +810,16 @@ fn test_repoint_tracking_branches_after_init() {
     create_upstream_repo(&upstream_dir);
     let upstream_url = upstream_dir.to_string_lossy().to_string();
     create_working_repo(&working_dir, &upstream_url);
-    let push_output = git_command(&["push", "-u", "origin", "master"], &working_dir);
+    let branch = default_branch(&working_dir);
+    let push_output = git_command(&["push", "-u", "origin", &branch], &working_dir);
     assert!(push_output.status.success());
 
     let working_repo = git::discover_repo(&working_dir).unwrap();
     git::rename_remote(&working_repo, "origin", "bypass-airlock").unwrap();
 
+    let head_ref = format!("refs/heads/{}", branch);
     let tracking_output = git_command(
-        &[
-            "for-each-ref",
-            "--format=%(upstream:remotename)",
-            "refs/heads/master",
-        ],
+        &["for-each-ref", "--format=%(upstream:remotename)", &head_ref],
         &working_dir,
     );
     assert_eq!(
@@ -822,11 +838,11 @@ fn test_repoint_tracking_branches_after_init() {
         .expect("Repoint should succeed");
 
     let tracking_output = git_command(
-        &["for-each-ref", "--format=%(upstream)", "refs/heads/master"],
+        &["for-each-ref", "--format=%(upstream)", &head_ref],
         &working_dir,
     );
     assert_eq!(
         String::from_utf8_lossy(&tracking_output.stdout).trim(),
-        "refs/remotes/origin/master"
+        format!("refs/remotes/origin/{}", branch)
     );
 }

@@ -557,9 +557,18 @@ fn test_pre_receive_hook_logs_ref_updates_to_stderr() {
     // Add gate as origin
     add_remote(&work_repo, "origin", gate_path.to_str().unwrap()).unwrap();
 
-    // 3. Push to gate and capture stderr
+    // 3. Detect default branch and push to gate, capturing stderr
+    let branch_output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(&work_path)
+        .output()
+        .expect("Failed to get branch");
+    let branch = String::from_utf8_lossy(&branch_output.stdout)
+        .trim()
+        .to_string();
+
     let output = Command::new("git")
-        .args(["push", "-u", "origin", "master"])
+        .args(["push", "-u", "origin", &branch])
         .current_dir(&work_path)
         .env("GIT_AUTHOR_NAME", "Test")
         .env("GIT_AUTHOR_EMAIL", "test@example.com")
@@ -890,9 +899,18 @@ exit 0
         }
     });
 
-    // 6. Perform git push
+    // 6. Detect default branch and perform git push
+    let branch_output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(&work_path)
+        .output()
+        .expect("Failed to get branch");
+    let branch = String::from_utf8_lossy(&branch_output.stdout)
+        .trim()
+        .to_string();
+
     let output = Command::new("git")
-        .args(["push", "-u", "origin", "master"])
+        .args(["push", "-u", "origin", &branch])
         .current_dir(&work_path)
         .env("GIT_AUTHOR_NAME", "Test")
         .env("GIT_AUTHOR_EMAIL", "test@example.com")
@@ -944,9 +962,12 @@ exit 0
     assert_eq!(ref_updates.len(), 1, "Should have 1 ref update");
 
     let ref_update = &ref_updates[0];
+    let expected_ref = format!("refs/heads/{}", branch);
     assert_eq!(
-        ref_update["ref_name"], "refs/heads/master",
-        "ref_name should be refs/heads/master"
+        ref_update["ref_name"],
+        expected_ref.as_str(),
+        "ref_name should be refs/heads/{}",
+        branch
     );
     assert_eq!(
         ref_update["old_sha"], "0000000000000000000000000000000000000000",

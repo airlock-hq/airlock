@@ -11,6 +11,16 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
 
+/// Get the default branch name (e.g., "main" or "master") from a working repo.
+pub(super) fn default_branch(repo_path: &Path) -> String {
+    let output = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(repo_path)
+        .output()
+        .expect("Failed to get default branch");
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
 /// Get current Unix timestamp.
 pub(super) fn now_timestamp() -> i64 {
     SystemTime::now()

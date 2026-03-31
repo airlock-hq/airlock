@@ -427,9 +427,17 @@ mod tests {
                 .unwrap();
         }
 
+        let branch_name = working_repo
+            .head()
+            .unwrap()
+            .shorthand()
+            .unwrap()
+            .to_string();
+
         {
             let mut remote = working_repo.find_remote("origin").unwrap();
-            let result = remote.push(&["refs/heads/master:refs/heads/master"], None);
+            let refspec = format!("refs/heads/{0}:refs/heads/{0}", branch_name);
+            let result = remote.push(&[&refspec], None);
             assert!(
                 result.is_ok(),
                 "Push should succeed after eject: {:?}",
@@ -439,8 +447,8 @@ mod tests {
 
         let upstream_repo = Repository::open_bare(&remote_dir).unwrap();
         let upstream_head = upstream_repo
-            .find_reference("refs/heads/master")
-            .expect("Upstream should have master branch after push");
+            .find_reference(&format!("refs/heads/{}", branch_name))
+            .expect("Upstream should have branch after push");
         let upstream_commit = upstream_head.peel_to_commit().unwrap();
 
         assert_eq!(upstream_commit.message().unwrap(), "Add file after eject");
