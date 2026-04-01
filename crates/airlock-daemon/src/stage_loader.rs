@@ -1276,7 +1276,7 @@ env:
         assert!(create_pr.run.contains("Bottom Critique Comments section"));
         assert!(create_pr
             .run
-            .contains("append a final section to the PR/MR description"));
+            .contains("ensure the PR/MR description contains exactly one final section"));
         assert!(!create_pr.run.contains("## Inline Critique Comments"));
         assert!(!create_pr
             .run
