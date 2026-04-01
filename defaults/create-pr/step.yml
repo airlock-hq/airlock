@@ -94,14 +94,14 @@ run: |
     - Key changes made
     - How was this tested
 
-  ## Inline Critique Comments
-  After creating (or updating) the PR/MR, check if the directory \`\$AIRLOCK_ARTIFACTS/comments/\` exists and contains JSON files. These are critique comments from the code review step. Each file is a JSON array of objects with \`file\`, \`line\`, \`message\`, and \`severity\` (error/warning/info) fields.
+  ## Bottom Critique Comments section
+  Before creating or updating the PR/MR, check if the directory \`\$AIRLOCK_ARTIFACTS/comments/\` exists and contains JSON files. These are critique comments from the code review step. Each file is a JSON array of objects with \`file\`, \`line\`, \`message\`, and \`severity\` (error/warning/info) fields.
 
-  If there are comments, post them as **inline review comments** on the PR/MR so they appear on the relevant lines of code:
-  - **GitHub**: Use \`gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews\` to create a review with inline comments. Set \`event\` to \`COMMENT\` (not \`REQUEST_CHANGES\`). Each comment needs \`path\` (file), \`line\` (line number), and \`body\` (the message prefixed with a severity emoji: 🔴 error, 🟡 warning, 💬 info).
-  - **GitLab**: Use \`glab api\` to create merge request discussion notes with position info.
-  - **Bitbucket**: Use \`bb\` or the Bitbucket API to create inline comments.
-  - If posting inline comments fails (e.g. line is not part of the diff), skip that comment silently and continue with the rest.
+  If there are comments, append a final section to the PR/MR description titled \`## Critique Comments\`.
+  - This must be the last section in the description.
+  - Include every critique comment as a bullet in this format: \`- 🔴 \`path/to/file\`:123 - message\` (use 🟡 for warning, 💬 for info).
+  - Preserve the main description content above it; do not replace the existing Summary, Risk Assessment, Architecture, Key changes made, or How was this tested sections.
+  - Do not post critique feedback as inline review comments, review threads, or separate PR/MR comments.
 
   ## Important Notes
   - The branch has already been pushed to the remote

@@ -1269,6 +1269,16 @@ env:
         assert!(gate.run.contains("never)"));
     }
 
+    #[test]
+    fn test_bundled_create_pr_appends_critique_to_description_instead_of_inline_comments() {
+        let create_pr: StageYaml = serde_yaml::from_str(BUNDLED_CREATE_PR).unwrap();
+
+        assert!(create_pr.run.contains("Bottom Critique Comments section"));
+        assert!(create_pr.run.contains("append a final section to the PR/MR description"));
+        assert!(!create_pr.run.contains("## Inline Critique Comments"));
+        assert!(!create_pr.run.contains("post them as **inline review comments**"));
+    }
+
     #[tokio::test]
     async fn test_resolve_stage_uses_bundled_default_no_cache() {
         let temp_dir = TempDir::new().unwrap();
