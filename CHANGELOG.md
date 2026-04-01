@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.78](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.77...airlock-v0.1.78) (2026-04-01)
+
+
+### Bug Fixes
+
+* **test:** add verdict indicator to artifact ([#112](https://github.com/airlock-hq/airlock/issues/112)) ([e809adf](https://github.com/airlock-hq/airlock/commit/e809adf69fe0a98d56ba1a0ec8c6bdee13b993c0))
+
 ## [0.1.77](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.76...airlock-v0.1.77) (2026-04-01)
 
 
