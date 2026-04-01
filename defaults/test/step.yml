@@ -63,26 +63,26 @@ run: |
   # Prepare artifacts directory
   mkdir -p "$AIRLOCK_ARTIFACTS"
 
-  # Determine status text for the artifact
+  # Determine verdict indicator for the artifact
   case "$VERDICT" in
       pass)
-          STATUS="Tests Passed"
+          STATUS_EMOJI="🟢"
           ;;
       fail)
-          STATUS="Tests Failed"
+          STATUS_EMOJI="🔴"
           ;;
       skip)
-          STATUS="Tests Skipped"
+          STATUS_EMOJI="🟡"
           ;;
       *)
-          STATUS="Unknown verdict: $VERDICT"
+          STATUS_EMOJI="⚪"
           ;;
   esac
 
   # Write test result as content artifact
   if [[ -n "$DETAILS" ]]; then
       cat << EOF | airlock artifact content --title "Test Results"
-  **$STATUS**
+  ## $STATUS_EMOJI Test Result: $(echo "$VERDICT" | tr '[:lower:]' '[:upper:]')
 
   ## Summary
   $SUMMARY
@@ -92,7 +92,7 @@ run: |
   EOF
   else
       cat << EOF | airlock artifact content --title "Test Results"
-  **$STATUS**
+  ## $STATUS_EMOJI Test Result: $(echo "$VERDICT" | tr '[:lower:]' '[:upper:]')
 
   ## Summary
   $SUMMARY

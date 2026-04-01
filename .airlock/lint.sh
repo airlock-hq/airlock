@@ -40,16 +40,29 @@ for file in "${changed_files[@]}"; do
   esac
 done
 
-if [[ ${#prettier_files[@]} -gt 0 || ${#eslint_files[@]} -gt 0 ]]; then
+ensure_node_dependencies() {
   if ! command -v npm >/dev/null 2>&1; then
     echo "npm is required for prettier/eslint" >&2
     exit 1
   fi
 
-  if [[ ! -d node_modules ]]; then
-    echo "Installing npm dependencies..."
+  local required_packages=("prettier" "eslint" "prettier-plugin-tailwindcss")
+  local missing_packages=()
+
+  for package in "${required_packages[@]}"; do
+    if ! npm ls "${package}" --depth=0 >/dev/null 2>&1; then
+      missing_packages+=("${package}")
+    fi
+  done
+
+  if [[ ${#missing_packages[@]} -gt 0 ]]; then
+    echo "Installing npm dependencies for missing packages: ${missing_packages[*]}"
     npm ci
   fi
+}
+
+if [[ ${#prettier_files[@]} -gt 0 || ${#eslint_files[@]} -gt 0 ]]; then
+  ensure_node_dependencies
 fi
 
 # Formatters (auto-fix)
