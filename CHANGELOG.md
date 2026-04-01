@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.77](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.76...airlock-v0.1.77) (2026-04-01)
+
+
+### Bug Fixes
+
+* **create-pr:** append critique to PR description ([#111](https://github.com/airlock-hq/airlock/issues/111)) ([bf4b67c](https://github.com/airlock-hq/airlock/commit/bf4b67c0ffaf6212a87b5032ee5f5f0bb4049d42))
+* **test:** adjust default branch handling ([#109](https://github.com/airlock-hq/airlock/issues/109)) ([5aa7e72](https://github.com/airlock-hq/airlock/commit/5aa7e723046952ac0fdb9588317961dae3bb605e))
+
 ## [0.1.76](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.75...airlock-v0.1.76) (2026-03-31)
 
 
