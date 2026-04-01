@@ -170,7 +170,8 @@ The Push Request view is where you review and approve changes before they ship.
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ## Test Results                              (from test stage) │
-│  ✅ 47 tests passed • 82% coverage                              │
+│  ## 🟢 Test Result: PASS                                         │
+│  Ran 47 tests successfully, including auth coverage checks.     │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ````
