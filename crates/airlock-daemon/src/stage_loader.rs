@@ -1274,9 +1274,9 @@ env:
         let test: StageYaml = serde_yaml::from_str(BUNDLED_TEST).unwrap();
 
         assert!(test.run.contains("STATUS_EMOJI"));
-        assert!(test
-            .run
-            .contains("## $STATUS_EMOJI Test Result: $(echo \"$VERDICT\" | tr '[:lower:]' '[:upper:]')"));
+        assert!(test.run.contains(
+            "## $STATUS_EMOJI Test Result: $(echo \"$VERDICT\" | tr '[:lower:]' '[:upper:]')"
+        ));
     }
 
     #[test]
