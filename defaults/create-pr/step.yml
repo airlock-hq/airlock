@@ -97,7 +97,7 @@ run: |
   ## Bottom Critique Comments section
   Before creating or updating the PR/MR, check if the directory \`\$AIRLOCK_ARTIFACTS/comments/\` exists and contains JSON files. These are critique comments from the code review step. Each file is a JSON array of objects with \`file\`, \`line\`, \`message\`, and \`severity\` (error/warning/info) fields.
 
-  If there are comments, append a final section to the PR/MR description titled \`## Critique Comments\`.
+  If there are comments, ensure the PR/MR description contains exactly one final section titled \`## Critique Comments\`. If the description already has a \`## Critique Comments\` section (from a previous run), replace it entirely instead of appending a duplicate.
   - This must be the last section in the description.
   - Include every critique comment as a bullet in this format: \`- 🔴 \`path/to/file\`:123 - message\` (use 🟡 for warning, 💬 for info).
   - Preserve the main description content above it; do not replace the existing Summary, Risk Assessment, Architecture, Key changes made, or How was this tested sections.

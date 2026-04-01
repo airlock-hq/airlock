@@ -1274,9 +1274,13 @@ env:
         let create_pr: StageYaml = serde_yaml::from_str(BUNDLED_CREATE_PR).unwrap();
 
         assert!(create_pr.run.contains("Bottom Critique Comments section"));
-        assert!(create_pr.run.contains("append a final section to the PR/MR description"));
+        assert!(create_pr
+            .run
+            .contains("append a final section to the PR/MR description"));
         assert!(!create_pr.run.contains("## Inline Critique Comments"));
-        assert!(!create_pr.run.contains("post them as **inline review comments**"));
+        assert!(!create_pr
+            .run
+            .contains("post them as **inline review comments**"));
     }
 
     #[tokio::test]
