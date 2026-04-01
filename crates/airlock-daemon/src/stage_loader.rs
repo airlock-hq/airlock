@@ -1270,6 +1270,16 @@ env:
     }
 
     #[test]
+    fn test_bundled_test_uses_verdict_indicator_in_artifact() {
+        let test: StageYaml = serde_yaml::from_str(BUNDLED_TEST).unwrap();
+
+        assert!(test.run.contains("STATUS_EMOJI"));
+        assert!(test
+            .run
+            .contains("## $STATUS_EMOJI Test Result: $(echo \"$VERDICT\" | tr '[:lower:]' '[:upper:]')"));
+    }
+
+    #[test]
     fn test_bundled_create_pr_appends_critique_to_description_instead_of_inline_comments() {
         let create_pr: StageYaml = serde_yaml::from_str(BUNDLED_CREATE_PR).unwrap();
 
