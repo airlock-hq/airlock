@@ -384,7 +384,7 @@ Properties from `step.yml` can be overridden inline:
 | `test`      | `defaults/test`      | Run tests, capture results                                      |
 | `critique`  | `defaults/critique`  | Critique diff for bugs, risks, and simplification opportunities |
 | `push`      | `defaults/push`      | Push changes to upstream remote                                 |
-| `create-pr` | `defaults/create-pr` | Create pull/merge request and post critique comments as inline reviews |
+| `create-pr` | `defaults/create-pr` | Create pull/merge request and append critique comments to a final `## Critique Comments` section in the PR/MR description |
 
 **Step structure:**
 
