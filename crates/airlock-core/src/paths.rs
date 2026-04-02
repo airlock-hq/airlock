@@ -22,9 +22,11 @@ impl AirlockPaths {
     pub fn new() -> Result<Self> {
         // Check for AIRLOCK_HOME environment variable first
         if let Ok(custom_home) = std::env::var("AIRLOCK_HOME") {
-            return Ok(Self {
-                root: PathBuf::from(custom_home),
-            });
+            if !custom_home.is_empty() {
+                return Ok(Self {
+                    root: PathBuf::from(custom_home),
+                });
+            }
         }
 
         let home = dirs::home_dir()
@@ -225,6 +227,12 @@ impl Default for AirlockPaths {
 mod tests {
     use super::*;
     use std::path::Path;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+        ENV_MUTEX.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
 
     #[test]
     fn test_paths_with_custom_root() {
@@ -265,6 +273,7 @@ mod tests {
 
     #[test]
     fn test_airlock_home_env_var() {
+        let _guard = env_lock();
         // Save original env var if it exists
         let original = std::env::var("AIRLOCK_HOME").ok();
 
@@ -275,6 +284,22 @@ mod tests {
         assert_eq!(paths.root(), Path::new("/custom/airlock/path"));
 
         // Restore original or remove
+        match original {
+            Some(val) => std::env::set_var("AIRLOCK_HOME", val),
+            None => std::env::remove_var("AIRLOCK_HOME"),
+        }
+    }
+
+    #[test]
+    fn test_empty_airlock_home_env_var_is_ignored() {
+        let _guard = env_lock();
+        let original = std::env::var("AIRLOCK_HOME").ok();
+
+        std::env::set_var("AIRLOCK_HOME", "");
+
+        let paths = AirlockPaths::new().expect("Should create default paths when env var is empty");
+        assert!(paths.root().ends_with(".airlock"));
+
         match original {
             Some(val) => std::env::set_var("AIRLOCK_HOME", val),
             None => std::env::remove_var("AIRLOCK_HOME"),

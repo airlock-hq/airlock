@@ -11,40 +11,15 @@
 //! **stderr** for real-time observability. The final result (text or structured
 //! JSON) is written to **stdout** only after the stream completes.
 
-use airlock_core::{create_adapter, load_global_config, AgentEvent, AgentRequest, StreamCollector};
+use airlock_core::{
+    create_adapter, load_global_config, resolve_agent_adapter_name, resolve_global_config_path,
+    AgentEvent, AgentOptions, AgentRequest, StreamCollector,
+};
 use anyhow::{Context, Result};
 use futures::StreamExt;
 use std::io::{self, Read, Write};
 use std::path::Path;
 use tracing::{debug, info};
-
-/// Resolve which adapter name to use.
-///
-/// Priority: `--adapter` CLI flag → `AIRLOCK_AGENT_ADAPTER` env var → config file → "auto".
-fn resolve_adapter_name(cli_adapter: Option<&str>) -> String {
-    if let Some(name) = cli_adapter {
-        return name.to_string();
-    }
-
-    if let Ok(name) = std::env::var("AIRLOCK_AGENT_ADAPTER") {
-        if !name.is_empty() {
-            return name;
-        }
-    }
-
-    // Try loading from global config
-    let config_path = dirs::home_dir()
-        .map(|h| h.join(".airlock").join("config.yml"))
-        .unwrap_or_default();
-
-    if config_path.exists() {
-        if let Ok(config) = load_global_config(&config_path) {
-            return config.agent.adapter;
-        }
-    }
-
-    "auto".to_string()
-}
 
 /// Execute the `agent` command.
 ///
@@ -58,7 +33,7 @@ pub async fn agent(
     info!("Running agent with prompt...");
 
     // Resolve adapter name and create it
-    let adapter_name = resolve_adapter_name(cli_adapter.as_deref());
+    let adapter_name = resolve_agent_adapter_name(cli_adapter.as_deref(), None);
     debug!("Using agent adapter: {}", adapter_name);
 
     let adapter = create_adapter(&adapter_name)
@@ -84,16 +59,7 @@ pub async fn agent(
     let output_schema = parse_output_schema(output_schema)?;
 
     // Load model/max_turns from config if not overridden
-    let config_path = dirs::home_dir()
-        .map(|h| h.join(".airlock").join("config.yml"))
-        .unwrap_or_default();
-    let agent_options = if config_path.exists() {
-        load_global_config(&config_path)
-            .ok()
-            .map(|c| c.agent.options)
-    } else {
-        None
-    };
+    let agent_options = load_agent_options();
 
     let request = AgentRequest {
         prompt: prompt.clone(),
@@ -164,6 +130,17 @@ pub async fn agent(
     Ok(())
 }
 
+fn load_agent_options() -> Option<AgentOptions> {
+    let config_path = resolve_global_config_path(None)?;
+    if !config_path.exists() {
+        return None;
+    }
+
+    load_global_config(&config_path)
+        .ok()
+        .map(|c| c.agent.options)
+}
+
 /// Parse output schema from either a file path or inline JSON string.
 fn parse_output_schema(schema: Option<String>) -> Result<Option<serde_json::Value>> {
     let Some(schema_str) = schema else {
@@ -208,7 +185,40 @@ fn read_stdin_if_available() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use tempfile::TempDir;
+
+    #[test]
+    #[serial]
+    fn test_load_agent_options_honors_airlock_home() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.yml");
+        std::fs::write(
+            &config_path,
+            "agent:\n  adapter: codex\n  options:\n    model: gpt-5\n    max_turns: 7\n",
+        )
+        .unwrap();
+
+        let saved_home = std::env::var("AIRLOCK_HOME").ok();
+
+        unsafe {
+            std::env::set_var("AIRLOCK_HOME", temp_dir.path());
+        }
+
+        let options = load_agent_options().unwrap();
+
+        match saved_home {
+            Some(value) => unsafe {
+                std::env::set_var("AIRLOCK_HOME", value);
+            },
+            None => unsafe {
+                std::env::remove_var("AIRLOCK_HOME");
+            },
+        }
+
+        assert_eq!(options.model.as_deref(), Some("gpt-5"));
+        assert_eq!(options.max_turns, Some(7));
+    }
 
     #[test]
     fn test_parse_output_schema_none() {
@@ -245,39 +255,13 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_adapter_name_cli_flag() {
-        assert_eq!(resolve_adapter_name(Some("codex")), "codex");
-    }
-
-    #[test]
-    fn test_resolve_adapter_name_env_var() {
-        // Save and restore env var
-        let saved = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
-        std::env::set_var("AIRLOCK_AGENT_ADAPTER", "codex");
-        assert_eq!(resolve_adapter_name(None), "codex");
-        // Restore
-        match saved {
-            Some(v) => std::env::set_var("AIRLOCK_AGENT_ADAPTER", v),
-            None => std::env::remove_var("AIRLOCK_AGENT_ADAPTER"),
-        }
-    }
-
-    #[test]
-    fn test_resolve_adapter_name_cli_overrides_env() {
-        let saved = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
-        std::env::set_var("AIRLOCK_AGENT_ADAPTER", "codex");
-        assert_eq!(resolve_adapter_name(Some("claude-code")), "claude-code");
-        match saved {
-            Some(v) => std::env::set_var("AIRLOCK_AGENT_ADAPTER", v),
-            None => std::env::remove_var("AIRLOCK_AGENT_ADAPTER"),
-        }
-    }
-
-    #[test]
+    #[serial]
     fn test_agent_model_env_var_overrides_config() {
         // When AIRLOCK_AGENT_MODEL is set, it should be used over config
         let saved = std::env::var("AIRLOCK_AGENT_MODEL").ok();
-        std::env::set_var("AIRLOCK_AGENT_MODEL", "haiku");
+        unsafe {
+            std::env::set_var("AIRLOCK_AGENT_MODEL", "haiku");
+        }
         let model = std::env::var("AIRLOCK_AGENT_MODEL")
             .ok()
             .filter(|s| !s.is_empty())
@@ -285,38 +269,35 @@ mod tests {
         assert_eq!(model, Some("haiku".to_string()));
         // Restore
         match saved {
-            Some(v) => std::env::set_var("AIRLOCK_AGENT_MODEL", v),
-            None => std::env::remove_var("AIRLOCK_AGENT_MODEL"),
+            Some(v) => unsafe {
+                std::env::set_var("AIRLOCK_AGENT_MODEL", v);
+            },
+            None => unsafe {
+                std::env::remove_var("AIRLOCK_AGENT_MODEL");
+            },
         }
     }
 
     #[test]
+    #[serial]
     fn test_agent_model_env_var_empty_falls_through() {
         // Empty AIRLOCK_AGENT_MODEL should fall through to config
         let saved = std::env::var("AIRLOCK_AGENT_MODEL").ok();
-        std::env::set_var("AIRLOCK_AGENT_MODEL", "");
+        unsafe {
+            std::env::set_var("AIRLOCK_AGENT_MODEL", "");
+        }
         let model = std::env::var("AIRLOCK_AGENT_MODEL")
             .ok()
             .filter(|s| !s.is_empty())
             .or(Some("opus-from-config".to_string()));
         assert_eq!(model, Some("opus-from-config".to_string()));
         match saved {
-            Some(v) => std::env::set_var("AIRLOCK_AGENT_MODEL", v),
-            None => std::env::remove_var("AIRLOCK_AGENT_MODEL"),
-        }
-    }
-
-    #[test]
-    fn test_resolve_adapter_name_default_auto() {
-        let saved = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
-        std::env::remove_var("AIRLOCK_AGENT_ADAPTER");
-        // Without a config file, should default to "auto"
-        let name = resolve_adapter_name(None);
-        // Either "auto" (no config) or whatever is in the user's config
-        assert!(!name.is_empty());
-        match saved {
-            Some(v) => std::env::set_var("AIRLOCK_AGENT_ADAPTER", v),
-            None => {}
+            Some(v) => unsafe {
+                std::env::set_var("AIRLOCK_AGENT_MODEL", v);
+            },
+            None => unsafe {
+                std::env::remove_var("AIRLOCK_AGENT_MODEL");
+            },
         }
     }
 }

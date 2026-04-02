@@ -45,9 +45,10 @@ pub use agent::{
 // --- Config types ---
 pub use config::{
     branch_matches_trigger, filter_workflows_for_branch, load_global_config,
-    load_workflows_from_disk, load_workflows_from_tree, parse_workflow_config, validate_job_dag,
-    AgentGlobalConfig, AgentOptions, DagValidationError, GlobalConfig, JobConfig, OneOrMany,
-    PushTrigger, TriggerConfig, WorkflowConfig,
+    load_workflows_from_disk, load_workflows_from_tree, parse_workflow_config,
+    resolve_agent_adapter_name, resolve_global_config_path, validate_job_dag, AgentGlobalConfig,
+    AgentOptions, DagValidationError, GlobalConfig, JobConfig, OneOrMany, PushTrigger,
+    TriggerConfig, WorkflowConfig,
 };
 
 // --- Database ---

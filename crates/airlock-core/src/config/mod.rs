@@ -20,7 +20,8 @@ mod tests;
 pub use global::{AgentGlobalConfig, AgentOptions, GlobalConfig};
 pub use loader::{
     filter_workflows_for_branch, load_global_config, load_workflows_from_disk,
-    load_workflows_from_tree, parse_workflow_config,
+    load_workflows_from_tree, parse_workflow_config, resolve_agent_adapter_name,
+    resolve_global_config_path,
 };
 pub use sync::{StorageConfig, SyncConfig};
 pub use workflow::{

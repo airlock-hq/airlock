@@ -14,10 +14,15 @@ use crate::ipc::{
     ApplyPatchesParams, ApplyPatchesResult, ApproveStepParams, ApproveStepResult, CommitDiffInfo,
     GetRunDiffParams, GetRunDiffResult, PatchError, Response,
 };
+use crate::stage_loader::StageLoader;
 use airlock_core::agent::{AgentEvent, AgentRequest};
 use airlock_core::git::compute_diff_with_commits;
-use airlock_core::{JobStatus, StepStatus};
+use airlock_core::{
+    load_global_config, resolve_agent_adapter_name, AgentOptions, JobStatus, StepDefinition,
+    StepStatus,
+};
 use futures::StreamExt;
+use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
@@ -1300,8 +1305,27 @@ async fn address_comments_background(
         return;
     }
 
-    // Create agent adapter
-    let adapter = match airlock_core::agent::create_adapter("auto") {
+    let agent_settings = match resolve_address_comments_agent_settings(
+        &ctx,
+        &repo,
+        &run,
+        &job_key,
+        step_order,
+        &worktree_path,
+    )
+    .await
+    {
+        Ok(settings) => settings,
+        Err(msg) => {
+            log_callback("stderr", format!("Error: {}\n", msg));
+            revert_step_to_awaiting(
+                &ctx, &step_id, &job_id, &repo_id, &run_id, &job_key, &step_name, &branch, &msg,
+            )
+            .await;
+            return;
+        }
+    };
+    let adapter = match airlock_core::agent::create_adapter(&agent_settings.adapter_name) {
         Ok(a) => a,
         Err(e) => {
             let msg = format!("No agent CLI available: {}", e);
@@ -1331,6 +1355,8 @@ async fn address_comments_background(
     let request = AgentRequest {
         prompt,
         cwd: Some(worktree_path.clone()),
+        model: agent_settings.model,
+        max_turns: agent_settings.max_turns,
         ..Default::default()
     };
 
@@ -1597,6 +1623,174 @@ async fn address_comments_background(
     execute_pipeline(ctx.clone(), run, repo, permit.token.clone()).await;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AddressCommentsAgentSettings {
+    adapter_name: String,
+    model: Option<String>,
+    max_turns: Option<u32>,
+}
+
+async fn resolve_address_comments_agent_settings(
+    ctx: &Arc<HandlerContext>,
+    repo: &airlock_core::Repo,
+    run: &airlock_core::Run,
+    job_key: &str,
+    step_order: i32,
+    worktree_path: &Path,
+) -> Result<AddressCommentsAgentSettings, String> {
+    let branch = extract_branch_name(&run.ref_updates);
+    let workflows = load_workflows_for_run(&repo.gate_path, &run.head_sha, branch.as_deref()).ok();
+    let step = match workflows.as_ref() {
+        Some(workflows) => Some(
+            resolve_effective_step_from_workflows(
+                workflows,
+                run,
+                job_key,
+                step_order,
+                worktree_path,
+            )
+            .await
+            .map_err(|e| format!("Failed to resolve reusable action for address_comments: {e}"))?,
+        )
+        .flatten(),
+        None => None,
+    };
+    let global_options = load_global_agent_options(&ctx.paths.global_config());
+    let env_model = load_agent_model_override_from_env();
+
+    Ok(resolve_address_comments_agent_settings_from_sources(
+        step.as_ref(),
+        global_options.as_ref(),
+        Some(&ctx.paths.global_config()),
+        env_model,
+    ))
+}
+
+fn resolve_address_comments_agent_settings_from_sources(
+    step: Option<&StepDefinition>,
+    global_options: Option<&AgentOptions>,
+    global_config_path: Option<&Path>,
+    env_model: Option<String>,
+) -> AddressCommentsAgentSettings {
+    AddressCommentsAgentSettings {
+        adapter_name: resolve_agent_adapter_name(
+            step.and_then(|step| step.adapter.as_deref()),
+            global_config_path,
+        ),
+        model: env_model.or_else(|| {
+            step.and_then(|step| step.model.clone())
+                .or_else(|| global_options.and_then(|options| options.model.clone()))
+        }),
+        max_turns: global_options.and_then(|options| options.max_turns),
+    }
+}
+
+fn load_agent_model_override_from_env() -> Option<String> {
+    std::env::var("AIRLOCK_AGENT_MODEL")
+        .ok()
+        .filter(|s| !s.is_empty())
+}
+
+fn load_global_agent_options(path: &Path) -> Option<AgentOptions> {
+    if !path.exists() {
+        return None;
+    }
+
+    load_global_config(path)
+        .ok()
+        .map(|config| config.agent.options)
+}
+
+fn resolve_step_from_workflows<'a>(
+    workflows: &'a [(String, airlock_core::WorkflowConfig)],
+    run: &airlock_core::Run,
+    job_key: &str,
+    step_order: i32,
+) -> Option<&'a StepDefinition> {
+    let step_index = usize::try_from(step_order).ok()?;
+
+    let workflow = if !run.workflow_file.is_empty() {
+        workflows
+            .iter()
+            .find(|(filename, _)| filename == &run.workflow_file)
+            .map(|(_, workflow)| workflow)
+            .or_else(|| {
+                workflows
+                    .iter()
+                    .find(|(_, workflow)| workflow.jobs.contains_key(job_key))
+                    .map(|(_, workflow)| workflow)
+            })?
+    } else {
+        workflows
+            .iter()
+            .find(|(_, workflow)| workflow.jobs.contains_key(job_key))
+            .map(|(_, workflow)| workflow)?
+    };
+
+    workflow.jobs.get(job_key)?.steps.get(step_index)
+}
+
+fn resolve_step_adapter_from_workflows(
+    workflows: &[(String, airlock_core::WorkflowConfig)],
+    run: &airlock_core::Run,
+    job_key: &str,
+    step_order: i32,
+) -> Option<String> {
+    resolve_step_from_workflows(workflows, run, job_key, step_order)
+        .and_then(|step| step.adapter.clone())
+}
+
+fn resolve_step_model_from_workflows(
+    workflows: &[(String, airlock_core::WorkflowConfig)],
+    run: &airlock_core::Run,
+    job_key: &str,
+    step_order: i32,
+) -> Option<String> {
+    resolve_step_from_workflows(workflows, run, job_key, step_order)
+        .and_then(|step| step.model.clone())
+}
+
+async fn resolve_effective_step_from_workflows(
+    workflows: &[(String, airlock_core::WorkflowConfig)],
+    run: &airlock_core::Run,
+    job_key: &str,
+    step_order: i32,
+    worktree_path: &Path,
+) -> anyhow::Result<Option<StepDefinition>> {
+    let loader = StageLoader::new()?;
+    resolve_effective_step_from_workflows_with_loader(
+        &loader,
+        workflows,
+        run,
+        job_key,
+        step_order,
+        worktree_path,
+    )
+    .await
+}
+
+async fn resolve_effective_step_from_workflows_with_loader(
+    loader: &StageLoader,
+    workflows: &[(String, airlock_core::WorkflowConfig)],
+    run: &airlock_core::Run,
+    job_key: &str,
+    step_order: i32,
+    worktree_path: &Path,
+) -> anyhow::Result<Option<StepDefinition>> {
+    let Some(step) = resolve_step_from_workflows(workflows, run, job_key, step_order) else {
+        return Ok(None);
+    };
+
+    if step.is_reusable() {
+        return loader
+            .resolve_stage(step, Some(worktree_path))
+            .await
+            .map(Some);
+    }
+
+    Ok(Some(step.clone()))
+}
+
 /// Build the agent prompt from the list of comments.
 fn build_address_comments_prompt(comments: &[AddressCommentItem]) -> String {
     let mut prompt = String::from(
@@ -1762,7 +1956,8 @@ mod tests {
     use super::*;
     use crate::handlers::HandlerContext;
     use airlock_core::{
-        AirlockPaths, Database, JobResult, JobStatus, RefUpdate, Repo, Run, StepResult,
+        config::workflow::WorkflowConfig, AirlockPaths, Database, JobConfig, JobResult, JobStatus,
+        RefUpdate, Repo, Run, StepDefinition, StepResult,
     };
     use std::path::PathBuf;
     use tokio::sync::watch;
@@ -1850,6 +2045,282 @@ mod tests {
                 Some(1704067300)
             },
         }
+    }
+
+    #[test]
+    fn test_resolve_step_adapter_prefers_run_workflow_file() {
+        let run = Run {
+            workflow_file: "main.yml".to_string(),
+            ..create_test_run("run1", "repo1")
+        };
+
+        let main_step = StepDefinition {
+            name: "review".to_string(),
+            run: Some("echo main".to_string()),
+            uses: None,
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: Default::default(),
+            timeout: None,
+            model: None,
+            adapter: Some("codex".to_string()),
+            apply_patch: false,
+        };
+        let other_step = StepDefinition {
+            adapter: Some("claude-code".to_string()),
+            ..main_step.clone()
+        };
+
+        let mut main_workflow = WorkflowConfig {
+            name: Some("Main".to_string()),
+            on: None,
+            jobs: Default::default(),
+        };
+        main_workflow.jobs.insert(
+            "gate".to_string(),
+            JobConfig {
+                name: None,
+                needs: Default::default(),
+                steps: vec![main_step],
+            },
+        );
+        let mut other_workflow = WorkflowConfig {
+            name: Some("Other".to_string()),
+            on: None,
+            jobs: Default::default(),
+        };
+        other_workflow.jobs.insert(
+            "gate".to_string(),
+            JobConfig {
+                name: None,
+                needs: Default::default(),
+                steps: vec![other_step],
+            },
+        );
+
+        let workflows = vec![
+            ("other.yml".to_string(), other_workflow),
+            ("main.yml".to_string(), main_workflow),
+        ];
+
+        let adapter = resolve_step_adapter_from_workflows(&workflows, &run, "gate", 0);
+
+        assert_eq!(adapter.as_deref(), Some("codex"));
+    }
+
+    #[test]
+    fn test_resolve_step_model_prefers_run_workflow_file() {
+        let run = Run {
+            workflow_file: "main.yml".to_string(),
+            ..create_test_run("run1", "repo1")
+        };
+
+        let main_step = StepDefinition {
+            name: "review".to_string(),
+            run: Some("echo main".to_string()),
+            uses: None,
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: Default::default(),
+            timeout: None,
+            model: Some("gpt-5".to_string()),
+            adapter: Some("codex".to_string()),
+            apply_patch: false,
+        };
+        let other_step = StepDefinition {
+            model: Some("opus".to_string()),
+            ..main_step.clone()
+        };
+
+        let mut main_workflow = WorkflowConfig {
+            name: Some("Main".to_string()),
+            on: None,
+            jobs: Default::default(),
+        };
+        main_workflow.jobs.insert(
+            "gate".to_string(),
+            JobConfig {
+                name: None,
+                needs: Default::default(),
+                steps: vec![main_step],
+            },
+        );
+        let mut other_workflow = WorkflowConfig {
+            name: Some("Other".to_string()),
+            on: None,
+            jobs: Default::default(),
+        };
+        other_workflow.jobs.insert(
+            "gate".to_string(),
+            JobConfig {
+                name: None,
+                needs: Default::default(),
+                steps: vec![other_step],
+            },
+        );
+
+        let workflows = vec![
+            ("other.yml".to_string(), other_workflow),
+            ("main.yml".to_string(), main_workflow),
+        ];
+
+        let model = resolve_step_model_from_workflows(&workflows, &run, "gate", 0);
+
+        assert_eq!(model.as_deref(), Some("gpt-5"));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_effective_step_from_workflows_uses_stage_loader_defaults() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let worktree = temp_dir.path().join("worktree");
+        let cache_dir = temp_dir.path().join("cache");
+        let action_dir = worktree.join("steps").join("critique");
+        std::fs::create_dir_all(&action_dir).unwrap();
+        std::fs::write(
+            action_dir.join("step.yml"),
+            "run: echo critique\nmodel: gpt-5\nadapter: codex\n",
+        )
+        .unwrap();
+
+        let loader = StageLoader::with_cache_dir(cache_dir);
+        let run = Run {
+            workflow_file: "main.yml".to_string(),
+            ..create_test_run("run1", "repo1")
+        };
+        let step = StepDefinition {
+            name: "critique".to_string(),
+            run: None,
+            uses: Some("./steps/critique".to_string()),
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: Default::default(),
+            timeout: None,
+            model: None,
+            adapter: None,
+            apply_patch: false,
+        };
+
+        let mut workflow = WorkflowConfig {
+            name: Some("Main".to_string()),
+            on: None,
+            jobs: Default::default(),
+        };
+        workflow.jobs.insert(
+            "gate".to_string(),
+            JobConfig {
+                name: None,
+                needs: Default::default(),
+                steps: vec![step],
+            },
+        );
+        let workflows = vec![("main.yml".to_string(), workflow)];
+
+        let resolved = resolve_effective_step_from_workflows_with_loader(
+            &loader, &workflows, &run, "gate", 0, &worktree,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(resolved.adapter.as_deref(), Some("codex"));
+        assert_eq!(resolved.model.as_deref(), Some("gpt-5"));
+    }
+
+    #[test]
+    fn test_address_comments_agent_settings_use_step_model_and_global_max_turns() {
+        let step = StepDefinition {
+            name: "review".to_string(),
+            run: Some("echo review".to_string()),
+            uses: None,
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: Default::default(),
+            timeout: None,
+            model: Some("gpt-5".to_string()),
+            adapter: Some("codex".to_string()),
+            apply_patch: false,
+        };
+        let global_options = AgentOptions {
+            model: Some("gpt-4.1".to_string()),
+            max_turns: Some(7),
+        };
+
+        let settings = resolve_address_comments_agent_settings_from_sources(
+            Some(&step),
+            Some(&global_options),
+            None,
+            None,
+        );
+
+        assert_eq!(settings.adapter_name, "codex");
+        assert_eq!(settings.model.as_deref(), Some("gpt-5"));
+        assert_eq!(settings.max_turns, Some(7));
+    }
+
+    #[test]
+    fn test_address_comments_agent_settings_fall_back_to_global_model() {
+        let step = StepDefinition {
+            name: "review".to_string(),
+            run: Some("echo review".to_string()),
+            uses: None,
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: Default::default(),
+            timeout: None,
+            model: None,
+            adapter: Some("codex".to_string()),
+            apply_patch: false,
+        };
+        let global_options = AgentOptions {
+            model: Some("gpt-4.1".to_string()),
+            max_turns: Some(5),
+        };
+
+        let settings = resolve_address_comments_agent_settings_from_sources(
+            Some(&step),
+            Some(&global_options),
+            None,
+            None,
+        );
+
+        assert_eq!(settings.model.as_deref(), Some("gpt-4.1"));
+        assert_eq!(settings.max_turns, Some(5));
+    }
+
+    #[test]
+    fn test_address_comments_agent_settings_env_model_overrides_step_and_global() {
+        let step = StepDefinition {
+            name: "review".to_string(),
+            run: Some("echo review".to_string()),
+            uses: None,
+            shell: None,
+            env: Default::default(),
+            continue_on_error: false,
+            require_approval: Default::default(),
+            timeout: None,
+            model: Some("gpt-5".to_string()),
+            adapter: Some("codex".to_string()),
+            apply_patch: false,
+        };
+        let global_options = AgentOptions {
+            model: Some("gpt-4.1".to_string()),
+            max_turns: Some(9),
+        };
+
+        let settings = resolve_address_comments_agent_settings_from_sources(
+            Some(&step),
+            Some(&global_options),
+            None,
+            Some("haiku".to_string()),
+        );
+
+        assert_eq!(settings.model.as_deref(), Some("haiku"));
+        assert_eq!(settings.max_turns, Some(9));
     }
 
     #[tokio::test]
