@@ -1730,26 +1730,6 @@ fn resolve_step_from_workflows<'a>(
     workflow.jobs.get(job_key)?.steps.get(step_index)
 }
 
-fn resolve_step_adapter_from_workflows(
-    workflows: &[(String, airlock_core::WorkflowConfig)],
-    run: &airlock_core::Run,
-    job_key: &str,
-    step_order: i32,
-) -> Option<String> {
-    resolve_step_from_workflows(workflows, run, job_key, step_order)
-        .and_then(|step| step.adapter.clone())
-}
-
-fn resolve_step_model_from_workflows(
-    workflows: &[(String, airlock_core::WorkflowConfig)],
-    run: &airlock_core::Run,
-    job_key: &str,
-    step_order: i32,
-) -> Option<String> {
-    resolve_step_from_workflows(workflows, run, job_key, step_order)
-        .and_then(|step| step.model.clone())
-}
-
 async fn resolve_effective_step_from_workflows(
     workflows: &[(String, airlock_core::WorkflowConfig)],
     run: &airlock_core::Run,
@@ -2104,9 +2084,10 @@ mod tests {
             ("main.yml".to_string(), main_workflow),
         ];
 
-        let adapter = resolve_step_adapter_from_workflows(&workflows, &run, "gate", 0);
+        let adapter = resolve_step_from_workflows(&workflows, &run, "gate", 0)
+            .and_then(|step| step.adapter.as_deref());
 
-        assert_eq!(adapter.as_deref(), Some("codex"));
+        assert_eq!(adapter, Some("codex"));
     }
 
     #[test]
@@ -2166,9 +2147,10 @@ mod tests {
             ("main.yml".to_string(), main_workflow),
         ];
 
-        let model = resolve_step_model_from_workflows(&workflows, &run, "gate", 0);
+        let model = resolve_step_from_workflows(&workflows, &run, "gate", 0)
+            .and_then(|step| step.model.as_deref());
 
-        assert_eq!(model.as_deref(), Some("gpt-5"));
+        assert_eq!(model, Some("gpt-5"));
     }
 
     #[tokio::test]
