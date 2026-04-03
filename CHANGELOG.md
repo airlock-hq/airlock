@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.79](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.78...airlock-v0.1.79) (2026-04-03)
+
+
+### Bug Fixes
+
+* **agent:** resolve agent settings consistently ([#114](https://github.com/airlock-hq/airlock/issues/114)) ([3cac3c8](https://github.com/airlock-hq/airlock/commit/3cac3c8893d4da8fd0324050e6ecee962d353fb5))
+
 ## [0.1.78](https://github.com/airlock-hq/airlock/compare/airlock-v0.1.77...airlock-v0.1.78) (2026-04-01)
 
 
