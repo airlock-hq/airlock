@@ -406,6 +406,8 @@ adapter: claude-code # Optional: agent adapter override (sets AIRLOCK_AGENT_ADAP
 description: Generate PR description via AI agent
 ```
 
+These overrides also apply when Airlock re-runs an agent to address critique comments for the step. For reusable `uses:` steps, Airlock resolves the referenced `step.yml` first and then applies inline overrides.
+
 Steps use `airlock artifact` and `airlock exec agent` CLI helpers to produce artifacts.
 
 ### 5.5 Core Operations
@@ -697,12 +699,15 @@ agent:
 
 ### 7.2 Global Configuration
 
-Located at `~/.airlock/config.yml`:
+Located at `$AIRLOCK_HOME/config.yml` or `~/.airlock/config.yml`:
 
 ```yaml
 # Default agent (can be overridden per-repo)
 agent:
   adapter: claude-code
+  options:
+    model: sonnet
+    max_turns: 7
 
 # Sync behavior
 sync:

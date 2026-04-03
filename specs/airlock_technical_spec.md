@@ -535,6 +535,7 @@ description: Generate PR description via AI agent
 ```
 
 This means a `uses:` step and an inline `run:` step have the same properties. The only difference is where the definition lives.
+Agent overrides on a step apply both when the step runs normally and when Airlock launches an agent to address critique comments for that step. For reusable `uses:` steps, Airlock resolves the referenced `step.yml` first and then applies any inline overrides.
 
 ### 5.8 Core Operations
 
@@ -559,7 +560,7 @@ airlock exec agent "Generate a PR description for this diff"
 git diff $AIRLOCK_BASE_SHA $AIRLOCK_HEAD_SHA | airlock exec agent "Summarize this diff"
 ```
 
-This uses the agent adapter configured in `~/.airlock/config.yml` or `.airlock/config.yml`. Stages are agent-agnostic — they use `airlock exec agent` and the user chooses which agent CLI to use.
+`airlock exec agent` resolves its adapter in this order: `--adapter`, `AIRLOCK_AGENT_ADAPTER`, then the global config at `$AIRLOCK_HOME/config.yml` or `~/.airlock/config.yml`, and finally `auto`. Model selection follows `AIRLOCK_AGENT_MODEL` first, then `agent.options.model` from global config. `agent.options.max_turns` provides the default turn limit. This keeps stages agent-agnostic while still allowing per-step overrides through environment variables.
 
 ### 5.10 Default Workflow
 
@@ -886,10 +887,12 @@ Airlock adapts to these agent CLIs:
 
 When a stage calls `airlock exec agent "prompt"`:
 
-1. Read configured agent adapter from `~/.airlock/config.yml`
-2. Spawn the agent CLI with appropriate flags
-3. Pass prompt (and stdin if provided) to the agent
-4. Capture and return output
+1. Resolve the global config path from `$AIRLOCK_HOME/config.yml` or `~/.airlock/config.yml`
+2. Resolve the adapter from `--adapter`, `AIRLOCK_AGENT_ADAPTER`, then global config, falling back to `auto`
+3. Resolve model and max-turn defaults from `AIRLOCK_AGENT_MODEL` and `agent.options`
+4. Spawn the agent CLI with appropriate flags
+5. Pass prompt (and stdin if provided) to the agent
+6. Capture and return output
 
 ```bash
 # Stage code (agent-agnostic)
@@ -900,7 +903,7 @@ airlock artifact content --title "Summary" <<< "$description"
 ### 8.4 Configuration
 
 ```yaml
-# ~/.airlock/config.yml
+# $AIRLOCK_HOME/config.yml or ~/.airlock/config.yml
 agent:
   # Which agent CLI to use
   adapter: claude-code # claude-code, codex, gemini, aider
@@ -908,12 +911,21 @@ agent:
   # Adapter-specific options (optional)
   options:
     model: sonnet # For adapters that support model selection
+    max_turns: 7
 ```
 
 **Adapter selection:**
 
-1. Use `adapter` from config (default: `claude-code`)
-2. Fall back to first available agent CLI on PATH
+1. Use `--adapter` when provided
+2. Else use `AIRLOCK_AGENT_ADAPTER` when set
+3. Else use `agent.adapter` from global config
+4. Else fall back to `auto`
+
+**Model selection:**
+
+1. Use `AIRLOCK_AGENT_MODEL` when set
+2. Else use `agent.options.model` from global config
+3. `agent.options.max_turns` sets the default turn cap for agent invocations
 
 ### 8.5 Adapter Implementation
 
@@ -1030,7 +1042,7 @@ or run 'airlock --help' for CLI commands.
 
 ## 11) Configuration
 
-### 11.1 Global Config (`~/.airlock/config.yml`)
+### 11.1 Global Config (`$AIRLOCK_HOME/config.yml` or `~/.airlock/config.yml`)
 
 - Daemon settings (socket path, log level)
 - Default agent adapter

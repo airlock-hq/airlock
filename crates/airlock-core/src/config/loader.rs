@@ -3,11 +3,12 @@
 //! This module provides functions to load global configuration and
 //! workflow configurations from disk or from git tree objects.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::error::{AirlockError, Result};
 use crate::git::show_file;
+use crate::paths::AirlockPaths;
 
 use super::workflow::{branch_matches_trigger, WorkflowConfig};
 use super::GlobalConfig;
@@ -18,6 +19,43 @@ pub fn load_global_config(path: &Path) -> Result<GlobalConfig> {
     let config: GlobalConfig = serde_yaml::from_str(&content)
         .map_err(|e| AirlockError::Config(format!("Failed to parse global config: {e}")))?;
     Ok(config)
+}
+
+/// Resolve the global config path.
+///
+/// When no explicit path is provided, this uses [`AirlockPaths::new`], which
+/// respects `AIRLOCK_HOME`.
+pub fn resolve_global_config_path(config_path: Option<&Path>) -> Option<PathBuf> {
+    config_path
+        .map(|path| path.to_path_buf())
+        .or_else(|| AirlockPaths::new().ok().map(|paths| paths.global_config()))
+}
+
+/// Resolve which agent adapter name to use.
+///
+/// Priority: explicit override → `AIRLOCK_AGENT_ADAPTER` env var → global config → `"auto"`.
+pub fn resolve_agent_adapter_name(cli_adapter: Option<&str>, config_path: Option<&Path>) -> String {
+    if let Some(name) = cli_adapter {
+        return name.to_string();
+    }
+
+    if let Ok(name) = std::env::var("AIRLOCK_AGENT_ADAPTER") {
+        if !name.is_empty() {
+            return name;
+        }
+    }
+
+    let resolved_config_path = resolve_global_config_path(config_path);
+
+    if let Some(path) = resolved_config_path.as_deref() {
+        if path.exists() {
+            if let Ok(config) = load_global_config(path) {
+                return config.agent.adapter;
+            }
+        }
+    }
+
+    "auto".to_string()
 }
 
 /// Parse a single workflow config from a YAML string.
@@ -171,7 +209,121 @@ pub fn filter_workflows_for_branch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
     use tempfile::TempDir;
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+        ENV_MUTEX.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
+
+    fn restore_env_var(name: &str, saved: Option<String>) {
+        match saved {
+            Some(value) => unsafe {
+                std::env::set_var(name, value);
+            },
+            None => unsafe {
+                std::env::remove_var(name);
+            },
+        }
+    }
+
+    #[test]
+    fn test_resolve_agent_adapter_name_prefers_cli_override() {
+        let _guard = env_lock();
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.yml");
+        std::fs::write(&config_path, "agent:\n  adapter: codex\n").unwrap();
+        let saved = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
+
+        unsafe {
+            std::env::set_var("AIRLOCK_AGENT_ADAPTER", "claude-code");
+        }
+
+        let adapter = resolve_agent_adapter_name(Some("opencode"), Some(&config_path));
+
+        restore_env_var("AIRLOCK_AGENT_ADAPTER", saved);
+
+        assert_eq!(adapter, "opencode");
+    }
+
+    #[test]
+    fn test_resolve_agent_adapter_name_prefers_env_over_config() {
+        let _guard = env_lock();
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.yml");
+        std::fs::write(&config_path, "agent:\n  adapter: codex\n").unwrap();
+        let saved = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
+
+        unsafe {
+            std::env::set_var("AIRLOCK_AGENT_ADAPTER", "claude-code");
+        }
+
+        let adapter = resolve_agent_adapter_name(None, Some(&config_path));
+
+        restore_env_var("AIRLOCK_AGENT_ADAPTER", saved);
+
+        assert_eq!(adapter, "claude-code");
+    }
+
+    #[test]
+    fn test_resolve_agent_adapter_name_uses_config_when_present() {
+        let _guard = env_lock();
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.yml");
+        std::fs::write(&config_path, "agent:\n  adapter: codex\n").unwrap();
+        let saved = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
+
+        unsafe {
+            std::env::remove_var("AIRLOCK_AGENT_ADAPTER");
+        }
+
+        let adapter = resolve_agent_adapter_name(None, Some(&config_path));
+
+        restore_env_var("AIRLOCK_AGENT_ADAPTER", saved);
+
+        assert_eq!(adapter, "codex");
+    }
+
+    #[test]
+    fn test_resolve_agent_adapter_name_falls_back_to_auto() {
+        let _guard = env_lock();
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("missing.yml");
+        let saved = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
+
+        unsafe {
+            std::env::remove_var("AIRLOCK_AGENT_ADAPTER");
+        }
+
+        let adapter = resolve_agent_adapter_name(None, Some(&config_path));
+
+        restore_env_var("AIRLOCK_AGENT_ADAPTER", saved);
+
+        assert_eq!(adapter, "auto");
+    }
+
+    #[test]
+    fn test_resolve_agent_adapter_name_honors_airlock_home_for_default_config_path() {
+        let _guard = env_lock();
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.yml");
+        std::fs::write(&config_path, "agent:\n  adapter: codex\n").unwrap();
+        let saved_home = std::env::var("AIRLOCK_HOME").ok();
+        let saved_adapter = std::env::var("AIRLOCK_AGENT_ADAPTER").ok();
+
+        unsafe {
+            std::env::set_var("AIRLOCK_HOME", temp_dir.path());
+            std::env::remove_var("AIRLOCK_AGENT_ADAPTER");
+        }
+
+        let adapter = resolve_agent_adapter_name(None, None);
+
+        restore_env_var("AIRLOCK_HOME", saved_home);
+        restore_env_var("AIRLOCK_AGENT_ADAPTER", saved_adapter);
+
+        assert_eq!(adapter, "codex");
+    }
 
     #[test]
     fn test_load_global_config() {
