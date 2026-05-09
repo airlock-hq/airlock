@@ -132,12 +132,10 @@ fn test_e2e_doctor_checks_hooks_pre_receive_missing() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        for hook in &["post-receive"] {
-            let hook_path = hooks_dir.join(hook);
-            let mut perms = fs::metadata(&hook_path).unwrap().permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&hook_path, perms).unwrap();
-        }
+        let hook_path = hooks_dir.join("post-receive");
+        let mut perms = fs::metadata(&hook_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&hook_path, perms).unwrap();
     }
 
     let result = check_hooks(&gate_path);
@@ -182,12 +180,10 @@ fn test_e2e_doctor_checks_hooks_post_receive_missing() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        for hook in &["pre-receive"] {
-            let hook_path = hooks_dir.join(hook);
-            let mut perms = fs::metadata(&hook_path).unwrap().permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&hook_path, perms).unwrap();
-        }
+        let hook_path = hooks_dir.join("pre-receive");
+        let mut perms = fs::metadata(&hook_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&hook_path, perms).unwrap();
     }
 
     let result = check_hooks(&gate_path);

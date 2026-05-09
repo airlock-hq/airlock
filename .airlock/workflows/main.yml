@@ -1,5 +1,5 @@
 # Airlock workflow configuration
-# Documentation: https://github.com/airlock-hq/airlock
+# Deprecated: use https://github.com/kunchenguid/no-mistakes for current guidance.
 
 name: Main Pipeline
 

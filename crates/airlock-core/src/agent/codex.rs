@@ -521,9 +521,8 @@ mod tests {
     #[test]
     fn test_is_available_returns_boolean() {
         let adapter = CodexAdapter::new();
-        let result = adapter.is_available();
         // Just verify it returns without panicking
-        assert!(result == true || result == false);
+        adapter.is_available();
     }
 
     // build_prompt tests moved to types.rs (AgentRequest::full_prompt)

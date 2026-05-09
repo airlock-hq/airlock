@@ -1,5 +1,9 @@
 # Follow-up: Batch Query Optimization for Remaining N+1 Callsites
 
+> [!WARNING]
+> This TODO is historical.
+> Airlock is deprecated, and active development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
+
 After eliminating the N+1 pattern in the daemon's run handlers (`handle_get_all_runs`, `handle_get_runs`, `handle_get_run_counts`), these production callsites still use the per-run `get_job_results_for_run` / `compute_run_status` in a loop.
 
 ## Worth optimizing

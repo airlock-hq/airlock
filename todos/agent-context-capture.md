@@ -1,5 +1,9 @@
 # Agent Context Capture for Airlock
 
+> [!WARNING]
+> This TODO is historical.
+> Airlock is deprecated, and active development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
+
 ## Context
 
 Most Airlock users write code with AI agents (Claude Code, Codex) then push through Airlock. Today, Airlock sees only the code diff — it has no idea what the user asked the agent to do or why. Capturing this intent and session context would make pipeline stages smarter (e.g., `describe` knows the original request) and give reviewers essential context for understanding AI-generated code.

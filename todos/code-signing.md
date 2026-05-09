@@ -1,5 +1,9 @@
 # Code Signing & Notarization
 
+> [!WARNING]
+> This TODO is historical.
+> Airlock is deprecated, and active development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
+
 ## Status
 
 Currently the macOS build is **unsigned** (ad-hoc signed). The Homebrew Cask postflight removes quarantine via `xattr -cr` so users don't have to do it manually, but Gatekeeper will still warn about an unidentified developer if the app is opened outside of Homebrew.

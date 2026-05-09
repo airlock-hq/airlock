@@ -201,7 +201,7 @@ mod tests {
         assert!(result.success);
 
         // Tracking ref should be updated
-        let tracking_ref = format!("refs/remotes/origin/main");
+        let tracking_ref = "refs/remotes/origin/main".to_string();
         let tracking = git::resolve_ref(&gate_path, &tracking_ref).unwrap();
         assert_eq!(
             tracking,

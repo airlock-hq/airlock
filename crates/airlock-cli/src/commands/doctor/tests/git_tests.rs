@@ -825,7 +825,7 @@ fn test_e2e_doctor_suggestions_contain_actionable_commands() {
         daemon_result
             .suggestion
             .as_ref()
-            .map_or(false, |s| s.contains("airlock daemon start")),
+            .is_some_and(|s| s.contains("airlock daemon start")),
         "Daemon suggestion should include 'airlock daemon start': {:?}",
         daemon_result.suggestion
     );
@@ -843,7 +843,7 @@ fn test_e2e_doctor_suggestions_contain_actionable_commands() {
         enrollment_result
             .suggestion
             .as_ref()
-            .map_or(false, |s| s.contains("airlock init")),
+            .is_some_and(|s| s.contains("airlock init")),
         "Enrollment suggestion should include 'airlock init': {:?}",
         enrollment_result.suggestion
     );
@@ -855,8 +855,7 @@ fn test_e2e_doctor_suggestions_contain_actionable_commands() {
         gate_result
             .suggestion
             .as_ref()
-            .map_or(false, |s| s.contains("airlock eject")
-                || s.contains("airlock init")),
+            .is_some_and(|s| s.contains("airlock eject") || s.contains("airlock init")),
         "Gate repo suggestion should include recovery steps: {:?}",
         gate_result.suggestion
     );
@@ -873,7 +872,7 @@ fn test_e2e_doctor_suggestions_contain_actionable_commands() {
         db_result
             .suggestion
             .as_ref()
-            .map_or(false, |s| s.contains("deleting")),
+            .is_some_and(|s| s.contains("deleting")),
         "Corrupted database suggestion should include deleting: {:?}",
         db_result.suggestion
     );
@@ -1049,7 +1048,7 @@ fn test_e2e_doctor_success_output_format() {
     db.insert_repo(&test_repo).unwrap();
 
     // Verify all checks pass (no issues collected)
-    let checks = vec![
+    let checks = [
         check_daemon(&paths),
         check_database(&paths),
         check_repo_enrollment(&working_dir, &paths),

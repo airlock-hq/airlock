@@ -540,8 +540,7 @@ mod tests {
     #[test]
     fn test_is_available_returns_boolean() {
         let adapter = ClaudeCodeAdapter::new();
-        let result = adapter.is_available();
-        assert!(result == true || result == false);
+        adapter.is_available();
     }
 
     // build_prompt tests moved to types.rs (AgentRequest::full_prompt)
@@ -1034,7 +1033,7 @@ Let me know if you need changes."#;
 
         // Spawn a helper process that echoes the JSONL to stdout
         let mut child = tokio::process::Command::new("printf")
-            .arg(&format!("{}\n", jsonl))
+            .arg(format!("{}\n", jsonl))
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
@@ -1095,7 +1094,7 @@ Let me know if you need changes."#;
         .join("\n");
 
         let mut child = tokio::process::Command::new("printf")
-            .arg(&format!("{}\n", jsonl))
+            .arg(format!("{}\n", jsonl))
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
@@ -1137,7 +1136,7 @@ Let me know if you need changes."#;
         .join("\n");
 
         let mut child = tokio::process::Command::new("printf")
-            .arg(&format!("{}\n", jsonl))
+            .arg(format!("{}\n", jsonl))
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())

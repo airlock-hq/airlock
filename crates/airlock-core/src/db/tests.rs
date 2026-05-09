@@ -1,7 +1,7 @@
 //! Tests for database operations.
 
 #[cfg(test)]
-mod tests {
+mod db_tests {
     use crate::db::Database;
     use crate::error::AirlockError;
     use crate::types::{

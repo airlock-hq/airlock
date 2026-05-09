@@ -1,5 +1,9 @@
 # Airlock Design System
 
+> [!WARNING]
+> This specification is historical.
+> Airlock is deprecated, and active development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
+
 ## Vision
 
 Airlock should feel:

@@ -1,5 +1,9 @@
 # Airlock — Product Specification
 
+> [!WARNING]
+> This specification is historical.
+> Airlock is deprecated, and active development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
+
 ## 1) Product Overview
 
 **Airlock** is a local-first Git proxy that transforms messy AI-generated code into clean, reviewable pull requests.

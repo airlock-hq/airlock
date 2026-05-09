@@ -127,7 +127,7 @@ pub fn load_artifacts(paths: &AirlockPaths, repo_id: &str, run_id: &str) -> Vec<
     }
 
     // Sort by creation time for chronological ordering
-    artifacts.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    artifacts.sort_by_key(|a| a.created_at);
 
     artifacts
 }
