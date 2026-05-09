@@ -24,7 +24,7 @@ pub const BYPASS_REMOTE: &str = "bypass-airlock";
 
 /// Default workflow content for new repositories.
 pub const DEFAULT_WORKFLOW_YAML: &str = r#"# Airlock workflow configuration
-# Documentation: https://github.com/airlock-hq/airlock
+# Deprecated: use https://github.com/kunchenguid/no-mistakes for current guidance.
 
 name: Main Pipeline
 

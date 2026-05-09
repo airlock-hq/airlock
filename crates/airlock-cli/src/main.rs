@@ -1,6 +1,8 @@
 //! Airlock CLI
 //!
-//! Local Git proxy for AI-assisted development.
+//! Deprecated local Git proxy for AI-assisted development.
+//!
+//! Active development has moved to https://github.com/kunchenguid/no-mistakes.
 //!
 //! When invoked without arguments, launches the desktop GUI application.
 
@@ -9,7 +11,9 @@ use tracing_subscriber::EnvFilter;
 
 mod commands;
 
-/// Airlock - Local Git proxy for AI-assisted development
+/// Airlock - deprecated local Git proxy for AI-assisted development
+///
+/// Active development has moved to https://github.com/kunchenguid/no-mistakes.
 ///
 /// When invoked without arguments, launches the desktop application.
 #[derive(Parser)]
