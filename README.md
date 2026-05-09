@@ -32,25 +32,10 @@ flowchart LR
   before ~~~ after
 ```
 
-## Install
+## Replacement Project
 
-```bash
-brew install --cask airlock-hq/airlock/airlock
-```
-
-macOS only for now. More platforms coming soon.
-
-Documentation: [https://airlockhq.com/docs](https://airlockhq.com/docs).
-
-## Quick Start
-
-```bash
-cd your-project
-airlock init      # sets up local git gate
-git push origin feature-branch   # triggers the pipeline
-```
-
-That's it. Airlock intercepts the push, runs your pipeline, and opens a **Push Request** in the desktop app for self-review. When you approve, it forwards to your upstream and creates a PR/MR (GitHub, GitLab, or Bitbucket Cloud).
+Use [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes) for current installation and usage guidance.
+The Airlock usage notes below are kept for historical context only.
 
 ![Airlock Push Request — Overview with architecture diagram](assets/screenshot1-overview-diagram.png)
 
