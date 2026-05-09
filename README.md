@@ -1,11 +1,15 @@
 # Airlock
 
+> [!WARNING]
+> **This project is deprecated.**
+> Development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes). Please use that repository instead. This repo is no longer actively maintained.
+
 [![CI](https://github.com/airlock-hq/airlock/actions/workflows/ci.yml/badge.svg)](https://github.com/airlock-hq/airlock/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/airlock-hq/airlock?filter=airlock-*&label=release)](https://github.com/airlock-hq/airlock/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)]()
-[![Website](https://img.shields.io/badge/web-airlockhq.com-black.svg)](https://airlockhq.com)
-[![X](https://img.shields.io/badge/follow-@Airlock__HQ-black.svg?logo=x)](https://x.com/Airlock_HQ)
+[![X](https://img.shields.io/badge/X-@kunchenguid-black?style=flat-square)](https://x.com/kunchenguid)
+[![Discord](https://img.shields.io/discord/1439901831038763092?style=flat-square&label=discord)](https://discord.gg/Wsy2NpnZDu)
 
 All slop must die. Airlock is where every git push turns into a slop-free PR.
 
@@ -159,7 +163,7 @@ Run `make help` for all available commands.
 
 ## Status
 
-Alpha. Expect rough edges. We're building in the open.
+Deprecated. Development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
 
 ## License
 
