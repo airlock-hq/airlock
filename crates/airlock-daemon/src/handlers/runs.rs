@@ -579,7 +579,7 @@ pub async fn handle_get_all_runs(
     }
 
     // Re-sort by created_at descending after merging
-    run_infos.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    run_infos.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
     let result = GetRunsResult { runs: run_infos };
     Response::success(id, serde_json::to_value(result).unwrap())
