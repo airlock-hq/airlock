@@ -4,6 +4,10 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Overview
 
+> [!WARNING]
+> This repository is deprecated.
+> Active development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
+
 All slop must die. Airlock is where every git push turns into a slop-free PR.
 
 Airlock is a local-first CI system that transforms messy AI-generated code into clean, reviewable pull requests. It intercepts `git push` operations through a local bare repo "gate", runs a transformation pipeline, and lets users review changes before forwarding to upstream.

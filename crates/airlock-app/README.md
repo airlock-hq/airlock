@@ -1,5 +1,9 @@
 # React + TypeScript + Vite
 
+> [!WARNING]
+> This package is part of the deprecated Airlock repository.
+> Active development has moved to [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes).
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
