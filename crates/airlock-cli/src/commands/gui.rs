@@ -126,8 +126,8 @@ mod tests {
 
         // In a clean test environment without GUI installed, this should fail
         // But on a dev machine it might succeed, so we just check it doesn't panic
-        if result.is_err() {
-            let err_msg = result.unwrap_err().to_string();
+        if let Err(err) = result {
+            let err_msg = err.to_string();
             assert!(err_msg.contains("Desktop app not found"));
             assert!(err_msg.contains("airlock.dev/download"));
         }

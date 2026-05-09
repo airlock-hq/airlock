@@ -861,7 +861,7 @@ mod tests {
 
             // List worktrees and verify our worktree is there
             let worktrees = list_worktrees(&bare_path).unwrap();
-            assert!(worktrees.len() >= 1); // At least the main bare repo and our worktree
+            assert!(!worktrees.is_empty()); // At least the main bare repo and our worktree
 
             // Remove the worktree
             remove_worktree(&bare_path, &worktree_path).unwrap();
@@ -1102,7 +1102,7 @@ mod tests {
 
             // List worktrees and verify our worktree is there
             let worktrees = list_worktrees(&bare_path).unwrap();
-            assert!(worktrees.len() >= 1);
+            assert!(!worktrees.is_empty());
 
             // Cleanup
             remove_worktree(&bare_path, &worktree_path).unwrap();
